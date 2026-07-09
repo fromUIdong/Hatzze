@@ -27,7 +27,7 @@ INDICATOR_META = {
     "name": "주식 초보 검색량 지수",
     "category": "밈",
     "description_beginner": "다들 이제서야 주식을 시작하려고 검색하고 있다면, 이미 많이 오른 뒤일 수 있어요",
-    "unit": "지수",
+    "unit": "pt",
 }
 
 
@@ -66,7 +66,12 @@ def ensure_indicator(client) -> str:
         client.table("indicators").select("id").eq("slug", INDICATOR_SLUG).execute()
     )
     if existing.data:
-        return existing.data[0]["id"]
+        indicator_id = existing.data[0]["id"]
+        # unit 등 메타데이터가 바뀔 수 있으므로 최신 내용으로 갱신한다.
+        client.table("indicators").update(
+            {k: v for k, v in INDICATOR_META.items() if k != "slug"}
+        ).eq("id", indicator_id).execute()
+        return indicator_id
 
     inserted = client.table("indicators").insert(INDICATOR_META).execute()
     return inserted.data[0]["id"]
