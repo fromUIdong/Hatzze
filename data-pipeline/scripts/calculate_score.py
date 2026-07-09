@@ -59,6 +59,7 @@ INDICATOR_ORDER = [
     "kospi_volume_surge",
     "vkospi",
     "news_sentiment",
+    "kospi_gold_ratio",
 ]
 
 INDICATOR_CONFIGS = {
@@ -70,6 +71,7 @@ INDICATOR_CONFIGS = {
     "kospi_volume_surge": {"kind": "percentile", "window_days": 365, "percentile": 95},
     "vkospi": {"kind": "percentile", "window_days": 365, "percentile": 5, "direction": "low"},
     "news_sentiment": {"kind": "percentile", "window_days": 30, "percentile": 95},
+    "kospi_gold_ratio": {"kind": "percentile", "window_days": 365, "percentile": 95},
 }
 
 

@@ -3,3 +3,4 @@ python-dotenv
 supabase
 pandas
 beautifulsoup4
+yfinance
