@@ -5,6 +5,8 @@ import type { IndicatorWithLatestValue } from "@/lib/data";
 // 굳어버리지 않도록 매 요청마다 서버에서 새로 조회한다.
 export const dynamic = "force-dynamic";
 
+const STAGE_ORDER = ["냉정", "보통", "과열", "광기"] as const;
+
 const STAGE_BADGE_CLASS: Record<string, string> = {
   냉정: "bg-sky-500/10 text-sky-300",
   보통: "bg-neutral-500/15 text-neutral-300",
@@ -12,9 +14,46 @@ const STAGE_BADGE_CLASS: Record<string, string> = {
   광기: "bg-red-500/10 text-red-300",
 };
 
+const STAGE_BAR_CLASS: Record<string, string> = {
+  냉정: "bg-sky-500/70",
+  보통: "bg-neutral-500/70",
+  과열: "bg-amber-500/70",
+  광기: "bg-red-500/70",
+};
+
+function StageGauge({ stage }: { stage: string }) {
+  const stageIndex = STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]);
+
+  return (
+    <div className="mt-5 mx-auto max-w-xs">
+      <div className="relative">
+        <div className="flex h-2 rounded-full overflow-hidden">
+          {STAGE_ORDER.map((s) => (
+            <div key={s} className={`flex-1 ${STAGE_BAR_CLASS[s]}`} />
+          ))}
+        </div>
+        {stageIndex !== -1 && (
+          <div
+            className="absolute -top-1 h-4 w-4 -translate-x-1/2 rounded-full border-2 border-neutral-950 bg-neutral-50 shadow"
+            style={{ left: `${(stageIndex + 0.5) * 25}%` }}
+          />
+        )}
+      </div>
+      <div className="flex justify-between mt-1.5 text-[11px] text-neutral-500">
+        {STAGE_ORDER.map((s) => (
+          <span key={s}>{s}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function IndicatorCard({ indicator }: { indicator: IndicatorWithLatestValue }) {
   const hasValue = indicator.latest !== null;
-  const isHit = (indicator.latest?.normalized_score ?? 0) >= 100;
+  const normalizedScore = indicator.latest?.normalized_score ?? null;
+  const isHit = (normalizedScore ?? 0) >= 100;
+  const barWidth =
+    normalizedScore !== null ? Math.min(Math.max(normalizedScore, 0), 100) : 0;
 
   return (
     <div className="rounded-lg border border-neutral-800 bg-neutral-900/30 p-4">
@@ -38,6 +77,32 @@ function IndicatorCard({ indicator }: { indicator: IndicatorWithLatestValue }) {
           {indicator.unit}
         </span>
       </p>
+
+      {normalizedScore !== null && (
+        <div className="mt-3">
+          <div className="flex items-center justify-between text-xs mb-1">
+            <span className="text-neutral-500">과열도</span>
+            <span
+              className={
+                isHit
+                  ? "font-semibold text-red-400"
+                  : "text-neutral-400"
+              }
+            >
+              {normalizedScore.toFixed(1)}%
+            </span>
+          </div>
+          <div className="h-1.5 rounded-full bg-neutral-800 overflow-hidden">
+            <div
+              className={`h-full rounded-full ${
+                isHit ? "bg-red-500" : "bg-neutral-500"
+              }`}
+              style={{ width: `${barWidth}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       <p className="text-sm text-neutral-500 mt-2 leading-relaxed">
         {indicator.description_beginner}
       </p>
@@ -56,6 +121,12 @@ export default async function Home() {
 
   return (
     <main className="max-w-2xl mx-auto p-6 space-y-12">
+      <div className="text-center">
+        <span className="text-2xl font-extrabold tracking-[0.2em] text-neutral-100">
+          HATZZE
+        </span>
+      </div>
+
       <section className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-8 sm:p-10 text-center">
         {dailyScore ? (
           <>
@@ -71,6 +142,7 @@ export default async function Home() {
             >
               {dailyScore.stage}
             </span>
+            <StageGauge stage={dailyScore.stage} />
           </>
         ) : (
           <p className="text-neutral-500">아직 계산된 스코어가 없습니다.</p>
