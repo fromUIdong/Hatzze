@@ -1,4 +1,8 @@
-"""네이버 데이터랩 검색어트렌드 API로 '주식 초보' 검색량 지수를 가져와 Supabase indicator_values에 upsert."""
+"""네이버 데이터랩 검색어트렌드 API로 '주식 초보' 검색량 지수를 가져와 Supabase indicator_values에 upsert.
+
+조회 기간(1년) 내 모든 날짜별 값을 매 실행마다 upsert한다. 같은 날짜를 다시
+upsert해도 값을 덮어쓸 뿐이라 멱등적이며, 별도의 최초/이후 실행 분기가 필요 없다.
+"""
 
 import json
 import sys
@@ -15,7 +19,7 @@ from common.supabase_client import get_client  # noqa: E402
 NAVER_DATALAB_URL = "https://openapi.naver.com/v1/datalab/search"
 KEYWORD_GROUP_NAME = "주식초보"
 KEYWORDS = ["주식 시작하는 법", "증권계좌 개설", "주식 초보"]
-LOOKBACK_DAYS = 90
+LOOKBACK_DAYS = 365
 
 INDICATOR_SLUG = "naver_search_trend"
 INDICATOR_META = {
@@ -27,7 +31,7 @@ INDICATOR_META = {
 }
 
 
-def fetch_latest_search_trend() -> tuple[str, float]:
+def fetch_search_trend() -> list[dict]:
     end = date.today()
     start = end - timedelta(days=LOOKBACK_DAYS)
 
@@ -48,15 +52,13 @@ def fetch_latest_search_trend() -> tuple[str, float]:
                 ],
             }
         ),
-        timeout=10,
+        timeout=15,
     )
     resp.raise_for_status()
     data_points = resp.json()["results"][0]["data"]
     if not data_points:
         raise RuntimeError("네이버 데이터랩 응답에 데이터가 없습니다")
-
-    latest = data_points[-1]
-    return latest["period"], float(latest["ratio"])
+    return data_points
 
 
 def ensure_indicator(client) -> str:
@@ -70,28 +72,34 @@ def ensure_indicator(client) -> str:
     return inserted.data[0]["id"]
 
 
-def upsert_value(client, indicator_id: str, value_date: str, raw_value: float) -> None:
-    client.table("indicator_values").upsert(
+def upsert_all(client, indicator_id: str, data_points: list[dict]) -> None:
+    rows = [
         {
             "indicator_id": indicator_id,
-            "date": value_date,
-            "raw_value": raw_value,
-        },
-        on_conflict="indicator_id,date",
+            "date": point["period"],
+            "raw_value": float(point["ratio"]),
+        }
+        for point in data_points
+    ]
+    client.table("indicator_values").upsert(
+        rows, on_conflict="indicator_id,date"
     ).execute()
 
 
 def main() -> None:
-    trend_date, ratio = fetch_latest_search_trend()
-    print(f"[Naver DataLab] '{KEYWORD_GROUP_NAME}' 최신 검색량 지수 ({trend_date} 기준): {ratio}")
+    data_points = fetch_search_trend()
+    latest = data_points[-1]
+    print(
+        f"[Naver DataLab] '{KEYWORD_GROUP_NAME}' {len(data_points)}일치 조회 완료 "
+        f"(최신 {latest['period']} 기준: {latest['ratio']})"
+    )
 
     client = get_client()
     indicator_id = ensure_indicator(client)
     print(f"[Supabase] indicator '{INDICATOR_SLUG}' id: {indicator_id}")
 
-    today = date.today().isoformat()
-    upsert_value(client, indicator_id, today, ratio)
-    print(f"[Supabase] indicator_values upsert 완료: date={today}, raw_value={ratio}")
+    upsert_all(client, indicator_id, data_points)
+    print(f"[Supabase] indicator_values upsert 완료: {len(data_points)}건")
 
 
 if __name__ == "__main__":
