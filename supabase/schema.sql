@@ -34,12 +34,12 @@ create table if not exists public.indicator_values (
   indicator_id uuid not null references public.indicators (id) on delete cascade,
   date date not null,
   raw_value numeric not null,
-  normalized_score numeric check (normalized_score >= 0 and normalized_score <= 100),
+  normalized_score numeric,
   created_at timestamptz not null default now(),
   unique (indicator_id, date)
 );
 
-comment on table public.indicator_values is '지표별 일별 원시값 및 정규화 스코어(0~100)';
+comment on table public.indicator_values is '지표별 일별 원시값 및 정규화 스코어(기준선 대비 진행률 %, 100 초과·음수 가능)';
 
 create index if not exists indicator_values_indicator_id_date_idx
   on public.indicator_values (indicator_id, date desc);
@@ -57,12 +57,12 @@ create policy "indicator_values_public_read"
 -- ============================================================
 create table if not exists public.daily_score (
   date date primary key,
-  score numeric not null check (score >= 0 and score <= 100),
+  score numeric not null,
   stage text not null check (stage in ('냉정', '보통', '과열', '광기')),
   created_at timestamptz not null default now()
 );
 
-comment on table public.daily_score is '날짜별 종합 과열도 스코어 및 단계';
+comment on table public.daily_score is '날짜별 종합 과열도 스코어(지표별 진행률 평균 %, 100 초과·음수 가능) 및 단계';
 
 alter table public.daily_score enable row level security;
 
