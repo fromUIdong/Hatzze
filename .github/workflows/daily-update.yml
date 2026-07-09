@@ -1,0 +1,89 @@
+name: Daily Indicator Update
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # UTC 00:00 = KST(UTC+9) 09:00
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    env:
+      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+      NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+      NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+      KRX_API_KEY: ${{ secrets.KRX_API_KEY }}
+      ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r data-pipeline/requirements.txt
+
+      - name: Fetch US 10Y treasury yield
+        id: us10y
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_us10y.py
+
+      - name: Fetch KOSPI 52-week-high gap
+        id: kospi_high_gap
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_kospi_high_gap.py
+
+      - name: Fetch Buffett index
+        id: buffett_index
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_buffett_index.py
+
+      - name: Fetch Naver search trend
+        id: naver_trend
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_naver_trend.py
+
+      - name: Fetch DCInside stock gallery post count
+        id: dcinside
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_dcinside_stock.py
+
+      - name: Calculate overheating score
+        id: calculate_score
+        continue-on-error: true
+        run: python data-pipeline/scripts/calculate_score.py
+
+      - name: Summarize results
+        if: always()
+        run: |
+          names=("fetch_us10y.py" "fetch_kospi_high_gap.py" "fetch_buffett_index.py" "fetch_naver_trend.py" "fetch_dcinside_stock.py" "calculate_score.py")
+          outcomes=("${{ steps.us10y.outcome }}" "${{ steps.kospi_high_gap.outcome }}" "${{ steps.buffett_index.outcome }}" "${{ steps.naver_trend.outcome }}" "${{ steps.dcinside.outcome }}" "${{ steps.calculate_score.outcome }}")
+
+          {
+            echo "## Daily update summary"
+            echo "| Script | Result |"
+            echo "|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          failed=0
+          for i in "${!names[@]}"; do
+            script="${names[$i]}"
+            outcome="${outcomes[$i]}"
+            echo "$script: $outcome"
+            if [ "$outcome" = "success" ]; then
+              echo "| $script | success |" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "| $script | $outcome |" >> "$GITHUB_STEP_SUMMARY"
+              failed=1
+            fi
+          done
+
+          if [ "$failed" = "1" ]; then
+            echo "One or more scripts failed. Check the step logs above for details."
+            exit 1
+          fi
