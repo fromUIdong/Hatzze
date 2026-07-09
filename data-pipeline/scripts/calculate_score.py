@@ -63,6 +63,7 @@ INDICATOR_ORDER = [
     "kosdaq_kospi_ratio",
     "usdkrw_volatility",
     "leverage_etf_volume",
+    "bestseller_finance_ratio",
 ]
 
 INDICATOR_CONFIGS = {
@@ -78,6 +79,7 @@ INDICATOR_CONFIGS = {
     "kosdaq_kospi_ratio": {"kind": "percentile", "window_days": 365, "percentile": 95},
     "usdkrw_volatility": {"kind": "percentile", "window_days": 365, "percentile": 5, "direction": "low"},
     "leverage_etf_volume": {"kind": "percentile", "window_days": 365, "percentile": 95},
+    "bestseller_finance_ratio": {"kind": "percentile", "window_days": 30, "percentile": 95},
 }
 
 
