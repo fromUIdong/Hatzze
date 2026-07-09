@@ -7,9 +7,13 @@
   상위 5% 지점), vkospi(과거 1년치의 하위 5% 지점 — 아래 direction 설명 참고)
 
 kospi_high_gap은 0 이하 값만 가지는 지표라 (현재값/기준선)*100 공식을 그대로 쓸 수
-없다. KOSPI_HIGH_GAP_FLOOR(기준선까지의 거리를 재는 "0% 진행" 기준점, 지금까지
-관측된 실제 값과 비슷한 -20%로 설정한 가정값)을 두고 0%(기준선)를 "100% 진행"으로
-선형 보간한다.
+없다. "0% 진행" 기준점(floor)을 두고 0%(기준선)를 "100% 진행"으로 선형 보간한다.
+이 floor는 원래 -20%로 고정된 가정값이었는데, 실제 관측치(-20.49%)가 이미 그보다
+더 내려가 있어서 progress가 항상 음수 → 0%로 캡핑되며 progress bar가 늘 비어
+보이는 문제가 있었다. 이제는 kospi_close_raw(1년치 종가 히스토리)의 연중
+최저/최고가로 "지난 1년간 실제로 관측된 최대 낙폭"을 계산해 floor로 쓴다
+(compute_kospi_high_gap_floor) — 히스토리가 부족하면 예전 고정값(-20%)으로
+대체한다.
 
 vkospi는 다른 지표와 반대 방향이다 — 값이 낮을수록(시장이 방심할수록) 과열 신호다.
 config에 "direction": "low"를 주면 기준선을 하위 5% 지점으로 잡고, 현재값이 그
@@ -41,7 +45,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client  # noqa: E402
 
-KOSPI_HIGH_GAP_FLOOR = -20.0  # "0% 진행"으로 볼 기준점 (조정 가능한 가정값)
+KOSPI_HIGH_GAP_FALLBACK_FLOOR = -20.0  # kospi_close_raw 히스토리가 부족할 때의 대체값
+KOSPI_CLOSE_RAW_SLUG = "kospi_close_raw"
 MIN_PERCENTILE_SAMPLES = 5  # percentile 기준선 계산에 필요한 최소 과거 데이터 개수
 NEUTRAL_PROGRESS = 50.0  # 히스토리 부족으로 판단을 보류할 때 대체하는 "중립" 값
 
@@ -68,7 +73,7 @@ INDICATOR_ORDER = [
 
 INDICATOR_CONFIGS = {
     "buffett_index": {"kind": "fixed", "threshold": 100.0},
-    "kospi_high_gap": {"kind": "fixed", "threshold": 0.0, "floor": KOSPI_HIGH_GAP_FLOOR},
+    "kospi_high_gap": {"kind": "fixed", "threshold": 0.0},
     "us10y": {"kind": "percentile", "window_days": 365, "percentile": 95},
     "naver_search_trend": {"kind": "percentile", "window_days": 365, "percentile": 95},
     "dcinside_post_count": {"kind": "percentile", "window_days": 30, "percentile": 95},
@@ -113,6 +118,30 @@ def get_latest_value(client, indicator_id: str) -> tuple[str, float]:
         raise InsufficientHistoryError(f"indicator_id={indicator_id}에 값이 아직 없습니다")
     row = result.data[0]
     return row["date"], float(row["raw_value"])
+
+
+def get_indicator_id_or_none(client, slug: str) -> str | None:
+    result = client.table("indicators").select("id").eq("slug", slug).execute()
+    if not result.data:
+        return None
+    return result.data[0]["id"]
+
+
+def compute_kospi_high_gap_floor(client) -> float:
+    """kospi_close_raw의 지난 1년 최고/최저 종가로 "실제 관측된 최대 낙폭"을
+    구해 kospi_high_gap의 floor로 쓴다. 히스토리가 부족하면 대체값을 쓴다.
+    """
+    raw_id = get_indicator_id_or_none(client, KOSPI_CLOSE_RAW_SLUG)
+    if raw_id is None:
+        return KOSPI_HIGH_GAP_FALLBACK_FLOOR
+
+    values = get_window_values(client, raw_id, 365)
+    if len(values) < MIN_PERCENTILE_SAMPLES:
+        return KOSPI_HIGH_GAP_FALLBACK_FLOOR
+
+    year_high = max(values)
+    year_low = min(values)
+    return round((year_low - year_high) / year_high * 100, 2)
 
 
 def get_window_values(client, indicator_id: str, window_days: int) -> list[float]:
@@ -178,6 +207,11 @@ def main() -> None:
     results = []
     for slug in INDICATOR_ORDER:
         config = INDICATOR_CONFIGS[slug]
+        if slug == "kospi_high_gap":
+            floor = compute_kospi_high_gap_floor(client)
+            config = {**config, "floor": floor}
+            print(f"[kospi_high_gap] floor(지난 1년 최대 낙폭) = {floor}%")
+
         indicator_id, name = get_indicator(client, slug)
 
         try:
