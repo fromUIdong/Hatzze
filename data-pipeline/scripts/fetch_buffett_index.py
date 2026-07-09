@@ -39,6 +39,7 @@ RAW_MKTCAP_META = {
     "category": "정통",
     "description_beginner": "버핏지수 계산을 위해 내부적으로 저장하는 코스피 전체 시가총액 데이터예요.",
     "unit": "원",
+    "is_public": False,
 }
 
 BUFFETT_SLUG = "buffett_index"

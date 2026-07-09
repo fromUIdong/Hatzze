@@ -33,6 +33,7 @@ RAW_META = {
     "category": "정통",
     "description_beginner": "52주 신고가 대비 괴리율 계산을 위해 내부적으로 저장하는 코스피 지수 종가 데이터예요.",
     "unit": "pt",
+    "is_public": False,
 }
 
 GAP_SLUG = "kospi_high_gap"

@@ -11,12 +11,14 @@ create table if not exists public.indicators (
   category text not null check (category in ('정통', '밈')),
   description_beginner text not null,
   unit text not null,
+  is_public boolean not null default true,
   created_at timestamptz not null default now()
 );
 
 comment on table public.indicators is '지표 메타데이터 (정통/밈 트랙 구분)';
 comment on column public.indicators.slug is '코드에서 참조하는 안정적인 식별자 (예: us_10y_yield)';
 comment on column public.indicators.description_beginner is '초보자용 한줄 설명';
+comment on column public.indicators.is_public is '프론트엔드 노출 여부. false면 다른 지표 계산용 내부 캐시(예: kospi_close_raw)라 화면에 표시하지 않음';
 
 alter table public.indicators enable row level security;
 
