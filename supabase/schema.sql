@@ -61,10 +61,12 @@ create table if not exists public.daily_score (
   date date primary key,
   score numeric not null,
   stage text not null check (stage in ('냉정', '보통', '과열', '광기')),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 comment on table public.daily_score is '날짜별 종합 과열도 스코어(지표별 진행률 평균 %, 100 초과·음수 가능) 및 단계';
+comment on column public.daily_score.updated_at is 'daily_score 갱신 시각. calculate_score.py가 실행할 때마다 명시적으로 채운다(upsert가 자동으로 갱신해주는 값이 아님)';
 
 alter table public.daily_score enable row level security;
 

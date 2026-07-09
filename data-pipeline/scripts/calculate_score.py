@@ -38,7 +38,7 @@ from __future__ import annotations
 
 import statistics
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -286,11 +286,20 @@ def main() -> None:
     print(f"[Supabase] indicator_values.normalized_score upsert 완료 ({len(results)}건, 원본 Progress 저장)")
 
     today = date.today().isoformat()
+    now_utc = datetime.now(timezone.utc).isoformat()
     client.table("daily_score").upsert(
-        {"date": today, "score": round(average_progress, 2), "stage": stage},
+        {
+            "date": today,
+            "score": round(average_progress, 2),
+            "stage": stage,
+            "updated_at": now_utc,
+        },
         on_conflict="date",
     ).execute()
-    print(f"[Supabase] daily_score upsert 완료: date={today}, score={round(average_progress, 2)}, stage={stage}")
+    print(
+        f"[Supabase] daily_score upsert 완료: date={today}, score={round(average_progress, 2)}, "
+        f"stage={stage}, updated_at={now_utc}"
+    )
 
 
 if __name__ == "__main__":

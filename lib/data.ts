@@ -6,6 +6,7 @@ export type DailyScore = {
   date: string;
   score: number;
   stage: string;
+  updated_at: string;
 };
 
 export type IndicatorWithLatestValue = {
@@ -25,7 +26,7 @@ export type IndicatorWithLatestValue = {
 export async function getLatestDailyScore(): Promise<DailyScore | null> {
   const { data, error } = await supabaseServer
     .from("daily_score")
-    .select("date,score,stage")
+    .select("date,score,stage,updated_at")
     .order("date", { ascending: false })
     .limit(1)
     .maybeSingle();

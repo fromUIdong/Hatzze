@@ -1,6 +1,6 @@
 import { getLatestDailyScore, getPublicIndicators } from "@/lib/data";
 import type { IndicatorWithLatestValue } from "@/lib/data";
-import { formatIndicatorValue } from "@/lib/format";
+import { formatIndicatorValue, formatKstDateTime } from "@/lib/format";
 
 // 지표는 하루 단위(GitHub Actions 배치)로 갱신되므로, 빌드 시점에 정적으로
 // 굳어버리지 않도록 매 요청마다 서버에서 새로 조회한다.
@@ -136,8 +136,13 @@ export default async function Home() {
       <section className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-8 sm:p-10 text-center">
         {dailyScore ? (
           <>
-            <p className="text-sm text-neutral-500">{dailyScore.date} 기준</p>
-            <p className="text-6xl sm:text-7xl font-bold mt-3 tracking-tight text-neutral-50">
+            <p className="text-sm text-neutral-500">
+              {formatKstDateTime(dailyScore.updated_at)}
+            </p>
+            <p className="text-xs font-medium tracking-wide text-neutral-500 mt-2">
+              햇쩨 지수
+            </p>
+            <p className="text-6xl sm:text-7xl font-bold mt-1 tracking-tight text-neutral-50">
               {formatIndicatorValue(dailyScore.score, "%").display}%
             </p>
             <span

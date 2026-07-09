@@ -39,3 +39,32 @@ export function formatIndicatorValue(
 
   return { display, displayUnit: unit };
 }
+
+const KST_DATETIME_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  weekday: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
+/**
+ * ISO 타임스탬프를 한국시간(KST) 기준 "YYYY-MM-DD(요일) HH:MM 기준" 형식으로 표시한다.
+ */
+export function formatKstDateTime(isoString: string): string {
+  const parts = KST_DATETIME_FORMATTER.formatToParts(new Date(isoString));
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? "";
+
+  const year = get("year");
+  const month = get("month");
+  const day = get("day");
+  const weekday = get("weekday").replace("요일", "");
+  const hour = get("hour");
+  const minute = get("minute");
+
+  return `${year}-${month}-${day}(${weekday}) ${hour}:${minute} 기준`;
+}
