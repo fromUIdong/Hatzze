@@ -24,14 +24,30 @@ Progress는 두 가지 버전을 함께 다룬다:
 - 원본(raw) Progress: 100%를 넘거나 음수여도 그대로 둔 값. "기준선을 몇 % 초과했는지"
   같은 상세 정보를 보여줘야 하는 indicator_values.normalized_score에 저장한다.
 - 캡핑(capped) Progress: 0~100% 범위로 자른 값(min(max(x, 0), 100)). 지표 하나가
-  100%를 크게 초과해 종합 스코어를 왜곡하지 않도록, daily_score.score(평균)는
-  이 캡핑된 값들의 평균으로 계산한다.
+  100%를 크게 초과해 종합 스코어를 왜곡하지 않도록, daily_score.score(아래
+  설명하는 가중 평균)는 이 캡핑된 값들로 계산한다.
 
 percentile 기준선을 계산하려면 지표별로 최소 MIN_PERCENTILE_SAMPLES개의 과거
 데이터가 필요하다. 갤러리 교체 등으로 특정 지표의 히스토리가 막 리셋된 경우처럼
-데이터가 부족하면, 그 지표 하나 때문에 스크립트 전체가 죽어서 나머지 4개 지표까지
+데이터가 부족하면, 그 지표 하나 때문에 스크립트 전체가 죽어서 나머지 지표까지
 daily_score 갱신이 막히는 걸 막기 위해 해당 지표만 hit=False/progress=50(중립)으로
 대체하고 경고를 남긴 뒤 계속 진행한다.
+
+daily_score.score("햇쩨 지수")는 지표별 capped_progress의 가중 평균이다
+(Σ(weight_i × capped_progress_i) / Σ(weight_i), weight는 indicators.weight).
+단, "데이터가 아예 없는" 지표(KRX 승인 대기 중인 vkospi/kosdaq_kospi_ratio/
+leverage_etf_volume처럼 indicator_values에 값 자체가 한 건도 없는 경우)는
+승인 전까지 지수를 왜곡하지 않도록 가중 평균에서 완전히 제외한다(분모의
+weight 합계에도 포함하지 않음). 반면 "값은 있지만 percentile 계산에 필요한
+히스토리가 부족한" 지표(초기의 dcinside_post_count, news_sentiment 등)는
+중립값(50%)으로 채워서 가중 평균에 계속 참여시킨다 — 이 둘을 구분하는 게
+get_latest_value(값 자체가 없음, no_value=True)와 compute_threshold(값은
+있지만 percentile 계산 불가, insufficient=True)의 실패 지점 차이다.
+
+stage(냉정/보통/과열/광기)는 이 가중 평균 점수 자체를 4구간으로 나눠 정한다
+(stage_for_score) — 예전처럼 hit_count 비율로 정하지 않는다. hit_count는
+화면의 Hit 배지 표시용으로 계속 계산하지만, stage 산정에는 더 이상 관여하지
+않는다.
 """
 
 from __future__ import annotations
@@ -96,13 +112,17 @@ def percentile(values: list[float], pct: float) -> float:
     return quantiles[index]
 
 
-def get_indicator(client, slug: str) -> tuple[str, str]:
-    result = client.table("indicators").select("id,name").eq("slug", slug).execute()
+def get_indicator(client, slug: str) -> tuple[str, str, float]:
+    result = (
+        client.table("indicators").select("id,name,weight").eq("slug", slug).execute()
+    )
     if not result.data:
         raise RuntimeError(
             f"indicator '{slug}'가 존재하지 않습니다. 해당 fetch 스크립트를 먼저 실행하세요."
         )
-    return result.data[0]["id"], result.data[0]["name"]
+    row = result.data[0]
+    weight = float(row["weight"]) if row.get("weight") is not None else 1.0
+    return row["id"], row["name"], weight
 
 
 def get_latest_value(client, indicator_id: str) -> tuple[str, float]:
@@ -190,13 +210,12 @@ def cap_progress(progress: float) -> float:
     return min(max(progress, 0.0), 100.0)
 
 
-def stage_for_hit_ratio(hit_count: int, total: int) -> str:
-    ratio = hit_count / total
-    if ratio <= 0.3:
+def stage_for_score(score: float) -> str:
+    if score < 25:
         return "냉정"
-    if ratio <= 0.5:
+    if score < 50:
         return "보통"
-    if ratio <= 0.7:
+    if score < 75:
         return "과열"
     return "광기"
 
@@ -212,12 +231,12 @@ def main() -> None:
             config = {**config, "floor": floor}
             print(f"[kospi_high_gap] floor(지난 1년 최대 낙폭) = {floor}%")
 
-        indicator_id, name = get_indicator(client, slug)
+        indicator_id, name, weight = get_indicator(client, slug)
 
         try:
             latest_date, current = get_latest_value(client, indicator_id)
         except InsufficientHistoryError as e:
-            print(f"[WARNING] '{slug}' 데이터 부족으로 중립 처리됨: {e}")
+            print(f"[WARNING] '{slug}' 값이 아직 없어 가중 평균에서 제외됨: {e}")
             latest_date = date.today().isoformat()
             current = None
             threshold = None
@@ -225,7 +244,9 @@ def main() -> None:
             progress = NEUTRAL_PROGRESS
             capped_progress = NEUTRAL_PROGRESS
             insufficient = True
+            no_value = True
         else:
+            no_value = False
             try:
                 threshold = compute_threshold(client, indicator_id, config)
                 hit = compute_hit(current, threshold, config)
@@ -233,7 +254,7 @@ def main() -> None:
                 capped_progress = cap_progress(progress)
                 insufficient = False
             except InsufficientHistoryError as e:
-                print(f"[WARNING] '{slug}' 데이터 부족으로 중립 처리됨: {e}")
+                print(f"[WARNING] '{slug}' 데이터 부족으로 중립(50%) 처리, 가중 평균엔 포함: {e}")
                 threshold = None
                 hit = False
                 progress = NEUTRAL_PROGRESS
@@ -244,6 +265,7 @@ def main() -> None:
             {
                 "slug": slug,
                 "name": name,
+                "weight": weight,
                 "indicator_id": indicator_id,
                 "date": latest_date,
                 "current": current,
@@ -252,15 +274,22 @@ def main() -> None:
                 "progress": progress,
                 "capped_progress": capped_progress,
                 "insufficient": insufficient,
+                "no_value": no_value,
             }
         )
 
     hit_count = sum(1 for r in results if r["hit"])
-    average_progress = sum(r["capped_progress"] for r in results) / len(results)
-    stage = stage_for_hit_ratio(hit_count, len(results))
+    weighted_results = [r for r in results if not r["no_value"]]
+    weight_sum = sum(r["weight"] for r in weighted_results)
+    weighted_score = (
+        sum(r["weight"] * r["capped_progress"] for r in weighted_results) / weight_sum
+        if weight_sum > 0
+        else 0.0
+    )
+    stage = stage_for_score(weighted_score)
 
     print(
-        f"{'slug':22} {'현재값':>14} {'기준선':>14} {'Hit':>5} "
+        f"{'slug':22} {'weight':>7} {'현재값':>14} {'기준선':>14} {'Hit':>5} "
         f"{'Progress(원본)':>14} {'Progress(캡핑)':>14}"
     )
     for r in results:
@@ -271,13 +300,23 @@ def main() -> None:
         threshold_str = (
             f"{r['threshold']:>14.2f}" if r["threshold"] is not None else f"{'N/A':>14}"
         )
-        note = "  (데이터 부족 - 중립 처리)" if r["insufficient"] else ""
+        if r["no_value"]:
+            note = "  (값 없음 - 가중 평균에서 제외)"
+        elif r["insufficient"]:
+            note = "  (데이터 부족 - 중립 처리, 가중 평균엔 포함)"
+        else:
+            note = ""
         print(
-            f"{r['slug']:22} {current_str} {threshold_str} "
+            f"{r['slug']:22} {r['weight']:>7.1f} {current_str} {threshold_str} "
             f"{hit_mark:>5} {r['progress']:>13.1f}% {r['capped_progress']:>13.1f}%{note}"
         )
     print()
-    print(f"[종합] Hit: {hit_count}/{len(results)}, average_progress(캡핑 기준): {average_progress:.2f}%, stage: {stage}")
+    excluded = [r["slug"] for r in results if r["no_value"]]
+    print(
+        f"[종합] Hit: {hit_count}/{len(results)}, weighted_score: {weighted_score:.2f}% "
+        f"(weight_sum: {weight_sum:.1f}), stage: {stage}"
+        + (f", 제외됨: {', '.join(excluded)}" if excluded else "")
+    )
 
     for r in results:
         client.table("indicator_values").update(
@@ -290,14 +329,14 @@ def main() -> None:
     client.table("daily_score").upsert(
         {
             "date": today,
-            "score": round(average_progress, 2),
+            "score": round(weighted_score, 2),
             "stage": stage,
             "updated_at": now_utc,
         },
         on_conflict="date",
     ).execute()
     print(
-        f"[Supabase] daily_score upsert 완료: date={today}, score={round(average_progress, 2)}, "
+        f"[Supabase] daily_score upsert 완료: date={today}, score={round(weighted_score, 2)}, "
         f"stage={stage}, updated_at={now_utc}"
     )
 

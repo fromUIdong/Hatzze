@@ -12,6 +12,7 @@ create table if not exists public.indicators (
   description_beginner text not null,
   unit text not null,
   is_public boolean not null default true,
+  weight numeric not null default 1,
   created_at timestamptz not null default now()
 );
 
@@ -19,6 +20,7 @@ comment on table public.indicators is '지표 메타데이터 (정통/밈 트랙
 comment on column public.indicators.slug is '코드에서 참조하는 안정적인 식별자 (예: us_10y_yield)';
 comment on column public.indicators.description_beginner is '초보자용 한줄 설명';
 comment on column public.indicators.is_public is '프론트엔드 노출 여부. false면 다른 지표 계산용 내부 캐시(예: kospi_close_raw)라 화면에 표시하지 않음';
+comment on column public.indicators.weight is '햇쩨 지수(daily_score.score) 가중 평균 계산용 가중치. 새 지표는 기본값 1(최저 가중치)로 시작한다';
 
 alter table public.indicators enable row level security;
 
@@ -65,7 +67,7 @@ create table if not exists public.daily_score (
   updated_at timestamptz not null default now()
 );
 
-comment on table public.daily_score is '날짜별 종합 과열도 스코어(지표별 진행률 평균 %, 100 초과·음수 가능) 및 단계';
+comment on table public.daily_score is '날짜별 종합 과열도 스코어(지표별 진행률의 가중 평균 %, 100 초과·음수 가능) 및 단계';
 comment on column public.daily_score.updated_at is 'daily_score 갱신 시각. calculate_score.py가 실행할 때마다 명시적으로 채운다(upsert가 자동으로 갱신해주는 값이 아님)';
 
 alter table public.daily_score enable row level security;
