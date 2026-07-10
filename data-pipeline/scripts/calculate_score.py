@@ -33,6 +33,15 @@ percentile 기준선을 계산하려면 지표별로 최소 MIN_PERCENTILE_SAMPL
 daily_score 갱신이 막히는 걸 막기 위해 해당 지표만 hit=False/progress=50(중립)으로
 대체하고 경고를 남긴 뒤 계속 진행한다.
 
+예외: youtube_finance_search_views는 이 percentile/중립-폴백 방식을 쓰지 않는
+유일한 지표다. 나머지 12개 percentile 지표는 "과거 N일치의 상위 P% 지점"을
+고정 기준선으로 삼지만, 이 지표는 window_days/percentile/MIN_PERCENTILE_SAMPLES
+개념 자체가 없고 대신 "오늘 값을 포함한 지금까지의 전체 평균"을 매일 다시 계산해
+그날의 기준선으로 쓴다(compute_threshold의 "cumulative_average" 분기). 표본이
+1개(오늘 하루)뿐이어도 평균=오늘 값이 되어 progress가 100%로 나오는데, 이는
+데이터 부족으로 판단을 보류하는 게 아니라 의도된 동작이다 — 데이터가 쌓일수록
+평균이 더 많은 날짜를 반영하며 비교 기준이 자연스럽게 안정되기 때문이다.
+
 daily_score.score("햇쩨 지수")는 지표별 capped_progress의 가중 평균이다
 (Σ(weight_i × capped_progress_i) / Σ(weight_i), weight는 indicators.weight).
 단, "데이터가 아예 없는" 지표(KRX 승인 대기 중인 vkospi/kosdaq_kospi_ratio/
@@ -85,6 +94,7 @@ INDICATOR_ORDER = [
     "usdkrw_volatility",
     "leverage_etf_volume",
     "bestseller_finance_ratio",
+    "youtube_finance_search_views",
 ]
 
 INDICATOR_CONFIGS = {
@@ -101,6 +111,10 @@ INDICATOR_CONFIGS = {
     "usdkrw_volatility": {"kind": "percentile", "window_days": 365, "percentile": 5, "direction": "low"},
     "leverage_etf_volume": {"kind": "percentile", "window_days": 365, "percentile": 95},
     "bestseller_finance_ratio": {"kind": "percentile", "window_days": 30, "percentile": 95},
+    # youtube_finance_search_views만 percentile이 아니라 "누적 평균 대비 비율"
+    # 방식을 쓴다 — 아래 compute_threshold의 "cumulative_average" 분기와
+    # 모듈 docstring 설명 참고.
+    "youtube_finance_search_views": {"kind": "cumulative_average"},
 }
 
 
@@ -176,9 +190,30 @@ def get_window_values(client, indicator_id: str, window_days: int) -> list[float
     return [float(r["raw_value"]) for r in result.data]
 
 
+def get_all_values(client, indicator_id: str) -> list[float]:
+    result = (
+        client.table("indicator_values")
+        .select("raw_value")
+        .eq("indicator_id", indicator_id)
+        .execute()
+    )
+    return [float(r["raw_value"]) for r in result.data]
+
+
 def compute_threshold(client, indicator_id: str, config: dict) -> float:
     if config["kind"] == "fixed":
         return config["threshold"]
+
+    if config["kind"] == "cumulative_average":
+        # youtube_finance_search_views 전용: percentile/MIN_PERCENTILE_SAMPLES를
+        # 쓰지 않고, 오늘 값을 포함해 지금까지 쌓인 전체 값의 평균을 매일 다시
+        # 계산해 그날의 기준선으로 삼는다. 데이터가 1건(오늘)뿐이면 평균=오늘 값이라
+        # progress가 항상 100%로 나오는데, 이건 "판단을 보류"하는 게 아니라 의도된
+        # 결과다 — 데이터가 쌓일수록 평균이 더 많은 날짜를 반영하며 자연스럽게
+        # 비교 기준이 안정된다. 따라서 다른 percentile 지표와 달리
+        # InsufficientHistoryError를 던지지 않고, 표본이 몇 개든 그냥 계산한다.
+        values = get_all_values(client, indicator_id)
+        return statistics.mean(values)
 
     values = get_window_values(client, indicator_id, config["window_days"])
     if len(values) < MIN_PERCENTILE_SAMPLES:
