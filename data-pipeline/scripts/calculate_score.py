@@ -1,4 +1,4 @@
-"""16개 지표의 현재값을 기준선과 비교해 과열도 스코어를 계산하고 daily_score/indicator_values에 저장.
+"""17개 지표의 현재값을 기준선과 비교해 과열도 스코어를 계산하고 daily_score/indicator_values에 저장.
 
 기준선(threshold)은 이제 전부 리서치/논리 기반의 고정값이다
 (config/indicator_thresholds.py의 INDICATOR_THRESHOLDS). 원래는 과거 데이터의

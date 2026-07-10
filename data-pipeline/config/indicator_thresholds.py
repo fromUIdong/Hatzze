@@ -1,4 +1,4 @@
-"""16개 지표의 Hit/progress 기준값(threshold) 설정.
+"""17개 지표의 Hit/progress 기준값(threshold) 설정.
 
 percentile 기반(과거 데이터의 상위/하위 N% 지점)은 데이터가 1년 가까이 쌓일
 때까지 기준선이 계속 흔들려서, 리서치·논리 기반으로 정한 고정 기준값으로
@@ -47,6 +47,9 @@ INDICATOR_THRESHOLDS = {
     # 최댓값·분산)를 아직 확인 못 했으니, 데이터가 쌓이면 재조정이 필요할
     # 수 있다.
     "kospi_asia_relative_strength": {"kind": "fixed", "threshold": 10.0},
+    # naver_search_trend와 동일한 논리: 조회 기간 내 최고치의 70% 수준을
+    # "이례적으로 관심이 쏠린" 구간으로 본다.
+    "luxury_consumption_index": {"kind": "fixed", "threshold": 70.0},
 }
 
 # 현재값이 음수로 나올 수 있는 지표(감성 점수류)는 음수를 "역방향 과열"로 해석하지
