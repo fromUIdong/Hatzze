@@ -1,4 +1,4 @@
-"""17개 지표의 Hit/progress 기준값(threshold) 설정.
+"""20개 지표의 Hit/progress 기준값(threshold) 설정.
 
 percentile 기반(과거 데이터의 상위/하위 N% 지점)은 데이터가 1년 가까이 쌓일
 때까지 기준선이 계속 흔들려서, 리서치·논리 기반으로 정한 고정 기준값으로
@@ -50,6 +50,19 @@ INDICATOR_THRESHOLDS = {
     # naver_search_trend와 동일한 논리: 조회 기간 내 최고치의 70% 수준을
     # "이례적으로 관심이 쏠린" 구간으로 본다.
     "luxury_consumption_index": {"kind": "fixed", "threshold": 70.0},
+    # 아래 둘도 naver_search_trend와 동일한 논리(조회 기간 내 최고치의 70%
+    # 수준을 과열로 봄). small_business_crisis_index는 검색량이 높을수록
+    # "실물경제 위기 신호가 뚜렷하다"는 뜻이라 direction은 그대로 high다 —
+    # 다른 지표들의 "높을수록 시장 과열"과는 의미가 다르지만, 계산 방식(현재값이
+    # 기준값 이상이면 Hit)은 동일하다.
+    "fine_dining_search_index": {"kind": "fixed", "threshold": 70.0},
+    "small_business_crisis_index": {"kind": "fixed", "threshold": 70.0},
+    # upbit_speculation_index: raw_value 자체가 이미 fetch 스크립트 안에서
+    # 두 서브지표(김치프리미엄, 거래대금 급증도)의 기하평균으로 계산된
+    # "진행률에 가까운" 값이라, threshold=100은 "두 신호 모두 자기 기준선에
+    # 도달한 수준"을 의미한다. 여기서 다시 나누는 건 사실상 그대로 통과시키는
+    # 것에 가깝다.
+    "upbit_speculation_index": {"kind": "fixed", "threshold": 100.0},
 }
 
 # 현재값이 음수로 나올 수 있는 지표(감성 점수류)는 음수를 "역방향 과열"로 해석하지
