@@ -96,7 +96,7 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_usdkrw_volatility.py
 
-      - name: Fetch leverage ETF trading value
+      - name: Fetch leverage ETF trade value + KOSPI200 futures open interest
         id: leverage_etf
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_leverage_etf_volume.py
