@@ -1,4 +1,4 @@
-"""20개 지표의 Hit/progress 기준값(threshold) 설정.
+"""22개 지표의 Hit/progress 기준값(threshold) 설정.
 
 percentile 기반(과거 데이터의 상위/하위 N% 지점)은 데이터가 1년 가까이 쌓일
 때까지 기준선이 계속 흔들려서, 리서치·논리 기반으로 정한 고정 기준값으로
@@ -67,6 +67,16 @@ INDICATOR_THRESHOLDS = {
     # 도달한 수준"을 의미한다. 여기서 다시 나누는 건 사실상 그대로 통과시키는
     # 것에 가깝다.
     "upbit_speculation_index": {"kind": "fixed", "threshold": 100.0},
+    # copper_price_momentum: 20거래일 만에 15% 이상 오르면 뚜렷한 상승 모멘텀으로
+    # 보는 논리적 추정치다 — kospi_asia_relative_strength와 마찬가지로 실측 분포를
+    # 아직 확인 못 했으니 데이터가 쌓이면 재조정이 필요할 수 있다.
+    "copper_price_momentum": {"kind": "fixed", "threshold": 15.0},
+    # github_trading_bot_repos: 사전 추정 근거가 전혀 없는 완전히 새로운 지표라
+    # 실행해서 나온 첫 관측값(81건, 2026-07-11)을 기준점으로 삼았다. threshold=150은
+    # 그 값의 약 1.85배 — "하루 평균보다 확연히 많이 튀는" 수준을 잠정적으로 잡은
+    # 것이라, 표본이 하루뿐이라는 한계가 크다. 며칠~몇 주치 데이터가 쌓이면 실제
+    # 분포(평균, 표준편차)를 보고 반드시 재조정해야 한다.
+    "github_trading_bot_repos": {"kind": "fixed", "threshold": 150.0},
 }
 
 # 현재값이 음수로 나올 수 있는 지표(감성 점수류)는 음수를 "역방향 과열"로 해석하지
