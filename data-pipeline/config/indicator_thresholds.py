@@ -1,4 +1,4 @@
-"""25개 지표의 Hit/progress 기준값(threshold) 설정.
+"""26개 지표의 Hit/progress 기준값(threshold) 설정.
 
 percentile 기반(과거 데이터의 상위/하위 N% 지점)은 데이터가 1년 가까이 쌓일
 때까지 기준선이 계속 흔들려서, 리서치·논리 기반으로 정한 고정 기준값으로
@@ -98,6 +98,13 @@ INDICATOR_THRESHOLDS = {
     # 임계선으로 잡은 논리적 추정치다 — API 승인 후 실측 분포를 보고 반드시
     # 재조정해야 한다.
     "top10_market_cap_concentration": {"kind": "fixed", "threshold": 50.0},
+    # vix_vkospi_spread: VKOSPI - VIX를 실측 1년치(2025-07~2026-07, 237거래일
+    # 공통)로 계산해보니 최솟값 2.24pt, 최댓값 79.29pt, 중앙값 18.6pt — 이 기간
+    # 동안 스프레드가 음수(한국 변동성이 미국보다 낮음)로 내려간 적은 한 번도
+    # 없었다. threshold=4.0은 하위 5%(4.16pt) 지점에 가까운 값으로, 관측치의
+    # 3.8%(9/237일)만 도달한 "스프레드가 이례적으로 좁아진" 구간이다. direction="low"라
+    # 이 값 이하로 내려가면 Hit — 한국 변동성이 미국 대비 유독 낮게 방심한 상태로 본다.
+    "vix_vkospi_spread": {"kind": "fixed", "threshold": 4.0, "direction": "low"},
 }
 
 # 현재값이 음수로 나올 수 있는 지표(감성 점수류)는 음수를 "역방향 과열"로 해석하지
