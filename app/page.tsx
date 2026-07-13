@@ -17,14 +17,12 @@ const C = {
   card: "#E8EEFE",
   bg: "#D4DAEA",
   line: "#c2c6d8",
+  track: "#c2c6d8",
   blue: "#0064FF",
-  track: "#c9cede",
 } as const;
 
 const MONO = "'JetBrains Mono', monospace";
 
-// 과열도(normalized_score)에 따라 온도색을 고른다. direction과 무관하게
-// normalized_score가 클수록 "과열"이라는 의미로 통일돼 있어 그대로 쓴다.
 function heatColor(score: number | null): string {
   if (score === null) return C.sub;
   if (score >= 100) return C.mania;
@@ -32,44 +30,6 @@ function heatColor(score: number | null): string {
   if (score >= 33) return C.neutral;
   return C.cold;
 }
-
-// slug → Material Symbols 아이콘. 순수 표현용이라 매핑에 없는(새로 추가된)
-// 지표는 기본 아이콘으로 떨어질 뿐, 화면에서 사라지지 않는다.
-const ICONS: Record<string, string> = {
-  buffett_index: "payments",
-  leverage_etf_volume: "rocket_launch",
-  market_actions_30d: "speed",
-  top10_market_cap_concentration: "pie_chart",
-  kospi_high_gap: "vertical_align_top",
-  vkospi: "monitor_heart",
-  vix_vkospi_spread: "compare_arrows",
-  kospi_asia_relative_strength: "public",
-  kospi_gold_ratio: "balance",
-  kosdaq_kospi_ratio: "celebration",
-  kospi_volume_surge: "groups",
-  usdkrw_volatility: "waves",
-  us10y: "account_balance",
-  copper_price_momentum: "bolt",
-  yield_curve_spread: "trending_down",
-  naver_search_trend: "search",
-  dcinside_post_count: "forum",
-  news_sentiment: "newspaper",
-  bestseller_finance_ratio: "menu_book",
-  youtube_finance_search_views: "play_circle",
-  luxury_consumption_index: "shopping_bag",
-  fine_dining_search_index: "restaurant",
-  upbit_speculation_index: "currency_bitcoin",
-  weather_sunshine_index: "wb_sunny",
-  github_trading_bot_repos: "terminal",
-  small_business_crisis_index: "storefront",
-};
-
-// slug → 집계 기간 배지. 없으면 배지를 그리지 않는다.
-const PERIODS: Record<string, string> = {
-  buffett_index: "당일 기준",
-  leverage_etf_volume: "당일 기준",
-  market_actions_30d: "최근 30일",
-};
 
 function Icon({ name, style }: { name: string; style?: React.CSSProperties }) {
   return (
@@ -79,11 +39,268 @@ function Icon({ name, style }: { name: string; style?: React.CSSProperties }) {
   );
 }
 
-// ── 히어로: 반원 게이지 + 요약 ────────────────────────────────────
-const STAGE_META: Record<
-  string,
-  { emoji: string; color: string; zone: string }
-> = {
+// ── 지표 데이터 픽 ────────────────────────────────────────────────
+type Ind = IndicatorWithLatestValue;
+
+type Pick = {
+  ind?: Ind;
+  name: string;
+  headline: string | null;
+  desc: string;
+  raw: number | null;
+  score: number | null;
+  capped: number | null;
+  threshold: number | null;
+  isHit: boolean;
+  color: string;
+  disp: string;
+  unit: string;
+  thDisp: string | null;
+  dirLabel: string;
+};
+
+function pick(ind: Ind | undefined): Pick {
+  const raw = ind?.latest?.raw_value ?? null;
+  const score = ind?.latest?.normalized_score ?? null;
+  const capped = score === null ? null : Math.min(Math.max(score, 0), 100);
+  const threshold = ind?.latest?.threshold ?? null;
+  const unit = ind?.unit ?? "";
+  const f =
+    raw !== null
+      ? formatIndicatorValue(raw, unit)
+      : { display: "-", displayUnit: unit };
+  const tf = threshold !== null ? formatIndicatorValue(threshold, unit) : null;
+  return {
+    ind,
+    name: ind?.name ?? "",
+    headline: ind?.headline ?? null,
+    desc: ind?.description_beginner ?? "",
+    raw,
+    score,
+    capped,
+    threshold,
+    isHit: (score ?? 0) >= 100,
+    color: heatColor(score),
+    disp: f.display,
+    unit: f.displayUnit,
+    thDisp: tf ? `${tf.display}${tf.displayUnit}` : null,
+    dirLabel: ind?.direction === "low" ? "이하" : "이상",
+  };
+}
+
+// ── 공용 카드 조각 ────────────────────────────────────────────────
+function Shell({
+  span = 1,
+  hit = false,
+  minH = 230,
+  children,
+}: {
+  span?: 1 | 2;
+  hit?: boolean;
+  minH?: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={span === 2 ? "hz-span2" : undefined}
+      style={{
+        background: C.card,
+        borderRadius: 20,
+        padding: span === 2 ? 30 : 24,
+        display: "flex",
+        flexDirection: "column",
+        position: "relative",
+        minHeight: minH,
+        boxShadow: hit
+          ? "0 8px 24px -12px rgba(255,107,129,0.35)"
+          : "0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -2px rgba(0,0,0,0.08)",
+        border: hit ? "2px solid rgba(255,107,129,0.18)" : "2px solid transparent",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function HitBadge({ label = "🎯 HIT", small = false }: { label?: string; small?: boolean }) {
+  return (
+    <span
+      style={{
+        position: "absolute",
+        top: small ? 18 : 24,
+        right: small ? 18 : 24,
+        background: C.mania,
+        color: "#fff",
+        fontWeight: 800,
+        fontSize: small ? 9 : 11,
+        padding: small ? "4px 9px" : "6px 12px",
+        borderRadius: small ? 6 : 8,
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function Tag({ text, color }: { text: string | null; color: string }) {
+  if (!text) return null;
+  return (
+    <p
+      style={{
+        margin: "0 0 12px",
+        fontSize: 11,
+        fontWeight: 800,
+        fontStyle: "italic",
+        textTransform: "uppercase",
+        letterSpacing: "0.04em",
+        color,
+      }}
+    >
+      &ldquo;{text}&rdquo;
+    </p>
+  );
+}
+
+function TitleRow({
+  icon,
+  name,
+  color = C.sub,
+  iconSize = 24,
+  badge,
+  right,
+}: {
+  icon: string;
+  name: React.ReactNode;
+  color?: string;
+  iconSize?: number;
+  badge?: string;
+  right?: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        marginBottom: 14,
+        justifyContent: right ? "space-between" : undefined,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <Icon name={icon} style={{ fontSize: iconSize, color }} />
+        <span style={{ fontSize: 15, fontWeight: 800, color: C.ink, lineHeight: 1.2, wordBreak: "keep-all" }}>
+          {name}
+        </span>
+        {badge && (
+          <span
+            style={{
+              fontSize: 9,
+              fontWeight: 700,
+              color: C.sub,
+              background: C.bg,
+              padding: "3px 8px",
+              borderRadius: 999,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {badge}
+          </span>
+        )}
+      </div>
+      {right}
+    </div>
+  );
+}
+
+function Big({
+  disp,
+  unit,
+  color,
+  size = 40,
+  sub,
+}: {
+  disp: string;
+  unit?: string;
+  color: string;
+  size?: number;
+  sub?: React.ReactNode;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginBottom: 12 }}>
+      <span
+        style={{
+          fontFamily: MONO,
+          fontSize: size,
+          fontWeight: 800,
+          color,
+          lineHeight: 1,
+          letterSpacing: "-0.03em",
+        }}
+      >
+        {disp}
+        {unit && <span style={{ fontSize: size * 0.5 }}>{unit}</span>}
+      </span>
+      {sub && <span style={{ fontSize: 12, fontWeight: 800, color, paddingBottom: 6 }}>{sub}</span>}
+    </div>
+  );
+}
+
+function Foot({ text, color = C.sub }: { text: string; color?: string }) {
+  return (
+    <p
+      style={{
+        margin: "auto 0 0",
+        paddingTop: 16,
+        fontSize: 12,
+        color,
+        fontWeight: 600,
+        borderTop: "1px solid rgba(0,0,0,0.05)",
+        marginTop: 16,
+        lineHeight: 1.5,
+      }}
+    >
+      {text}
+    </p>
+  );
+}
+
+// 과열도 진행 바 (세부 데이터가 없는 카드의 공용 시각화).
+function HeatBar({ v }: { v: Pick }) {
+  if (v.capped === null) return null;
+  return (
+    <div style={{ background: C.bg, borderRadius: 14, padding: "16px 18px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 800, marginBottom: 8 }}>
+        <span style={{ color: C.sub }}>과열도</span>
+        <span style={{ color: v.color, fontFamily: MONO }}>
+          {Math.round(v.capped)}
+          <span style={{ color: "#a9b0bd" }}>/100</span>
+        </span>
+      </div>
+      <div style={{ position: "relative", height: 10, background: C.track, borderRadius: 999, overflow: "hidden" }}>
+        <div
+          style={{
+            height: "100%",
+            width: `${v.capped}%`,
+            background: v.isHit ? `linear-gradient(90deg, ${C.hot}, ${C.mania})` : v.color,
+            borderRadius: 999,
+          }}
+        />
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 700, color: C.sub, marginTop: 7 }}>
+        <span>안심</span>
+        <span style={{ color: C.hot }}>과열 100</span>
+      </div>
+      {v.thDisp && (
+        <p style={{ margin: "8px 0 0", textAlign: "center", fontSize: 10, fontWeight: 700, color: C.sub, fontFamily: MONO }}>
+          기준선 {v.thDisp} {v.dirLabel}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── 히어로 ────────────────────────────────────────────────────────
+const STAGE_META: Record<string, { emoji: string; color: string; zone: string }> = {
   냉정: { emoji: "🧊", color: C.cold, zone: "냉정 구간" },
   보통: { emoji: "⚖️", color: C.neutral, zone: "보통 구간" },
   과열: { emoji: "🔥", color: C.hot, zone: "과열 구간" },
@@ -92,12 +309,11 @@ const STAGE_META: Record<
 
 function HeroGauge({ score }: { score: number }) {
   const s = Math.max(0, Math.min(100, score));
-  const arcLen = 389.6; // π * 124 (반원)
+  const arcLen = 389.6;
   const dashoffset = arcLen * (1 - s / 100);
   const theta = ((180 - (s / 100) * 180) * Math.PI) / 180;
   const nx = 150 + 124 * Math.cos(theta);
   const ny = 150 - 124 * Math.sin(theta);
-
   return (
     <svg viewBox="0 0 300 172" style={{ width: 300, height: 172, overflow: "visible" }}>
       <defs>
@@ -108,13 +324,7 @@ function HeroGauge({ score }: { score: number }) {
           <stop offset="100%" stopColor={C.mania} />
         </linearGradient>
       </defs>
-      <path
-        d="M 26 150 A 124 124 0 0 1 274 150"
-        fill="none"
-        stroke={C.bg}
-        strokeWidth={22}
-        strokeLinecap="round"
-      />
+      <path d="M 26 150 A 124 124 0 0 1 274 150" fill="none" stroke={C.bg} strokeWidth={22} strokeLinecap="round" />
       <path
         d="M 26 150 A 124 124 0 0 1 274 150"
         fill="none"
@@ -129,341 +339,55 @@ function HeroGauge({ score }: { score: number }) {
   );
 }
 
-function Hero({
-  dailyScore,
-  tradHits,
-  socialHits,
-}: {
-  dailyScore: DailyScore;
-  tradHits: number;
-  socialHits: number;
-}) {
-  const stage = STAGE_META[dailyScore.stage] ?? {
-    emoji: "📊",
-    color: C.neutral,
-    zone: dailyScore.stage,
-  };
+function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tradHits: number; socialHits: number }) {
+  const stage = STAGE_META[dailyScore.stage] ?? { emoji: "📊", color: C.neutral, zone: dailyScore.stage };
   const scoreDisplay = formatIndicatorValue(dailyScore.score, "%").display;
-
   return (
     <section
       className="hz-hero"
       style={{
         background: C.card,
         borderRadius: 24,
-        boxShadow:
-          "0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -2px rgba(0,0,0,0.08)",
+        boxShadow: "0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -2px rgba(0,0,0,0.08)",
         display: "flex",
         flexWrap: "wrap",
         alignItems: "center",
       }}
     >
-      {/* Gauge */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
         <div style={{ position: "relative", width: 300, height: 172 }}>
           <HeroGauge score={dailyScore.score} />
           <div style={{ position: "absolute", left: 0, right: 0, top: 78, textAlign: "center" }}>
-            <div
-              style={{
-                fontFamily: MONO,
-                fontSize: 58,
-                fontWeight: 800,
-                color: C.ink,
-                letterSpacing: "-0.04em",
-                lineHeight: 1,
-              }}
-            >
+            <div style={{ fontFamily: MONO, fontSize: 58, fontWeight: 800, color: C.ink, letterSpacing: "-0.04em", lineHeight: 1 }}>
               {scoreDisplay}
               <span style={{ fontSize: 30 }}>%</span>
             </div>
-            <div style={{ fontSize: 11, fontWeight: 800, color: stage.color, marginTop: 6 }}>
-              지금 · {stage.zone}
-            </div>
+            <div style={{ fontSize: 11, fontWeight: 800, color: stage.color, marginTop: 6 }}>지금 · {stage.zone}</div>
           </div>
         </div>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            width: 300,
-            padding: "0 6px",
-            fontSize: 10,
-            fontWeight: 800,
-            textTransform: "uppercase",
-            letterSpacing: "0.06em",
-          }}
-        >
+        <div style={{ display: "flex", justifyContent: "space-between", width: 300, padding: "0 6px", fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em" }}>
           <span style={{ color: C.cold }}>냉정</span>
           <span style={{ color: C.neutral }}>보통</span>
           <span style={{ color: C.hot }}>과열</span>
           <span style={{ color: C.mania }}>광기</span>
         </div>
       </div>
-
-      {/* Text */}
       <div style={{ flex: 1, minWidth: 280 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-          <span style={{ fontSize: 15, fontWeight: 800, color: C.blue }}>
-            Hatzze Overheating Index
-          </span>
-          <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              background: `${stage.color}24`,
-              color: stage.color,
-              fontWeight: 800,
-              fontSize: 16,
-              padding: "5px 14px",
-              borderRadius: 999,
-              whiteSpace: "nowrap",
-            }}
-          >
+          <span style={{ fontSize: 15, fontWeight: 800, color: C.blue }}>Hatzze Overheating Index</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: `${stage.color}24`, color: stage.color, fontWeight: 800, fontSize: 16, padding: "5px 14px", borderRadius: 999, whiteSpace: "nowrap" }}>
             {stage.emoji} {dailyScore.stage}
           </span>
         </div>
-        <p style={{ margin: "0 0 4px", fontSize: 11, color: C.sub, fontFamily: MONO }}>
-          최종 업데이트 · {formatKstDateTime(dailyScore.updated_at)}
-        </p>
-        <div
-          style={{
-            marginTop: 20,
-            background: C.bg,
-            borderRadius: 16,
-            padding: "22px 24px",
-            display: "flex",
-            gap: 14,
-          }}
-        >
+        <p style={{ margin: "0 0 4px", fontSize: 11, color: C.sub, fontFamily: MONO }}>최종 업데이트 · {formatKstDateTime(dailyScore.updated_at)}</p>
+        <div style={{ marginTop: 20, background: C.bg, borderRadius: 16, padding: "22px 24px", display: "flex", gap: 14 }}>
           <Icon name="auto_awesome" style={{ color: C.blue, fontSize: 22 }} />
           <p style={{ margin: 0, fontSize: 15, lineHeight: 1.6, color: "#3a4453", fontWeight: 500 }}>
-            오늘은 정통 지표 <b style={{ color: C.ink }}>{tradHits}개</b>, 소셜 지표{" "}
-            <b style={{ color: C.ink }}>{socialHits}개</b>가 기준선을 넘었어요. 지표들이 가리키는
-            현재 시장 온도는 <b style={{ color: stage.color }}>{dailyScore.stage}</b> 구간이에요.
+            오늘은 정통 지표 <b style={{ color: C.ink }}>{tradHits}개</b>, 소셜 지표 <b style={{ color: C.ink }}>{socialHits}개</b>가 기준선을 넘었어요. 지표들이 가리키는 현재 시장 온도는 <b style={{ color: stage.color }}>{dailyScore.stage}</b> 구간이에요.
           </p>
         </div>
       </div>
     </section>
-  );
-}
-
-// ── 지표 카드 ─────────────────────────────────────────────────────
-function IndicatorCard({ indicator }: { indicator: IndicatorWithLatestValue }) {
-  const latest = indicator.latest;
-  const hasValue = latest !== null;
-  const rawScore = latest?.normalized_score ?? null;
-  const capped = rawScore !== null ? Math.min(Math.max(rawScore, 0), 100) : null;
-  const isHit = (rawScore ?? 0) >= 100;
-  const color = heatColor(rawScore);
-
-  const { display, displayUnit } = hasValue
-    ? formatIndicatorValue(latest!.raw_value, indicator.unit)
-    : { display: "-", displayUnit: indicator.unit };
-
-  const threshold = latest?.threshold ?? null;
-  const thresholdDisplay =
-    threshold !== null ? formatIndicatorValue(threshold, indicator.unit) : null;
-  const directionLabel = indicator.direction === "low" ? "이하" : "이상";
-
-  const icon = ICONS[indicator.slug] ?? "insights";
-  const period = PERIODS[indicator.slug];
-
-  // HIT 카드는 붉은 테두리 + 그림자로 강조하고 2열을 차지해 눈에 띄게 한다.
-  const cardStyle: React.CSSProperties = {
-    background: C.card,
-    borderRadius: 20,
-    padding: 28,
-    display: "flex",
-    flexDirection: "column",
-    position: "relative",
-    minHeight: 236,
-    boxShadow: isHit
-      ? "0 8px 24px -12px rgba(255,107,129,0.35)"
-      : "0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -2px rgba(0,0,0,0.08)",
-    border: isHit ? "2px solid rgba(255,107,129,0.18)" : "2px solid transparent",
-  };
-
-  return (
-    <div className={isHit ? "hz-span2" : undefined} style={cardStyle}>
-      {isHit && (
-        <span
-          style={{
-            position: "absolute",
-            top: 22,
-            right: 22,
-            background: C.mania,
-            color: "#fff",
-            fontWeight: 800,
-            fontSize: 11,
-            padding: "6px 12px",
-            borderRadius: 8,
-          }}
-        >
-          🎯 HIT
-        </span>
-      )}
-
-      {/* 캐치프레이즈(headline) */}
-      {indicator.headline && (
-        <p
-          style={{
-            margin: "0 0 14px",
-            fontSize: 12,
-            fontWeight: 800,
-            fontStyle: "italic",
-            textTransform: "uppercase",
-            letterSpacing: "0.04em",
-            color,
-            paddingRight: isHit ? 64 : 0,
-          }}
-        >
-          &ldquo;{indicator.headline}&rdquo;
-        </p>
-      )}
-
-      {/* 아이콘 + 이름 + 기간 배지 */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-        <Icon name={icon} style={{ fontSize: 28, color }} />
-        <h3
-          style={{
-            margin: 0,
-            fontSize: 17,
-            fontWeight: 800,
-            color: C.ink,
-            lineHeight: 1.2,
-            wordBreak: "keep-all",
-          }}
-        >
-          {indicator.name}
-        </h3>
-        {period && (
-          <span
-            style={{
-              fontSize: 9,
-              fontWeight: 700,
-              color: C.sub,
-              background: C.bg,
-              padding: "3px 8px",
-              borderRadius: 999,
-              whiteSpace: "nowrap",
-            }}
-          >
-            {period}
-          </span>
-        )}
-      </div>
-
-      {/* 값 */}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 6, marginBottom: 20 }}>
-        <span
-          style={{
-            fontFamily: MONO,
-            fontSize: 44,
-            fontWeight: 800,
-            color,
-            lineHeight: 1,
-            letterSpacing: "-0.04em",
-          }}
-        >
-          {display}
-          {displayUnit && <span style={{ fontSize: 22 }}>{displayUnit}</span>}
-        </span>
-      </div>
-
-      {/* 과열도 바 */}
-      {capped !== null && (
-        <div
-          style={{
-            background: C.bg,
-            borderRadius: 14,
-            padding: "16px 18px",
-            marginBottom: 4,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: 11,
-              fontWeight: 800,
-              marginBottom: 8,
-            }}
-          >
-            <span style={{ color: C.sub }}>과열도</span>
-            <span style={{ color, fontFamily: MONO }}>
-              {Math.round(capped)}
-              <span style={{ color: "#a9b0bd" }}>/100</span>
-            </span>
-          </div>
-          <div style={{ position: "relative", height: 10, background: C.track, borderRadius: 999, overflow: "hidden" }}>
-            <div
-              style={{
-                height: "100%",
-                width: `${capped}%`,
-                background: isHit
-                  ? `linear-gradient(90deg, ${C.hot}, ${C.mania})`
-                  : color,
-                borderRadius: 999,
-              }}
-            />
-          </div>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: 9,
-              fontWeight: 700,
-              color: C.sub,
-              marginTop: 7,
-            }}
-          >
-            <span>안심</span>
-            <span style={{ color: C.hot }}>과열 100</span>
-          </div>
-          {thresholdDisplay && (
-            <p
-              style={{
-                margin: "8px 0 0",
-                textAlign: "center",
-                fontSize: 10,
-                fontWeight: 700,
-                color: C.sub,
-                fontFamily: MONO,
-              }}
-            >
-              기준선 {thresholdDisplay.display}
-              {thresholdDisplay.displayUnit} {directionLabel}
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* 설명 */}
-      <p
-        style={{
-          margin: "auto 0 0",
-          paddingTop: 18,
-          fontSize: 13,
-          color: C.sub,
-          fontWeight: 500,
-          borderTop: "1px solid rgba(0,0,0,0.05)",
-          marginTop: 18,
-          lineHeight: 1.5,
-        }}
-      >
-        {indicator.description_beginner}
-      </p>
-    </div>
-  );
-}
-
-function SectionHeading({ title }: { title: string }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 28 }}>
-      <h2 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: C.ink }}>{title}</h2>
-      <div style={{ height: 1, flex: 1, background: C.line }} />
-    </div>
   );
 }
 
@@ -478,48 +402,14 @@ const NAV = [
 
 function Sidebar() {
   return (
-    <aside
-      className="hz-sidebar"
-      style={{
-        width: 248,
-        flexShrink: 0,
-        background: C.card,
-        borderRight: `1px solid ${C.line}`,
-        padding: "32px 0",
-      }}
-    >
+    <aside className="hz-sidebar" style={{ width: 248, flexShrink: 0, background: C.card, borderRight: `1px solid ${C.line}`, padding: "32px 0" }}>
       <div style={{ padding: "0 32px", marginBottom: 48 }}>
-        <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, color: C.blue, letterSpacing: "-0.04em" }}>
-          HATZZE
-        </h1>
-        <p
-          style={{
-            margin: "6px 0 0",
-            fontSize: 10,
-            fontWeight: 700,
-            color: C.sub,
-            textTransform: "uppercase",
-            letterSpacing: "0.2em",
-          }}
-        >
-          시장 과열도 분석
-        </p>
+        <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, color: C.blue, letterSpacing: "-0.04em" }}>HATZZE</h1>
+        <p style={{ margin: "6px 0 0", fontSize: 10, fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.2em" }}>시장 과열도 분석</p>
       </div>
       <nav style={{ flex: 1, padding: "0 16px", display: "flex", flexDirection: "column", gap: 8 }}>
         {NAV.map((item) => (
-          <span
-            key={item.label}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              padding: "16px 20px",
-              color: item.active ? C.blue : C.sub,
-              fontWeight: item.active ? 700 : 600,
-              background: item.active ? "rgba(0,100,255,0.08)" : "transparent",
-              borderRadius: 14,
-            }}
-          >
+          <span key={item.label} style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 20px", color: item.active ? C.blue : C.sub, fontWeight: item.active ? 700 : 600, background: item.active ? "rgba(0,100,255,0.08)" : "transparent", borderRadius: 14 }}>
             <Icon name={item.icon} />
             <span style={{ fontSize: 15 }}>{item.label}</span>
           </span>
@@ -532,18 +422,7 @@ function Sidebar() {
 function TopBar({ dailyScore }: { dailyScore: DailyScore | null }) {
   const stage = dailyScore ? STAGE_META[dailyScore.stage] : undefined;
   return (
-    <header
-      style={{
-        height: 64,
-        flexShrink: 0,
-        background: C.card,
-        borderBottom: `1px solid ${C.line}`,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "0 32px",
-      }}
-    >
+    <header style={{ height: 64, flexShrink: 0, background: C.card, borderBottom: `1px solid ${C.line}`, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 32px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, fontFamily: MONO, overflow: "hidden" }}>
         {dailyScore ? (
           <>
@@ -551,10 +430,7 @@ function TopBar({ dailyScore }: { dailyScore: DailyScore | null }) {
             <span style={{ fontSize: 13, fontWeight: 800, color: stage?.color ?? C.ink }}>
               {formatIndicatorValue(dailyScore.score, "%").display}% · {dailyScore.stage}
             </span>
-            <span
-              className="hz-topbar-date"
-              style={{ fontSize: 11, fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}
-            >
+            <span className="hz-topbar-date" style={{ fontSize: 11, fontWeight: 600, color: C.sub, whiteSpace: "nowrap" }}>
               {formatKstDateTime(dailyScore.updated_at)}
             </span>
           </>
@@ -564,49 +440,587 @@ function TopBar({ dailyScore }: { dailyScore: DailyScore | null }) {
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
         <div style={{ position: "relative" }}>
-          <Icon
-            name="search"
-            style={{
-              position: "absolute",
-              left: 12,
-              top: "50%",
-              transform: "translateY(-50%)",
-              color: C.sub,
-              fontSize: 20,
-            }}
-          />
-          <input
-            placeholder="지표 검색..."
-            style={{
-              background: C.bg,
-              border: "none",
-              borderRadius: 12,
-              padding: "9px 16px 9px 40px",
-              fontSize: 12,
-              width: 240,
-              maxWidth: "40vw",
-              color: C.ink,
-              outline: "none",
-              fontFamily: "inherit",
-            }}
-          />
+          <Icon name="search" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: C.sub, fontSize: 20 }} />
+          <input placeholder="지표 검색..." style={{ background: C.bg, border: "none", borderRadius: 12, padding: "9px 16px 9px 40px", fontSize: 12, width: 240, maxWidth: "40vw", color: C.ink, outline: "none", fontFamily: "inherit" }} />
         </div>
       </div>
     </header>
   );
 }
 
-// ── 페이지 ────────────────────────────────────────────────────────
-export default async function Home() {
-  const [dailyScore, indicators] = await Promise.all([
-    getLatestDailyScore(),
-    getPublicIndicators(),
-  ]);
+// ── 소형 시각화 조각 ──────────────────────────────────────────────
+function Donut({ pct, color }: { pct: number; color: string }) {
+  const circ = 2 * Math.PI * 15.5;
+  const fill = (Math.max(0, Math.min(100, pct)) / 100) * circ;
+  return (
+    <svg width="116" height="116" viewBox="0 0 36 36">
+      <circle cx="18" cy="18" r="15.5" fill="none" stroke={C.bg} strokeWidth="5" />
+      <circle cx="18" cy="18" r="15.5" fill="none" stroke={color} strokeWidth="5" strokeLinecap="round" strokeDasharray={`${fill} ${circ - fill}`} transform="rotate(-90 18 18)" />
+    </svg>
+  );
+}
 
-  const traditional = indicators.filter((i) => i.category === "정통");
-  const meme = indicators.filter((i) => i.category === "밈");
-  const countHits = (list: IndicatorWithLatestValue[]) =>
-    list.filter((i) => (i.latest?.normalized_score ?? 0) >= 100).length;
+// 반원 게이지 (과열도 0~100 → 바늘 각도).
+function HalfGauge({ score, color }: { score: number; color: string }) {
+  const s = Math.max(0, Math.min(100, score));
+  const theta = ((180 - (s / 100) * 180) * Math.PI) / 180;
+  const L = 78;
+  const x2 = 96 + L * Math.cos(theta);
+  const y2 = 90 - L * Math.sin(theta);
+  return (
+    <svg viewBox="0 0 196 100" style={{ width: 196, height: 86, overflow: "visible" }}>
+      <path d="M 14 90 A 82 82 0 0 1 178 90" fill="none" stroke="#bfe0f2" strokeWidth="13" strokeLinecap="round" />
+      <path d="M 96 8 A 82 82 0 0 1 178 90" fill="none" stroke="#ffd3ab" strokeWidth="13" strokeLinecap="round" />
+      <line x1="96" y1="90" x2={x2} y2={y2} stroke={color} strokeWidth="3" strokeLinecap="round" />
+      <circle cx="96" cy="90" r="6" fill={C.ink} />
+    </svg>
+  );
+}
+
+// 우상향/우하향 추세를 암시하는 장식용 라인 (실제 시계열이 아님).
+function TrendLine({ color, down = false }: { color: string; down?: boolean }) {
+  const d = down ? "M0 18 L25 22 L50 28 L75 34 L98 40" : "M0 42 L25 38 L50 30 L75 20 L98 14";
+  return (
+    <svg width="100%" height="100%" viewBox="0 0 100 52" preserveAspectRatio="none" style={{ position: "absolute", inset: 0 }}>
+      <path d={d} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// ── 정통 지표 카드들 (목업 순서대로) ──────────────────────────────
+
+// 1. 버핏지수 — 경제(GDP) vs 증시 시총 비교 (실제 값으로 복원 가능)
+function CardBuffett({ v }: { v: Pick }) {
+  const ratio = v.raw !== null ? v.raw / 100 : null; // 시총/GDP 배수
+  const gdpWidth = v.raw && v.raw > 0 ? Math.min(100, (100 / v.raw) * 100) : 46;
+  return (
+    <Shell span={2} hit={v.isHit} minH={236}>
+      {v.isHit && <HitBadge />}
+      <Tag text={v.headline} color={v.color} />
+      <TitleRow icon="payments" iconSize={30} color={v.color} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="당일 기준" />
+      <Big disp={v.disp} unit={v.unit} color={v.color} size={52} sub={ratio !== null ? `${ratio.toFixed(1)}배 · 과열도 ${v.capped !== null ? Math.round(v.capped) : "-"}` : undefined} />
+      <div style={{ background: C.bg, borderRadius: 14, padding: "18px 18px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 6 }}>
+            <span>나라 경제 (GDP)</span>
+            <span style={{ fontFamily: MONO }}>기준 100</span>
+          </div>
+          <div style={{ height: 18, background: "#c9cede", borderRadius: 6, overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${gdpWidth}%`, background: "#8a93a8", borderRadius: 6 }} />
+          </div>
+        </div>
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 800, color: v.color, marginBottom: 6 }}>
+            <span>증시 시가총액</span>
+            <span style={{ fontFamily: MONO }}>{v.disp} · {ratio !== null ? `${ratio.toFixed(1)}배` : "-"}</span>
+          </div>
+          <div style={{ height: 18, background: "#c9cede", borderRadius: 6, overflow: "hidden" }}>
+            <div style={{ height: "100%", width: "100%", background: `linear-gradient(90deg,${C.hot},${C.mania})`, borderRadius: 6 }} />
+          </div>
+        </div>
+        <p style={{ margin: "2px 0 0", fontSize: 11, fontWeight: 700, color: "#3a4453", textAlign: "center" }}>
+          증시가 실물 경제보다 <span style={{ color: v.color }}>{ratio !== null ? `${ratio.toFixed(1)}배 커진` : "커진"}</span> 상태예요
+        </p>
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+// 2. 레버리지 지수 — 역대 범위 내 위치 (세부 ETF/선물 분해는 DB 미보유 → 과열도로 표현)
+function CardLeverage({ v }: { v: Pick }) {
+  return (
+    <Shell span={2} hit={v.isHit} minH={236}>
+      {v.isHit && <HitBadge />}
+      <Tag text={v.headline} color={v.color} />
+      <TitleRow icon="rocket_launch" iconSize={30} color={v.color} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="당일 기준" />
+      <Big disp={v.disp} unit={v.unit} color={v.color} size={44} sub={v.capped !== null ? `과열도 ${Math.round(v.capped)}` : undefined} />
+      <div style={{ background: C.bg, borderRadius: 14, padding: 18 }}>
+        <div style={{ position: "relative", height: 12, background: C.line, borderRadius: 999, overflow: "hidden" }}>
+          <div style={{ position: "absolute", inset: 0, width: `${v.capped ?? 0}%`, background: `linear-gradient(90deg,${C.hot},${C.mania})`, borderRadius: 999 }} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 700, color: C.sub, marginTop: 7 }}>
+          <span>역대 최저</span>
+          <span style={{ color: v.color }}>▲ 지금{v.isHit ? " · 역대 최고" : ""}</span>
+        </div>
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+// 3. 매수 쏠림 지수 — 순 쏠림(중앙 기준 다이버징). 세부 건수는 DB 미보유.
+function CardMarketActions({ v }: { v: Pick }) {
+  const buy = (v.raw ?? 0) > 0;
+  const mag = v.threshold ? Math.min(100, (Math.abs(v.raw ?? 0) / Math.abs(v.threshold)) * 50) : 20;
+  return (
+    <Shell span={2} hit={v.isHit} minH={236}>
+      {v.isHit && <HitBadge />}
+      <Tag text={v.headline} color={v.color} />
+      <TitleRow icon="speed" iconSize={30} color={v.color} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="최근 30일" />
+      <Big disp={v.raw !== null && v.raw > 0 ? `+${v.disp}` : v.disp} color={v.color} size={44} sub="최근 30일 순 쏠림" />
+      <div style={{ background: C.bg, borderRadius: 14, padding: 18 }}>
+        <div style={{ position: "relative", height: 16, background: C.line, borderRadius: 999 }}>
+          <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 2, background: "rgba(32,38,50,0.4)" }} />
+          <div style={{ position: "absolute", top: 0, bottom: 0, borderRadius: 999, background: v.color, ...(buy ? { left: "50%", width: `${mag}%` } : { right: "50%", width: `${mag}%` }) }} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 700, color: C.sub, marginTop: 8 }}>
+          <span style={{ color: C.cold }}>매도 우세</span>
+          <span style={{ color: C.hot }}>매수 우세</span>
+        </div>
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+// 4. 상위 10종목 쏠림 — 도넛 (실제 비중으로 복원)
+function CardTop10({ v }: { v: Pick }) {
+  const pct = v.raw ?? 0;
+  return (
+    <Shell minH={230}>
+      <Tag text={v.headline} color={v.color} />
+      <TitleRow icon="pie_chart" name={v.name} color={v.color} />
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
+        <div style={{ position: "relative", width: 116, height: 116 }}>
+          <Donut pct={pct} color={v.color} />
+          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 800, color: v.color, lineHeight: 1 }}>{v.disp}{v.unit}</span>
+            <span style={{ fontSize: 8, fontWeight: 700, color: C.sub, marginTop: 2 }}>Top 10</span>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 14, fontSize: 10, fontWeight: 700, color: C.sub }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 9, height: 9, borderRadius: 3, background: v.color }} />상위 10 · {v.disp}{v.unit}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 9, height: 9, borderRadius: 3, background: C.line }} />나머지 · {v.raw !== null ? `${(100 - v.raw).toFixed(1)}%` : "-"}</span>
+        </div>
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+// 5. 코스피 신고가 괴리율 — 세로 게이지 (실제 값으로 복원)
+function CardHighGap({ v }: { v: Pick }) {
+  const gap = v.raw ?? 0;
+  const fillH = Math.max(0, Math.min(100, 100 - Math.abs(gap)));
+  return (
+    <Shell minH={230}>
+      <Tag text={v.headline} color={v.color} />
+      <TitleRow icon="vertical_align_top" name={v.name} color={v.color} />
+      <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1 }}>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <span style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}{v.unit}</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginTop: 4 }}>{gap < 0 ? "전고점까지 남음" : "전고점 돌파"}</span>
+        </div>
+        <div style={{ flex: 1, alignSelf: "stretch", display: "flex", justifyContent: "center", padding: "6px 0" }}>
+          <div style={{ width: 74, position: "relative", background: C.bg, borderRadius: 10, overflow: "hidden" }}>
+            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: `${fillH}%`, background: `linear-gradient(180deg,#7cbde6,${C.cold})` }} />
+            <span style={{ position: "absolute", top: 6, right: 8, fontSize: 9, fontWeight: 800, color: C.ink }}>전고점</span>
+          </div>
+        </div>
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+// 6. VKOSPI — 반원 게이지 (과열도 + 실제 값)
+function CardVkospi({ v }: { v: Pick }) {
+  return (
+    <Shell minH={230}>
+      <Tag text={v.headline} color={v.color} />
+      <TitleRow icon="monitor_heart" name={v.name} color={v.color} />
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
+        <HalfGauge score={v.capped ?? 0} color={v.color} />
+        <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+          <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: v.color, lineHeight: 1 }}>{v.capped !== null ? Math.round(v.capped) : "-"}</span>
+          <span style={{ fontSize: 13, fontWeight: 800, color: "#a9b0bd" }}>/100</span>
+          <span style={{ fontSize: 11, fontWeight: 800, color: v.color, marginLeft: 2 }}>과열도</span>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", width: 182, fontSize: 9, fontWeight: 800, marginTop: 2 }}>
+          <span style={{ color: C.cold }}>안심</span>
+          <span style={{ color: C.hot }}>과열</span>
+        </div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginTop: 2 }}>실제 VKOSPI <b style={{ color: C.ink }}>{v.disp}</b> · 낮을수록 과열</div>
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+// 7. VIX 대비 VKOSPI 스프레드 (스프레드 실제 값 + 과열도)
+function CardVixSpread({ v }: { v: Pick }) {
+  return (
+    <Shell minH={230}>
+      <Tag text={v.headline} color={v.color} />
+      <TitleRow icon="compare_arrows" name={v.name} color={v.color} />
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.bg, borderRadius: 10, padding: 12 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: C.sub }}>공포 격차</span>
+          <span style={{ fontFamily: MONO, fontSize: 24, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>
+        </div>
+        <HeatBar v={v} />
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+// 8. 코스피 vs 아시아 (상대 강도 실제 값 + 과열도). 4개국 개별값은 DB 미보유.
+function CardAsia({ v }: { v: Pick }) {
+  return (
+    <Shell span={2} minH={230}>
+      <Tag text={v.headline} color={v.color} />
+      <TitleRow icon="public" name={v.name} color={v.color} />
+      <Big disp={v.raw !== null && v.raw > 0 ? `+${v.disp}` : v.disp} unit={v.unit} color={v.color} size={40} sub="아시아 3국 평균 대비" />
+      <HeatBar v={v} />
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+// 9. 위험자산 vs 안전자산 — 금/코스닥 두 지표 결합 (둘 다 실제 값)
+function SubRatio({ v, icon, note }: { v: Pick; icon: string; note: string }) {
+  return (
+    <div style={{ flex: 1 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <Icon name={icon} style={{ fontSize: 20, color: C.sub }} />
+        <span style={{ fontSize: 13, fontWeight: 800, wordBreak: "keep-all" }}>{v.name}</span>
+      </div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 14 }}>
+        <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>
+        {v.thDisp && <span style={{ fontSize: 10, fontWeight: 700, color: C.sub }}>기준 {v.thDisp}</span>}
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, fontWeight: 800, marginBottom: 6 }}>
+        <span style={{ color: C.sub }}>과열도</span>
+        <span style={{ color: v.color }}>{v.capped !== null ? Math.round(v.capped) : "-"} / 100</span>
+      </div>
+      <div style={{ position: "relative", height: 10, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
+        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${v.capped ?? 0}%`, background: `linear-gradient(90deg,${C.hot},${C.mania})`, borderRadius: 999 }} />
+      </div>
+      <p style={{ margin: "12px 0 0", fontSize: 11, color: C.sub, fontWeight: 600, lineHeight: 1.5 }}>{note}</p>
+    </div>
+  );
+}
+
+function CardRiskAssets({ gold, kosdaq }: { gold: Pick; kosdaq: Pick }) {
+  return (
+    <Shell span={2} minH={230}>
+      <Tag text="위험자산 vs 안전자산" color={C.sub} />
+      <div style={{ display: "flex", gap: 32 }}>
+        <SubRatio v={gold} icon="balance" note={gold.desc} />
+        <div style={{ width: 1, background: C.line }} />
+        <SubRatio v={kosdaq} icon="celebration" note={kosdaq.desc} />
+      </div>
+    </Shell>
+  );
+}
+
+// 10. 거래대금 급증도 — 오늘 vs 과열기준 막대
+function CardVolume({ v }: { v: Pick }) {
+  const todayH = 100;
+  const baseH = v.raw && v.threshold ? Math.max(20, Math.min(100, (v.threshold / v.raw) * 100)) : 70;
+  return (
+    <Shell minH={230}>
+      <Tag text={v.headline} color={v.color} />
+      <TitleRow icon="groups" name={v.name} color={v.color} />
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 12, height: 120, flex: 1 }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, height: "100%" }}>
+          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: C.neutral }}>{v.thDisp ?? "-"}</span>
+          <div style={{ width: "100%", height: `${baseH}%`, background: C.line, borderRadius: "6px 6px 0 0" }} />
+          <span style={{ fontSize: 9, fontWeight: 700, color: C.sub }}>과열 기준</span>
+        </div>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, height: "100%" }}>
+          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>
+          <div style={{ width: "100%", height: `${todayH}%`, background: v.color, borderRadius: "6px 6px 0 0" }} />
+          <span style={{ fontSize: 9, fontWeight: 700, color: C.sub }}>오늘</span>
+        </div>
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+// 11. 원/달러 환율 변동성 — 값 + 장식 파동 + 과열도
+function CardFx({ v }: { v: Pick }) {
+  return (
+    <Shell minH={230}>
+      <Tag text={v.headline} color={v.color} />
+      <TitleRow icon="waves" name={v.name} color={v.color} />
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
+        <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>±{v.disp}{v.unit}</span>
+        <span style={{ fontSize: 11, fontWeight: 800, color: v.color }}>과열도 {v.capped !== null ? Math.round(v.capped) : "-"}</span>
+      </div>
+      <div style={{ flex: 1, position: "relative", minHeight: 50, display: "flex", alignItems: "center" }}>
+        <svg width="100%" height="50" viewBox="0 0 100 50" preserveAspectRatio="none" style={{ position: "absolute", inset: 0 }}>
+          <line x1="0" y1="25" x2="100" y2="25" stroke={C.line} strokeWidth="0.8" strokeDasharray="2,2" />
+          <path d="M0 25 C5 20 9 20 13 25 S21 30 26 25 S34 20 39 25 S47 30 52 25 S60 20 65 25 S73 30 78 25 S86 20 91 25 S99 29 100 25" fill="none" stroke={v.color} strokeWidth="2.2" strokeLinecap="round" />
+        </svg>
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+// 12·14. 미국 10년물 금리 / 장단기 금리차 — 범위 바 + 마커
+function CardRangeRate({ v, icon, warn = false }: { v: Pick; icon: string; warn?: boolean }) {
+  const pos = v.capped !== null ? Math.max(4, Math.min(96, v.capped)) : 50;
+  return (
+    <Shell minH={230}>
+      {warn && v.raw !== null && v.raw < 0 && <HitBadge label="⚠ 역전" small />}
+      <Tag text={v.headline} color={v.color} />
+      <TitleRow icon={icon} name={v.name} color={v.color} />
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 20 }}>
+        <span style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}{v.unit}</span>
+      </div>
+      <div style={{ marginTop: "auto" }}>
+        <div style={{ position: "relative", height: 12, borderRadius: 999, background: C.bg, overflow: "hidden" }}>
+          <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: `${pos}%`, background: v.color }} />
+        </div>
+        <div style={{ position: "relative", height: 0 }}>
+          <div className={warn ? "hz-pulse-red" : undefined} style={{ position: "absolute", top: -13, transform: "translateX(-50%)", left: `${pos}%`, width: 16, height: 16, borderRadius: 999, background: v.color, border: `3px solid ${C.card}`, boxShadow: "0 1px 4px rgba(0,0,0,.2)" }} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 800, color: C.sub, marginTop: 10 }}>
+          <span>낮음</span>
+          <span style={{ color: v.color }}>높음 · 부담</span>
+        </div>
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+// 13. 구리 가격 모멘텀 — 값 + 장식 상승 라인 + 과열도
+function CardCopper({ v }: { v: Pick }) {
+  return (
+    <Shell minH={230}>
+      <Tag text={v.headline} color={v.color} />
+      <TitleRow icon="bolt" name={v.name} color={v.color} />
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
+        <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.raw !== null && v.raw > 0 ? "+" : ""}{v.disp}{v.unit}</span>
+        <span style={{ fontSize: 11, fontWeight: 800, color: v.color }}>과열도 {v.capped !== null ? Math.round(v.capped) : "-"}</span>
+      </div>
+      <div style={{ flex: 1, position: "relative", minHeight: 56 }}>
+        <TrendLine color={v.color} down={v.raw !== null && v.raw < 0} />
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+// 15. 신용융자 잔고 — DB 미보유 placeholder ("준비 중")
+function CardComingSoon() {
+  return (
+    <Shell minH={230}>
+      <div style={{ opacity: 0.85, display: "flex", flexDirection: "column", flex: 1 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <p style={{ margin: 0, fontSize: 10, fontWeight: 800, fontStyle: "italic", textTransform: "uppercase", letterSpacing: "0.04em", color: C.sub }}>&ldquo;빚내서 사는 돈의 크기&rdquo;</p>
+          <span style={{ background: "rgba(0,100,255,0.08)", color: C.blue, fontWeight: 800, padding: "4px 9px", borderRadius: 6, fontSize: 9 }}>준비 중</span>
+        </div>
+        <TitleRow icon="credit_score" name={<span style={{ color: "#8a919e" }}>신용융자 잔고</span>} color="#a9b0bd" />
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <svg width="100%" height="70" viewBox="0 0 100 40" preserveAspectRatio="none">
+            <path d="M0 34 L20 32 L40 28 L60 22 L80 15 L100 8" fill="none" stroke={C.line} strokeDasharray="4,3" strokeWidth="2.5" strokeLinecap="round" />
+          </svg>
+        </div>
+        <Foot text="빚내서 주식 사는 돈이 불어나면 과열의 대표 신호로 볼 수 있어요." color="#8a919e" />
+      </div>
+    </Shell>
+  );
+}
+
+// ── 소셜 지표 카드들 ──────────────────────────────────────────────
+
+// 라인+마커형 (초보검색/재테크도서/GitHub/자영업)
+function CardTrend({ v, icon }: { v: Pick; icon: string }) {
+  return (
+    <Shell minH={210}>
+      <Tag text={v.headline} color={v.color} />
+      <TitleRow icon={icon} name={v.name} iconSize={22} color={v.color} />
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+        <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}{v.unit}</span>
+        <span style={{ fontSize: 10, fontWeight: 800, color: v.color }}>과열도 {v.capped !== null ? Math.round(v.capped) : "-"}</span>
+      </div>
+      <div style={{ flex: 1, position: "relative", minHeight: 52 }}>
+        <TrendLine color={v.color} down={(v.score ?? 0) < 33} />
+        {v.thDisp && <span style={{ position: "absolute", top: 1, left: 2, fontSize: 8, fontWeight: 800, color: C.hot }}>과열 기준 {v.thDisp}</span>}
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+// 중앙 기준 감성/카운트 바 (커뮤니티/뉴스)
+function CardSentiment({ v, icon, span = 1 }: { v: Pick; icon: string; span?: 1 | 2 }) {
+  return (
+    <Shell span={span} minH={210}>
+      <Tag text={v.headline} color={v.color} />
+      <TitleRow icon={icon} iconSize={22} color={v.color} name={v.name} right={<span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>} />
+      <div style={{ marginTop: "auto" }}>
+        <div style={{ position: "relative", height: 16, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
+          <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${v.capped ?? 0}%`, background: v.isHit ? `linear-gradient(90deg,${C.hot},${C.mania})` : v.color, borderRadius: 999 }} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 800, color: C.sub, marginTop: 8 }}>
+          <span>안심</span>
+          {v.thDisp && <span>기준 {v.thDisp} {v.dirLabel}</span>}
+          <span style={{ color: C.hot }}>과열 100</span>
+        </div>
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+// 유튜브 — 평소(기준) vs 오늘 막대 (HIT)
+function CardYoutube({ v }: { v: Pick }) {
+  const ratio = v.raw && v.threshold ? v.raw / v.threshold : null;
+  const baseH = v.raw && v.threshold ? Math.max(15, Math.min(100, (v.threshold / v.raw) * 100)) : 34;
+  return (
+    <Shell hit={v.isHit} minH={210}>
+      {v.isHit && <HitBadge label="✨ HIT" small />}
+      <Tag text={v.headline} color={v.color} />
+      <TitleRow icon="play_circle" iconSize={22} name={v.name} color={v.color} />
+      <div style={{ flex: 1, display: "flex", alignItems: "flex-end", gap: 14 }}>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 88 }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, height: "100%" }}>
+            <div style={{ width: 26, height: `${baseH}%`, background: C.line, borderRadius: "5px 5px 0 0" }} />
+            <span style={{ fontSize: 8, fontWeight: 700, color: C.sub }}>평소</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, height: "100%" }}>
+            <div style={{ width: 26, height: "100%", background: v.color, borderRadius: "5px 5px 0 0" }} />
+            <span style={{ fontSize: 8, fontWeight: 700, color: C.sub }}>오늘</span>
+          </div>
+        </div>
+        <div style={{ marginLeft: "auto", textAlign: "right" }}>
+          <div style={{ fontFamily: MONO, fontSize: 24, fontWeight: 800, color: v.color, lineHeight: 1 }}>{v.disp}{v.unit && <span style={{ fontSize: 14 }}>{v.unit}</span>}</div>
+          {ratio !== null && <div style={{ fontSize: 9, fontWeight: 800, color: v.color, marginTop: 4 }}>평소 대비 {ratio.toFixed(1)}배</div>}
+        </div>
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+// 여윳돈이 향하는 곳 — 명품/오마카세 결합
+function SubSpend({ v, icon }: { v: Pick; icon: string }) {
+  return (
+    <div style={{ flex: 1 }}>
+      <Tag text={v.headline} color={v.color} />
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <Icon name={icon} style={{ fontSize: 18, color: C.sub }} />
+        <span style={{ fontSize: 12, fontWeight: 700, wordBreak: "keep-all" }}>{v.name}</span>
+      </div>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
+        <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>
+        <span style={{ fontSize: 10, fontWeight: 800, color: v.color, paddingBottom: 4 }}>과열도 {v.capped !== null ? Math.round(v.capped) : "-"}</span>
+      </div>
+      <p style={{ margin: "10px 0 0", fontSize: 11, color: C.sub, fontWeight: 600, lineHeight: 1.5 }}>{v.desc}</p>
+    </div>
+  );
+}
+
+function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick }) {
+  return (
+    <Shell span={2} minH={210}>
+      <h3 style={{ margin: "0 0 18px", fontSize: 15, fontWeight: 800 }}>여윳돈이 향하는 곳</h3>
+      <div style={{ display: "flex", gap: 32 }}>
+        <SubSpend v={luxury} icon="shopping_bag" />
+        <div style={{ width: 1, background: C.line }} />
+        <SubSpend v={dining} icon="restaurant" />
+      </div>
+    </Shell>
+  );
+}
+
+// 업비트 — 복합 점수 (김치프리미엄/거래량 분해는 DB 미보유)
+function CardUpbit({ v }: { v: Pick }) {
+  return (
+    <Shell minH={210}>
+      <Tag text={v.headline} color={v.color} />
+      <TitleRow icon="currency_bitcoin" iconSize={22} color={v.color} name={v.name} right={<span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>} />
+      <div style={{ marginTop: "auto" }}>
+        <HeatBar v={v} />
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+// 서울 맑은 날씨 — 아이콘 + 게이지 바
+function CardWeather({ v }: { v: Pick }) {
+  return (
+    <Shell minH={210}>
+      <Tag text={v.headline} color={v.color} />
+      <TitleRow icon="wb_sunny" iconSize={22} name={v.name} color={v.color} />
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
+        <Icon name={(v.score ?? 0) >= 50 ? "clear_day" : "cloudy"} style={{ fontSize: 52, color: v.color }} />
+        <span style={{ fontFamily: MONO, fontSize: 20, fontWeight: 800, color: C.ink }}>{v.disp}{v.unit}</span>
+        <div style={{ width: "100%", height: 8, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
+          <div style={{ height: "100%", width: `${v.capped ?? 0}%`, background: `linear-gradient(90deg,${C.neutral},${C.hot})` }} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", width: "100%", fontSize: 9, fontWeight: 700, color: C.sub }}>
+          <span>흐림</span>
+          <span>쾌청</span>
+        </div>
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+function SectionHeading({ title }: { title: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 28 }}>
+      <h2 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: C.ink }}>{title}</h2>
+      <div style={{ height: 1, flex: 1, background: C.line }} />
+    </div>
+  );
+}
+
+// ── 페이지 ────────────────────────────────────────────────────────
+// 목업에서 명시적으로 배치·결합·순서가 정해진 slug들. 이 목록에 없는
+// 공개 지표는 각 섹션 끝에 일반 카드로 덧붙여 자동 노출을 유지한다.
+const LAID_OUT = new Set([
+  "buffett_index", "leverage_etf_volume", "market_actions_30d", "top10_market_cap_concentration",
+  "kospi_high_gap", "vkospi", "vix_vkospi_spread", "kospi_asia_relative_strength",
+  "kospi_gold_ratio", "kosdaq_kospi_ratio", "kospi_volume_surge", "usdkrw_volatility",
+  "us10y", "copper_price_momentum", "yield_curve_spread",
+  "naver_search_trend", "dcinside_post_count", "news_sentiment", "bestseller_finance_ratio",
+  "youtube_finance_search_views", "luxury_consumption_index", "fine_dining_search_index",
+  "upbit_speculation_index", "weather_sunshine_index", "github_trading_bot_repos",
+  "small_business_crisis_index",
+]);
+
+const FALLBACK_ICONS: Record<string, string> = {
+  정통: "insights",
+  밈: "tag",
+};
+
+function GenericCard({ v, icon }: { v: Pick; icon: string }) {
+  return (
+    <Shell hit={v.isHit} minH={210}>
+      {v.isHit && <HitBadge label="🎯 HIT" small />}
+      <Tag text={v.headline} color={v.color} />
+      <TitleRow icon={icon} iconSize={22} name={v.name} color={v.color} />
+      <Big disp={v.disp} unit={v.unit} color={v.color} size={30} />
+      <div style={{ marginTop: "auto" }}>
+        <HeatBar v={v} />
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+export default async function Home() {
+  const [dailyScore, indicators] = await Promise.all([getLatestDailyScore(), getPublicIndicators()]);
+
+  const bySlug = new Map(indicators.map((i) => [i.slug, i]));
+  const p = (slug: string) => pick(bySlug.get(slug));
+  const countHits = (cat: "정통" | "밈") =>
+    indicators.filter((i) => i.category === cat && (i.latest?.normalized_score ?? 0) >= 100).length;
+
+  const extra = (cat: "정통" | "밈") =>
+    indicators.filter((i) => i.category === cat && !LAID_OUT.has(i.slug));
 
   return (
     <div
@@ -621,76 +1035,64 @@ export default async function Home() {
       }}
     >
       <Sidebar />
-
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <TopBar dailyScore={dailyScore} />
-
         <main className="hz-scroll" style={{ flex: 1, overflowY: "auto", padding: 40 }}>
-          <div
-            style={{
-              maxWidth: 1180,
-              margin: "0 auto",
-              display: "flex",
-              flexDirection: "column",
-              gap: 56,
-            }}
-          >
+          <div style={{ maxWidth: 1180, margin: "0 auto", display: "flex", flexDirection: "column", gap: 56 }}>
             {dailyScore ? (
-              <Hero
-                dailyScore={dailyScore}
-                tradHits={countHits(traditional)}
-                socialHits={countHits(meme)}
-              />
+              <Hero dailyScore={dailyScore} tradHits={countHits("정통")} socialHits={countHits("밈")} />
             ) : (
-              <section
-                style={{
-                  background: C.card,
-                  borderRadius: 24,
-                  padding: 44,
-                  textAlign: "center",
-                  color: C.sub,
-                }}
-              >
+              <section style={{ background: C.card, borderRadius: 24, padding: 44, textAlign: "center", color: C.sub }}>
                 아직 계산된 스코어가 없습니다.
               </section>
             )}
 
+            {/* 정통 지표 */}
             <section>
               <SectionHeading title="정통 지표" />
               <div className="hz-grid">
-                {traditional.map((indicator) => (
-                  <IndicatorCard key={indicator.id} indicator={indicator} />
+                <CardBuffett v={p("buffett_index")} />
+                <CardLeverage v={p("leverage_etf_volume")} />
+                <CardMarketActions v={p("market_actions_30d")} />
+                <CardTop10 v={p("top10_market_cap_concentration")} />
+                <CardHighGap v={p("kospi_high_gap")} />
+                <CardVkospi v={p("vkospi")} />
+                <CardVixSpread v={p("vix_vkospi_spread")} />
+                <CardAsia v={p("kospi_asia_relative_strength")} />
+                <CardRiskAssets gold={p("kospi_gold_ratio")} kosdaq={p("kosdaq_kospi_ratio")} />
+                <CardVolume v={p("kospi_volume_surge")} />
+                <CardFx v={p("usdkrw_volatility")} />
+                <CardRangeRate v={p("us10y")} icon="account_balance" />
+                <CardCopper v={p("copper_price_momentum")} />
+                <CardRangeRate v={p("yield_curve_spread")} icon="trending_down" warn />
+                <CardComingSoon />
+                {extra("정통").map((i) => (
+                  <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["정통"]} />
                 ))}
               </div>
             </section>
 
+            {/* 소셜 지표 */}
             <section>
               <SectionHeading title="소셜 지표" />
               <div className="hz-grid">
-                {meme.map((indicator) => (
-                  <IndicatorCard key={indicator.id} indicator={indicator} />
+                <CardTrend v={p("naver_search_trend")} icon="search" />
+                <CardSentiment v={p("dcinside_post_count")} icon="forum" span={2} />
+                <CardSentiment v={p("news_sentiment")} icon="newspaper" />
+                <CardTrend v={p("bestseller_finance_ratio")} icon="menu_book" />
+                <CardYoutube v={p("youtube_finance_search_views")} />
+                <CardSpending luxury={p("luxury_consumption_index")} dining={p("fine_dining_search_index")} />
+                <CardUpbit v={p("upbit_speculation_index")} />
+                <CardWeather v={p("weather_sunshine_index")} />
+                <CardTrend v={p("github_trading_bot_repos")} icon="terminal" />
+                <CardTrend v={p("small_business_crisis_index")} icon="storefront" />
+                {extra("밈").map((i) => (
+                  <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["밈"]} />
                 ))}
-                <a
-                  href="#"
-                  style={{
-                    border: `2px dashed ${C.line}`,
-                    borderRadius: 20,
-                    padding: 24,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 10,
-                    minHeight: 236,
-                    color: C.sub,
-                    textAlign: "center",
-                  }}
-                >
+                <a href="#" style={{ border: `2px dashed ${C.line}`, borderRadius: 20, padding: 24, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, minHeight: 210, color: C.sub, textAlign: "center" }}>
                   <Icon name="add_circle" style={{ fontSize: 34 }} />
                   <span style={{ fontSize: 14, fontWeight: 700 }}>새로운 지표 제보하기</span>
-                  <span style={{ fontSize: 11, fontWeight: 500, color: "#8a919e" }}>
-                    아이디어가 있다면 알려주세요
-                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 500, color: "#8a919e" }}>아이디어가 있다면 알려주세요</span>
                 </a>
               </div>
             </section>
