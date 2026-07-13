@@ -1,6 +1,6 @@
 import "server-only";
 
-import { supabaseServer } from "@/lib/supabase-server";
+import { getSupabaseServer } from "@/lib/supabase-server";
 
 export type DailyScore = {
   date: string;
@@ -27,7 +27,7 @@ export type IndicatorWithLatestValue = {
 };
 
 export async function getLatestDailyScore(): Promise<DailyScore | null> {
-  const { data, error } = await supabaseServer
+  const { data, error } = await getSupabaseServer()
     .from("daily_score")
     .select("date,score,stage,updated_at")
     .order("date", { ascending: false })
@@ -42,7 +42,7 @@ export async function getPublicIndicators(): Promise<IndicatorWithLatestValue[]>
   // is_public=false인 지표(예: kospi_close_raw)는 다른 지표를 계산하기 위한
   // 내부용 캐시라 화면에 노출하지 않는다. 그 외에는 새로 추가되는 지표도
   // 코드 수정 없이 자동으로 표시된다.
-  const { data, error } = await supabaseServer
+  const { data, error } = await getSupabaseServer()
     .from("indicators")
     .select(
       `
