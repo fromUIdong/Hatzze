@@ -583,7 +583,7 @@ function CardBuffett({ v }: { v: Pick }) {
             <span>
               나라 경제 (GDP)
               {dt && dt.gdp_year ? (
-                <span style={{ color: "#a9b0bd", fontWeight: 600 }}> · {dt.gdp_year} {dt.gdp_q}분기</span>
+                <span style={{ color: "#a9b0bd", fontWeight: 600 }}> · 최근 4개 분기(~{dt.gdp_year} {dt.gdp_q}분기)</span>
               ) : null}
             </span>
             <span style={{ fontFamily: MONO }}>{dt && dt.gdp ? `약 ${jo(dt.gdp)}조원` : "기준 100"}</span>
@@ -788,6 +788,15 @@ function CardVkospi({ v }: { v: Pick }) {
 function CardVixSpread({ v }: { v: Pick }) {
   const dt = v.details;
   const hasPct = !!dt && "vix_pct" in dt && "vkospi_pct" in dt;
+  // 부호에 따라 방향 문구를 바꾼다 — 음수면 한국이 오히려 더 출렁이는 것이므로
+  // "한국이 더 잠잠"이라고 하면 안 된다. 크기는 절댓값으로 보여준다.
+  const rawv = v.raw ?? 0;
+  const spread =
+    rawv > 0
+      ? { label: "한국이 더 잠잠", color: C.hot }
+      : rawv < 0
+        ? { label: "한국이 더 출렁", color: C.cold }
+        : { label: "미·한 비슷", color: C.sub };
   return (
     <Shell minH={230}>
       <Tag text={v.headline} color={v.color} />
@@ -799,10 +808,9 @@ function CardVixSpread({ v }: { v: Pick }) {
             <VixPctRow flag="🇺🇸" label="VIX" pct={dt!.vix_pct} color={C.mania} />
             <VixPctRow flag="🇰🇷" label="VKOSPI" pct={dt!.vkospi_pct} color={C.cold} />
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.bg, borderRadius: 10, padding: 9 }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: C.sub }}>한국이 더 잠잠</span>
-              <span style={{ fontFamily: MONO, fontSize: 20, fontWeight: 800, color: v.color }}>
-                {v.raw !== null && v.raw > 0 ? "+" : ""}
-                {v.disp}
+              <span style={{ fontSize: 10, fontWeight: 700, color: C.sub }}>{spread.label}</span>
+              <span style={{ fontFamily: MONO, fontSize: 20, fontWeight: 800, color: spread.color }}>
+                {Math.abs(Math.round(rawv))}
                 {v.unit}
               </span>
             </div>
