@@ -549,15 +549,15 @@ function UpbitSubBar({ label, value, pct, color }: { label: string; value: strin
   );
 }
 
-// VIX/VKOSPI 카드의 국가별 변동성 바
-function VixRow({ flag, label, value, pct, color }: { flag: string; label: string; value: number; pct: number; color: string }) {
+// VIX/VKOSPI 카드의 국가별 값 칩. VIX와 KRX "코스피 200 변동성지수"는 산출
+// 기준이 달라 절대 크기를 나란히 막대로 비교하면(예: 78 vs 15) 한국 변동성이
+// 훨씬 큰 것처럼 오해를 준다. 그래서 각 값은 비교 막대 없이 사실값 칩으로만
+// 보여주고, 실제 신호는 아래의 격차(spread) + 과열도로 전달한다.
+function VixChip({ flag, label, value }: { flag: string; label: string; value: number }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <span style={{ width: 74, fontSize: 10, fontWeight: 800, color, textAlign: "right" }}>{flag} {label}</span>
-      <div style={{ flex: 1, height: 9, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, pct))}%`, background: color, borderRadius: 999 }} />
-      </div>
-      <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, color, width: 30, textAlign: "right" }}>{value.toFixed(0)}</span>
+    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: C.bg, borderRadius: 10, padding: "8px 6px" }}>
+      <span style={{ fontSize: 10, fontWeight: 800, color: C.sub }}>{flag} {label}</span>
+      <span style={{ fontFamily: MONO, fontSize: 15, fontWeight: 800, color: C.ink }}>{value.toFixed(1)}</span>
     </div>
   );
 }
@@ -747,26 +747,26 @@ function CardVkospi({ v }: { v: Pick }) {
   );
 }
 
-// 7. VIX 대비 VKOSPI 스프레드 — VIX/VKOSPI 개별 바 + 공포격차 (details 있으면 목업 원본)
+// 7. VIX 대비 VKOSPI 스프레드 — 두 값은 산출 기준이 달라 크기 비교가 무의미하므로
+// 사실값 칩으로만 보여주고, 실제 신호(보정된 과열도)는 격차 + 과열도 바로 전달한다.
 function CardVixSpread({ v }: { v: Pick }) {
   const dt = v.details;
-  const maxV = dt ? Math.max(dt.vix ?? 0, dt.vkospi ?? 0, 1) : 1;
   return (
     <Shell minH={230}>
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="compare_arrows" name={v.name} color={v.color} />
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 12 }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 10 }}>
         {dt && (
-          <>
-            <VixRow flag="🇺🇸" label="VIX" value={dt.vix ?? 0} pct={((dt.vix ?? 0) / maxV) * 100} color={C.mania} />
-            <VixRow flag="🇰🇷" label="VKOSPI" value={dt.vkospi ?? 0} pct={((dt.vkospi ?? 0) / maxV) * 100} color={C.cold} />
-          </>
+          <div style={{ display: "flex", gap: 8 }}>
+            <VixChip flag="🇺🇸" label="VIX" value={dt.vix ?? 0} />
+            <VixChip flag="🇰🇷" label="VKOSPI" value={dt.vkospi ?? 0} />
+          </div>
         )}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.bg, borderRadius: 10, padding: dt ? 9 : 12 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.bg, borderRadius: 10, padding: 10 }}>
           <span style={{ fontSize: 10, fontWeight: 700, color: C.sub }}>공포 격차</span>
-          <span style={{ fontFamily: MONO, fontSize: dt ? 20 : 24, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>
+          <span style={{ fontFamily: MONO, fontSize: 20, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>
         </div>
-        {!dt && <HeatBar v={v} />}
+        <HeatBar v={v} />
       </div>
       <Foot text={v.desc} />
     </Shell>
