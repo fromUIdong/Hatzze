@@ -98,16 +98,25 @@ INDICATOR_THRESHOLDS = {
     # 임계선으로 잡은 논리적 추정치다 — API 승인 후 실측 분포를 보고 반드시
     # 재조정해야 한다.
     "top10_market_cap_concentration": {"kind": "fixed", "threshold": 50.0},
-    # vix_vkospi_spread: VKOSPI - VIX를 실측 1년치(2025-07~2026-07, 237거래일
-    # 공통)로 계산해보니 최솟값 2.24pt, 최댓값 79.29pt, 중앙값 18.6pt — 이 기간
-    # 동안 스프레드가 음수(한국 변동성이 미국보다 낮음)로 내려간 적은 한 번도
-    # 없었다. threshold=4.0은 하위 5%(4.16pt) 지점에 가까운 값으로, 관측치의
-    # 3.8%(9/237일)만 도달한 "스프레드가 이례적으로 좁아진" 구간이다. direction="low"라
-    # 이 값 이하로 내려가면 Hit — 한국 변동성이 미국 대비 유독 낮게 방심한 상태로 본다.
-    "vix_vkospi_spread": {"kind": "fixed", "threshold": 4.0, "direction": "low"},
+    # vix_vkospi_spread: raw = VIX 백분위 - VKOSPI 백분위(각자 최근 1년 분포 기준).
+    # VIX와 VKOSPI는 산출식·스케일이 달라(VIX~15, KRX "코스피200 변동성지수"~78) 절대값
+    # 뺄셈이 무의미해서, 각자 자기 분포 내 백분위로 바꿔 비교한다. 양수로 클수록
+    # "미국은 불안한데 한국만 유독 잠잠" = 방심(과열)이라 direction=high(기본).
+    # 실측 분포(2025-07~2026-07, 237거래일, 저장된 VKOSPI와 기존 스프레드로 VIX를 역산해
+    # 계산)로 보니 min -82.9, 중앙값 -13.4, p90 14.3, p95 31.6, max 77.1 — 양수(한국이 더
+    # 잠잠)인 날이 22%뿐이라 과열은 원래 드문 신호다. threshold=30은 상위 5.5%(13/237일)로,
+    # 기존 지표가 잡던 상위 3.8% 및 다른 지표들의 상위 5~12% 관례와 비슷한 "뚜렷한 방심"
+    # 구간이다. 음수(한국이 오히려 더 출렁)면 progress=0으로 바닥 처리한다
+    # (NEGATIVE_CURRENT_CLAMP_SLUGS).
+    "vix_vkospi_spread": {"kind": "fixed", "threshold": 30.0},
 }
 
 # 현재값이 음수로 나올 수 있는 지표(감성 점수류)는 음수를 "역방향 과열"로 해석하지
 # 않고 그냥 progress=0으로 바닥 처리한다. current/threshold*100 공식을 그대로 쓰면
 # 음수 현재값이 음수 progress를 만들어 화면에 "-12%"처럼 어색하게 표시되기 때문.
-NEGATIVE_CURRENT_CLAMP_SLUGS = {"dcinside_post_count", "news_sentiment"}
+NEGATIVE_CURRENT_CLAMP_SLUGS = {
+    "dcinside_post_count",
+    "news_sentiment",
+    # 한국이 미국보다 오히려 더 출렁이면(백분위 스프레드 음수) 방심과 반대라 progress=0.
+    "vix_vkospi_spread",
+}

@@ -1,14 +1,16 @@
 """yfinance의 VIX(^VIX) 종가와 이미 저장된 vkospi 값을 날짜로 매칭해
-"VIX 대비 VKOSPI 스프레드"(VKOSPI - VIX)를 계산해 Supabase에 upsert.
+"VIX 대비 VKOSPI 스프레드"를 계산해 Supabase에 upsert.
 
 VKOSPI는 fetch_vkospi.py가 이미 매일 수집해 indicator_values에 쌓고 있으므로
-여기서 다시 받지 않고 Supabase에서 읽기만 한다 — VIX만 새로 yfinance에서 받아
-같은 날짜끼리 뺄셈한다(fetch_yield_spread.py와 동일한 패턴).
+여기서 다시 받지 않고 Supabase에서 읽기만 한다 — VIX만 새로 yfinance에서 받는다.
 
-스프레드가 음수로 크면 "미국보다 한국 변동성이 낮다"는 뜻인데, 이게 꼭 안전하다는
-뜻은 아니다 — 오히려 한국 시장이 미국 대비 유독 방심하고 있다는 신호로 본다.
-그래서 이 지표는 direction="low"(스프레드가 낮을수록/더 마이너스일수록 과열)로
-잡는다.
+VIX와 VKOSPI(우리가 저장한 KRX "코스피 200 변동성지수")는 산출식·스케일이 서로
+달라(전자는 ~15, 후자는 ~78 수준) 절대값을 그냥 빼면 의미가 없다. 그래서 각
+지수를 자기 최근 1년 분포 내 백분위(0~100)로 바꾼 뒤, raw = VIX 백분위 - VKOSPI
+백분위로 계산한다. 양수로 클수록 "미국은 불안한데(높은 백분위) 한국만 유독
+잠잠(낮은 백분위)" = 방심 신호이므로 direction="high"다. 음수(한국이 오히려 더
+출렁)일 땐 calculate_score에서 progress를 0으로 바닥 처리한다
+(NEGATIVE_CURRENT_CLAMP_SLUGS).
 
 VIX와 VKOSPI는 각각 미국/한국 거래일 기준이라 하루 정도 어긋날 수 있는데,
 kospi_gold_ratio와 동일하게 지금 단계에서는 이 오차를 감수하고 단순 날짜
@@ -33,6 +35,7 @@ from common.supabase_client import get_client  # noqa: E402
 
 VIX_TICKER = "^VIX"
 BACKFILL_DAYS = 365
+PERCENTILE_WINDOW = 252  # 백분위 계산에 쓰는 최대 트레일링 거래일(약 1년)
 
 VKOSPI_SLUG = "vkospi"
 
@@ -42,9 +45,12 @@ INDICATOR_META = {
     "name": "VIX 대비 VKOSPI 스프레드",
     "category": "정통",
     "headline": "태평양 건너 공포와 비교하면",
-    "description_beginner": "미국 시장(VIX)보다 한국 시장(VKOSPI)이 유독 방심하고 있는지 비교해요. 스프레드가 마이너스로 클수록 한국만 유독 안일한 상태일 수 있어요",
+    "description_beginner": "미국(VIX)과 한국(VKOSPI) 변동성을 각자 최근 1년 대비 백분위로 바꿔 비교해요. 미국은 불안한데 한국만 유독 잠잠할수록(백분위 격차가 클수록) 방심 신호로 봐요",
     "unit": "pt",
-    "direction": "low",
+    # raw = VIX 백분위 - VKOSPI 백분위. 양수로 클수록 "한국만 유독 방심" = 과열이므로
+    # direction은 high(기본). VIX·VKOSPI는 산출식/스케일이 달라 절대값 뺄셈이 무의미했는데,
+    # 각자 자기 1년 분포 내 백분위로 바꾸면 스케일과 무관하게 비교할 수 있다.
+    "direction": "high",
     "weight": 2,
 }
 
@@ -54,7 +60,12 @@ def ensure_indicator(client) -> str:
         client.table("indicators").select("id").eq("slug", INDICATOR_SLUG).execute()
     )
     if existing.data:
-        return existing.data[0]["id"]
+        indicator_id = existing.data[0]["id"]
+        # 이름/설명/방향이 바뀌었을 때 기존 레코드에도 반영되도록 매 실행 갱신한다.
+        client.table("indicators").update(
+            {k: v for k, v in INDICATOR_META.items() if k != "slug"}
+        ).eq("id", indicator_id).execute()
+        return indicator_id
 
     inserted = client.table("indicators").insert(INDICATOR_META).execute()
     return inserted.data[0]["id"]
@@ -87,6 +98,21 @@ def get_indicator_values(client, indicator_id: str, start: date) -> dict[str, fl
     return {row["date"]: float(row["raw_value"]) for row in result.data}
 
 
+def trailing_percentiles(series: dict[str, float]) -> dict[str, float]:
+    """각 날짜의 값이 '자기 직전 PERCENTILE_WINDOW 거래일 분포'에서 몇 백분위인지
+    (0~100)를 계산한다. VIX와 VKOSPI는 산출식·스케일이 달라 절대값을 그대로 빼면
+    안 되므로, 각자 자기 과거 분포 내 위치(백분위)로 바꿔 비교 가능하게 만든다."""
+    dates = sorted(series)
+    vals = [series[d] for d in dates]
+    result: dict[str, float] = {}
+    for i, d in enumerate(dates):
+        lo = max(0, i - PERCENTILE_WINDOW + 1)
+        window = vals[lo : i + 1]
+        cur = vals[i]
+        result[d] = sum(1 for x in window if x <= cur) / len(window) * 100
+    return result
+
+
 def main() -> None:
     client = get_client()
     indicator_id = ensure_indicator(client)
@@ -107,17 +133,22 @@ def main() -> None:
         print("[vix_vkospi_spread] VIX/VKOSPI 시계열의 공통 날짜가 없습니다")
         return
 
-    # 공통 날짜 전체를 매 실행마다 다시 upsert한다 — raw_value(스프레드)는 동일하지만
-    # 카드용 세부값(VIX·VKOSPI 개별값)을 details(JSONB)에 채워 넣기 위해서다.
-    # normalized_score는 payload에 없어 보존되고, VIX 조회는 어차피 매 실행마다 한다.
+    # 각 지수를 자기 1년 분포 내 백분위로 바꾼 뒤, raw = VIX 백분위 - VKOSPI 백분위.
+    # 양수로 클수록 "미국은 불안한데 한국만 유독 잠잠" = 방심(과열). 매 실행 전체를
+    # 다시 upsert한다 — normalized_score는 payload에 없어 보존된다.
+    vix_pct = trailing_percentiles(vix_prices)
+    vkospi_pct = trailing_percentiles(vkospi_values)
+
     rows = [
         {
             "indicator_id": indicator_id,
             "date": d,
-            "raw_value": round(vkospi_values[d] - vix_prices[d], 2),
+            "raw_value": round(vix_pct[d] - vkospi_pct[d], 2),
             "details": {
                 "vix": round(vix_prices[d], 2),
                 "vkospi": round(vkospi_values[d], 2),
+                "vix_pct": round(vix_pct[d], 1),
+                "vkospi_pct": round(vkospi_pct[d], 1),
             },
         }
         for d in common_dates
@@ -125,14 +156,14 @@ def main() -> None:
     client.table("indicator_values").upsert(
         rows, on_conflict="indicator_id,date"
     ).execute()
-    print(f"[Supabase] indicator_values upsert 완료: {len(rows)}건 (details 포함)")
+    print(f"[Supabase] indicator_values upsert 완료: {len(rows)}건 (백분위 스프레드)")
 
     latest_date = common_dates[-1]
-    latest_spread = vkospi_values[latest_date] - vix_prices[latest_date]
     print(
         f"[vix_vkospi_spread] 최신값 ({latest_date} 기준): "
-        f"VKOSPI {vkospi_values[latest_date]:.2f} - VIX {vix_prices[latest_date]:.2f} "
-        f"= {latest_spread:.2f}pt"
+        f"VIX {vix_prices[latest_date]:.2f}(백분위 {vix_pct[latest_date]:.0f}) - "
+        f"VKOSPI {vkospi_values[latest_date]:.2f}(백분위 {vkospi_pct[latest_date]:.0f}) "
+        f"-> 방심도 {vix_pct[latest_date] - vkospi_pct[latest_date]:.1f}pt"
     )
 
 
