@@ -23,6 +23,7 @@ from common.supabase_client import get_client  # noqa: E402
 KRX_URL = "http://data-dbg.krx.co.kr/svc/apis/idx/kospi_dd_trd"
 BACKFILL_DAYS = 365
 REQUEST_DELAY_SEC = 0.05
+VOLUME_AVG_WINDOW = 30  # 급증도 비교 기준: 직전 30영업일 평균 거래대금
 TARGET_INDEX_NAME = "코스피"
 TRADING_VALUE_KEY = "ACC_TRDVAL"
 WON_PER_EOK = 100_000_000  # 1억원 = 1e8원
@@ -117,12 +118,60 @@ def backfill(client, indicator_id: str) -> None:
     print(f"[KRX] 백필 완료: {len(new_rows)}건 저장 (휴장일 등 {skipped}건 제외)")
 
 
+def get_values(client, indicator_id: str, start: date) -> dict[str, float]:
+    result = (
+        client.table("indicator_values")
+        .select("date,raw_value")
+        .eq("indicator_id", indicator_id)
+        .gte("date", start.isoformat())
+        .execute()
+    )
+    return {row["date"]: float(row["raw_value"]) for row in result.data}
+
+
+def store_rolling_average_details(client, indicator_id: str) -> None:
+    """각 날짜의 직전 VOLUME_AVG_WINDOW 영업일 평균 거래대금과 급증율(%)을 계산해
+    details에 채운다 — 카드가 '30일 평균 vs 오늘'을 보여줄 수 있게 한다. raw_value는
+    그대로 두고(같은 값 재설정) details만 갱신하며, normalized_score는 payload에
+    없어 보존된다."""
+    today = date.today()
+    start = today - timedelta(days=BACKFILL_DAYS)
+    values = get_values(client, indicator_id, start)
+    dates_sorted = sorted(values)
+
+    rows = []
+    for i in range(VOLUME_AVG_WINDOW, len(dates_sorted)):
+        window = [values[dates_sorted[j]] for j in range(i - VOLUME_AVG_WINDOW, i)]
+        avg = sum(window) / VOLUME_AVG_WINDOW
+        if avg <= 0:
+            continue
+        d = dates_sorted[i]
+        rows.append(
+            {
+                "indicator_id": indicator_id,
+                "date": d,
+                "raw_value": values[d],
+                "details": {
+                    "avg_30d": round(avg, 0),
+                    "surge_pct": round(values[d] / avg * 100 - 100, 1),
+                },
+            }
+        )
+
+    if rows:
+        client.table("indicator_values").upsert(
+            rows, on_conflict="indicator_id,date"
+        ).execute()
+    print(f"[Supabase] 30일 평균 details 저장 완료: {len(rows)}건")
+
+
 def main() -> None:
     client = get_client()
     indicator_id = ensure_indicator(client)
     print(f"[Supabase] indicator '{INDICATOR_SLUG}' id: {indicator_id}")
 
     backfill(client, indicator_id)
+    store_rolling_average_details(client, indicator_id)
 
 
 if __name__ == "__main__":

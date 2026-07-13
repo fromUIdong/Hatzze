@@ -199,9 +199,27 @@ def main() -> None:
         on_conflict="indicator_id,date",
     ).execute()
 
+    # 카드가 GDP 실제 규모를 보여줄 수 있도록 세부값을 details(JSONB)에 저장한다.
+    # 분기 문자열("2026Q1")은 연/분기 숫자로 쪼개 저장한다(details는 숫자 맵).
+    try:
+        gdp_year = int(latest_quarter[:4])
+        gdp_q = int(latest_quarter.split("Q")[-1])
+    except (ValueError, IndexError):
+        gdp_year, gdp_q = 0, 0
+
     rounded_index = round(buffett_index, 2)
     client.table("indicator_values").upsert(
-        {"indicator_id": buffett_id, "date": today, "raw_value": rounded_index},
+        {
+            "indicator_id": buffett_id,
+            "date": today,
+            "raw_value": rounded_index,
+            "details": {
+                "gdp": round(annualized_gdp_krw, 0),
+                "market_cap": round(market_cap_krw, 0),
+                "gdp_year": gdp_year,
+                "gdp_q": gdp_q,
+            },
+        },
         on_conflict="indicator_id,date",
     ).execute()
     print(f"[Supabase] indicator_values upsert 완료: date={today}, raw_value={rounded_index}")

@@ -69,10 +69,10 @@ MARKET_NAMES = {"유가증권시장", "코스닥시장"}
 INDICATOR_SLUG = "market_actions_30d"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
-    "name": "최근 한 달 매수 쏠림 안전장치 지수",
+    "name": "최근 한 달 매매 안전장치 동향",
     "category": "정통",
-    "headline": "다들 사려고 멈춰선 순간들",
-    "description_beginner": "주가가 너무 급하게 오르면 프로그램 매매를 잠깐 멈추는 사이드카가 발동되고, 급락하면 아예 거래를 멈추는 서킷브레이커가 발동돼요. 매수 쪽 안전장치가 우세하다면 시장이 그만큼 뜨거워졌다는 뜻이에요",
+    "headline": "한 달간 어느 쪽이 우세했나",
+    "description_beginner": "주가가 급등하면 매수 사이드카, 급락하면 매도 사이드카·서킷브레이커(CB)가 발동돼요. 최근 한 달 어느 쪽 안전장치가 더 자주 걸렸는지로 시장이 달아올랐는지 식었는지를 읽어요",
     "unit": "건",
     "weight": 2,
 }
@@ -83,7 +83,12 @@ def ensure_indicator(client) -> str:
         client.table("indicators").select("id").eq("slug", INDICATOR_SLUG).execute()
     )
     if existing.data:
-        return existing.data[0]["id"]
+        indicator_id = existing.data[0]["id"]
+        # 이름/헤드라인/설명을 바꿨을 때 기존 레코드에도 반영되도록 매 실행 갱신한다.
+        client.table("indicators").update(
+            {k: v for k, v in INDICATOR_META.items() if k != "slug"}
+        ).eq("id", indicator_id).execute()
+        return indicator_id
 
     inserted = client.table("indicators").insert(INDICATOR_META).execute()
     return inserted.data[0]["id"]

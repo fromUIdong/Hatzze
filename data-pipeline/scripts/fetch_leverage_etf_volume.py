@@ -290,17 +290,26 @@ def main() -> None:
         composite = etf_progress * 0.5 + oi_progress * 0.5
         return etf_progress, oi_progress, composite
 
+    # 카드의 범위 바가 "역대 최저 ↔ 역대 최고" 사이에서 '지금' 위치를 정확히
+    # 찍을 수 있도록, 보유 구간의 종합 지수 최소/최대를 미리 구해 details에 함께 넣는다.
+    comp_by_date = {d: composite_for(d) for d in common_dates}
+    all_composites = [v[2] for v in comp_by_date.values()]
+    hist_min = round(min(all_composites), 2)
+    hist_max = round(max(all_composites), 2)
+
     def row_for(d: str) -> dict:
-        etf_progress, oi_progress, composite = composite_for(d)
+        etf_progress, oi_progress, composite = comp_by_date[d]
         return {
             "indicator_id": composite_id,
             "date": d,
             "raw_value": round(composite, 2),
-            # 카드가 목업 원본대로 ETF 거래대금 / 선물 미결제약정 두 서브바를
-            # 그릴 수 있도록 각 진행률을 details(JSONB)에 함께 저장한다.
+            # 카드가 목업 원본대로 ETF 거래대금 / 선물 미결제약정 두 서브바를 그리고,
+            # 범위 바에 역대 최저/최고 대비 현재 위치를 찍을 수 있도록 details에 저장.
             "details": {
                 "etf_progress": round(etf_progress, 1),
                 "futures_progress": round(oi_progress, 1),
+                "hist_min": hist_min,
+                "hist_max": hist_max,
             },
         }
 

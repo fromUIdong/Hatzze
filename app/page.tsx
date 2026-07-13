@@ -566,8 +566,10 @@ function VixChip({ flag, label, value }: { flag: string; label: string; value: n
 
 // 1. 버핏지수 — 경제(GDP) vs 증시 시총 비교 (실제 값으로 복원 가능)
 function CardBuffett({ v }: { v: Pick }) {
+  const dt = v.details;
   const ratio = v.raw !== null ? v.raw / 100 : null; // 시총/GDP 배수
   const gdpWidth = v.raw && v.raw > 0 ? Math.min(100, (100 / v.raw) * 100) : 46;
+  const jo = (won: number) => Math.round(won / 1e12).toLocaleString("ko-KR"); // 원 → 조원
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
       {v.isHit && <HitBadge />}
@@ -577,8 +579,13 @@ function CardBuffett({ v }: { v: Pick }) {
       <div style={{ background: C.bg, borderRadius: 14, padding: "18px 18px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 6 }}>
-            <span>나라 경제 (GDP)</span>
-            <span style={{ fontFamily: MONO }}>기준 100</span>
+            <span>
+              나라 경제 (GDP)
+              {dt && dt.gdp_year ? (
+                <span style={{ color: "#a9b0bd", fontWeight: 600 }}> · {dt.gdp_year} {dt.gdp_q}분기</span>
+              ) : null}
+            </span>
+            <span style={{ fontFamily: MONO }}>{dt && dt.gdp ? `약 ${jo(dt.gdp)}조원` : "기준 100"}</span>
           </div>
           <div style={{ height: 18, background: "#c9cede", borderRadius: 6, overflow: "hidden" }}>
             <div style={{ height: "100%", width: `${gdpWidth}%`, background: "#8a93a8", borderRadius: 6 }} />
@@ -587,7 +594,10 @@ function CardBuffett({ v }: { v: Pick }) {
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 800, color: v.color, marginBottom: 6 }}>
             <span>증시 시가총액</span>
-            <span style={{ fontFamily: MONO }}>{v.disp} · {ratio !== null ? `${ratio.toFixed(1)}배` : "-"}</span>
+            <span style={{ fontFamily: MONO }}>
+              {dt && dt.market_cap ? `약 ${jo(dt.market_cap)}조원 · ` : `${v.disp} · `}
+              {ratio !== null ? `${ratio.toFixed(1)}배` : "-"}
+            </span>
           </div>
           <div style={{ height: 18, background: "#c9cede", borderRadius: 6, overflow: "hidden" }}>
             <div style={{ height: "100%", width: "100%", background: `linear-gradient(90deg,${C.hot},${C.mania})`, borderRadius: 6 }} />
@@ -605,6 +615,12 @@ function CardBuffett({ v }: { v: Pick }) {
 // 2. 레버리지 지수 — 역대 범위 바 + ETF/선물 서브 진행률 (details 있으면 목업 원본)
 function CardLeverage({ v }: { v: Pick }) {
   const dt = v.details;
+  // 역대 최저/최고 사이에서 '지금' 위치. min/max가 있으면 실제 범위로, 없으면 과열도로.
+  const hasRange =
+    !!dt && dt.hist_max !== undefined && dt.hist_min !== undefined && dt.hist_max > dt.hist_min && v.raw !== null;
+  const pos = hasRange
+    ? Math.max(0, Math.min(100, ((v.raw! - dt!.hist_min) / (dt!.hist_max - dt!.hist_min)) * 100))
+    : v.capped ?? 0;
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
       {v.isHit && <HitBadge />}
@@ -613,12 +629,14 @@ function CardLeverage({ v }: { v: Pick }) {
       <Big disp={v.disp} unit={v.unit} color={v.color} size={44} sub={v.capped !== null ? `과열도 ${Math.round(v.capped)}` : undefined} />
       <div style={{ background: C.bg, borderRadius: 14, padding: 18, display: "flex", flexDirection: "column", gap: 16 }}>
         <div>
-          <div style={{ position: "relative", height: 12, background: C.line, borderRadius: 999, overflow: "hidden" }}>
-            <div style={{ position: "absolute", inset: 0, width: `${v.capped ?? 0}%`, background: `linear-gradient(90deg,${C.hot},${C.mania})`, borderRadius: 999 }} />
+          <div style={{ position: "relative", height: 12, background: C.line, borderRadius: 999 }}>
+            <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${pos}%`, background: `linear-gradient(90deg,${C.hot},${C.mania})`, borderRadius: 999 }} />
+            <div style={{ position: "absolute", top: "50%", left: `${pos}%`, transform: "translate(-50%,-50%)", width: 14, height: 14, borderRadius: 999, background: v.color, border: `3px solid ${C.card}`, boxShadow: "0 1px 3px rgba(0,0,0,.25)" }} />
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 700, color: C.sub, marginTop: 7 }}>
             <span>역대 최저</span>
-            <span style={{ color: v.color }}>▲ 지금{v.isHit ? " · 역대 최고" : ""}</span>
+            <span style={{ color: v.color }}>지금 {Math.round(pos)}%</span>
+            <span style={{ color: C.hot }}>역대 최고</span>
           </div>
         </div>
         {dt && (
@@ -641,13 +659,30 @@ function CardMarketActions({ v }: { v: Pick }) {
   const dt = v.details;
   const buy = (v.raw ?? 0) > 0;
   const mag = v.threshold ? Math.min(100, (Math.abs(v.raw ?? 0) / Math.abs(v.threshold)) * 50) : 20;
-  const maxC = dt ? Math.max(1, dt.buy ?? 0, dt.sell ?? 0, dt.cb ?? 0) : 1;
+  const buyN = dt?.buy ?? 0;
+  const sellN = dt?.sell ?? 0;
+  const maxC = Math.max(1, buyN, sellN, dt?.cb ?? 0);
+  // 매수/매도 안전장치 중 무엇이 우세했는지 판정 — 종합 점수가 0이어도 방향은 보여준다.
+  const verdict = !dt
+    ? null
+    : buyN > sellN
+      ? { t: "매수 우세", c: C.hot }
+      : sellN > buyN
+        ? { t: "매도 우세", c: C.cold }
+        : { t: "균형", c: C.neutral };
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
       {v.isHit && <HitBadge />}
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="speed" iconSize={30} color={v.color} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="최근 30일" />
-      <Big disp={v.raw !== null && v.raw > 0 ? `+${v.disp}` : v.disp} color={v.color} size={44} sub="최근 30일 순 쏠림" />
+      {verdict ? (
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginBottom: 12 }}>
+          <span style={{ fontSize: 34, fontWeight: 800, color: verdict.c, lineHeight: 1 }}>{verdict.t}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: C.sub, paddingBottom: 4 }}>최근 30일 안전장치</span>
+        </div>
+      ) : (
+        <Big disp={v.raw !== null && v.raw > 0 ? `+${v.disp}` : v.disp} color={v.color} size={44} sub="최근 30일 순 쏠림" />
+      )}
       <div style={{ background: C.bg, borderRadius: 14, padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
         {dt ? (
           <>
@@ -815,12 +850,12 @@ function CardAsia({ v }: { v: Pick }) {
 }
 
 // 9. 위험자산 vs 안전자산 — 금/코스닥 두 지표 결합 (둘 다 실제 값)
-function SubRatio({ v, icon, note }: { v: Pick; icon: string; note: string }) {
+function SubRatio({ v, icon, label, note }: { v: Pick; icon: string; label: string; note: string }) {
   return (
     <div style={{ flex: 1 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <Icon name={icon} style={{ fontSize: 20, color: C.sub }} />
-        <span style={{ fontSize: 13, fontWeight: 800, wordBreak: "keep-all" }}>{v.name}</span>
+        <span style={{ fontSize: 13, fontWeight: 800, wordBreak: "keep-all" }}>{label}</span>
       </div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 14 }}>
         <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>
@@ -843,27 +878,47 @@ function CardRiskAssets({ gold, kosdaq }: { gold: Pick; kosdaq: Pick }) {
     <Shell span={2} minH={230}>
       <Tag text="위험자산 vs 안전자산" color={C.sub} />
       <div style={{ display: "flex", gap: 32 }}>
-        <SubRatio v={gold} icon="balance" note={gold.desc} />
+        <SubRatio v={gold} icon="balance" label="코스피 강도 (vs 금)" note={gold.desc} />
         <div style={{ width: 1, background: C.line }} />
-        <SubRatio v={kosdaq} icon="celebration" note={kosdaq.desc} />
+        <SubRatio v={kosdaq} icon="celebration" label="코스닥 강도 (vs 코스피)" note={kosdaq.desc} />
       </div>
     </Shell>
   );
 }
 
-// 10. 거래대금 급증도 — 오늘 vs 과열기준 막대
+// 10. 거래대금 급증도 — 오늘 vs 30일 평균 (details 있으면 실제 평균, 없으면 과열기준 폴백)
 function CardVolume({ v }: { v: Pick }) {
-  const todayH = 100;
-  const baseH = v.raw && v.threshold ? Math.max(20, Math.min(100, (v.threshold / v.raw) * 100)) : 70;
+  const dt = v.details;
+  const avg = dt?.avg_30d ?? null;
+  const today = v.raw ?? null;
+  const maxV = avg !== null && today !== null ? Math.max(avg, today, 1) : 1;
+  const avgH = avg !== null && today !== null ? (avg / maxV) * 100 : 70;
+  const todayH = avg !== null && today !== null ? (today / maxV) * 100 : 100;
+  const avgFmt = avg !== null ? formatIndicatorValue(avg, "억원") : null;
+  const surge = dt?.surge_pct ?? null;
   return (
     <Shell minH={230}>
       <Tag text={v.headline} color={v.color} />
-      <TitleRow icon="groups" name={v.name} color={v.color} />
+      <TitleRow
+        icon="groups"
+        name={v.name}
+        color={v.color}
+        right={
+          surge !== null ? (
+            <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: surge >= 0 ? C.hot : C.cold }}>
+              {surge >= 0 ? "+" : ""}
+              {surge}%
+            </span>
+          ) : undefined
+        }
+      />
       <div style={{ display: "flex", alignItems: "flex-end", gap: 12, height: 120, flex: 1 }}>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, height: "100%" }}>
-          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: C.neutral }}>{v.thDisp ?? "-"}</span>
-          <div style={{ width: "100%", height: `${baseH}%`, background: C.line, borderRadius: "6px 6px 0 0" }} />
-          <span style={{ fontSize: 9, fontWeight: 700, color: C.sub }}>과열 기준</span>
+          <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: C.neutral }}>
+            {avgFmt ? `${avgFmt.display}${avgFmt.displayUnit}` : v.thDisp ?? "-"}
+          </span>
+          <div style={{ width: "100%", height: `${avgH}%`, background: C.line, borderRadius: "6px 6px 0 0" }} />
+          <span style={{ fontSize: 9, fontWeight: 700, color: C.sub }}>{avg !== null ? "30일 평균" : "과열 기준"}</span>
         </div>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, height: "100%" }}>
           <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>
