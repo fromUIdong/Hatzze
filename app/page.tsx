@@ -534,6 +534,34 @@ function AsiaBar({ label, sub, index, maxIndex, color }: { label: string; sub: s
   );
 }
 
+// 업비트 카드의 서브 바 (김치 프리미엄 / 거래량 강도) — 값 라벨은 우측 표시
+function UpbitSubBar({ label, value, pct, color }: { label: string; value: string; pct: number; color: string }) {
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 6 }}>
+        <span>{label}</span>
+        <span style={{ color }}>{value}</span>
+      </div>
+      <div style={{ height: 8, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, pct))}%`, background: color }} />
+      </div>
+    </div>
+  );
+}
+
+// VIX/VKOSPI 카드의 국가별 변동성 바
+function VixRow({ flag, label, value, pct, color }: { flag: string; label: string; value: number; pct: number; color: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <span style={{ width: 74, fontSize: 10, fontWeight: 800, color, textAlign: "right" }}>{flag} {label}</span>
+      <div style={{ flex: 1, height: 9, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, pct))}%`, background: color, borderRadius: 999 }} />
+      </div>
+      <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, color, width: 30, textAlign: "right" }}>{value.toFixed(0)}</span>
+    </div>
+  );
+}
+
 // ── 정통 지표 카드들 (목업 순서대로) ──────────────────────────────
 
 // 1. 버핏지수 — 경제(GDP) vs 증시 시총 비교 (실제 값으로 복원 가능)
@@ -719,18 +747,26 @@ function CardVkospi({ v }: { v: Pick }) {
   );
 }
 
-// 7. VIX 대비 VKOSPI 스프레드 (스프레드 실제 값 + 과열도)
+// 7. VIX 대비 VKOSPI 스프레드 — VIX/VKOSPI 개별 바 + 공포격차 (details 있으면 목업 원본)
 function CardVixSpread({ v }: { v: Pick }) {
+  const dt = v.details;
+  const maxV = dt ? Math.max(dt.vix ?? 0, dt.vkospi ?? 0, 1) : 1;
   return (
     <Shell minH={230}>
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="compare_arrows" name={v.name} color={v.color} />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.bg, borderRadius: 10, padding: 12 }}>
+        {dt && (
+          <>
+            <VixRow flag="🇺🇸" label="VIX" value={dt.vix ?? 0} pct={((dt.vix ?? 0) / maxV) * 100} color={C.mania} />
+            <VixRow flag="🇰🇷" label="VKOSPI" value={dt.vkospi ?? 0} pct={((dt.vkospi ?? 0) / maxV) * 100} color={C.cold} />
+          </>
+        )}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.bg, borderRadius: 10, padding: dt ? 9 : 12 }}>
           <span style={{ fontSize: 10, fontWeight: 700, color: C.sub }}>공포 격차</span>
-          <span style={{ fontFamily: MONO, fontSize: 24, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>
+          <span style={{ fontFamily: MONO, fontSize: dt ? 20 : 24, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>
         </div>
-        <HeatBar v={v} />
+        {!dt && <HeatBar v={v} />}
       </div>
       <Foot text={v.desc} />
     </Shell>
@@ -1031,14 +1067,28 @@ function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick }) {
   );
 }
 
-// 업비트 — 복합 점수 (김치프리미엄/거래량 분해는 DB 미보유)
+// 업비트 — 김치프리미엄 / 거래량 강도 서브바 (details 있으면 목업 원본)
 function CardUpbit({ v }: { v: Pick }) {
+  const dt = v.details;
+  const volLabel = (p: number) => (p >= 100 ? "HIGH" : p >= 60 ? "MID" : "LOW");
   return (
     <Shell minH={210}>
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="currency_bitcoin" iconSize={22} color={v.color} name={v.name} right={<span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>} />
       <div style={{ marginTop: "auto" }}>
-        <HeatBar v={v} />
+        {dt ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <UpbitSubBar
+              label="김치 프리미엄"
+              value={`${(dt.kimchi_premium ?? 0) > 0 ? "+" : ""}${(dt.kimchi_premium ?? 0).toFixed(1)}%`}
+              pct={dt.kimchi_progress ?? 0}
+              color={(dt.kimchi_premium ?? 0) >= 0 ? C.hot : C.cold}
+            />
+            <UpbitSubBar label="거래량 강도" value={volLabel(dt.volume_progress ?? 0)} pct={dt.volume_progress ?? 0} color={C.hot} />
+          </div>
+        ) : (
+          <HeatBar v={v} />
+        )}
       </div>
       <Foot text={v.desc} />
     </Shell>

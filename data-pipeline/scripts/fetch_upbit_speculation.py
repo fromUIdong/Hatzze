@@ -164,16 +164,27 @@ def main() -> None:
         composite = kimchi_progress * 0.5 + volume_progress * 0.5
         return premium, volume_surge[d], composite
 
-    rows = [
-        {
+    def row_for(d: str) -> dict:
+        premium, surge, composite = composite_for(d)
+        kimchi_progress = max(premium / KIMCHI_PREMIUM_THRESHOLD * 100, 0.0)
+        volume_progress = surge / VOLUME_SURGE_THRESHOLD * 100
+        return {
             "indicator_id": indicator_id,
             "date": d,
-            "raw_value": round(composite_for(d)[2], 2),
+            "raw_value": round(composite, 2),
+            # 카드가 목업 원본대로 김치프리미엄 / 거래량 강도 두 서브바를 그릴 수
+            # 있도록 세부값을 details(JSONB)에 함께 저장한다.
+            "details": {
+                "kimchi_premium": round(premium, 2),
+                "kimchi_progress": round(kimchi_progress, 1),
+                "volume_surge": round(surge, 1),
+                "volume_progress": round(volume_progress, 1),
+            },
         }
-        for d in sorted(common_dates)
-    ]
+
+    rows = [row_for(d) for d in sorted(common_dates)]
     client.table("indicator_values").upsert(rows, on_conflict="indicator_id,date").execute()
-    print(f"[Supabase] indicator_values upsert 완료: {len(rows)}건")
+    print(f"[Supabase] indicator_values upsert 완료: {len(rows)}건 (details 포함)")
 
     latest_date = max(common_dates)
     premium, surge, composite = composite_for(latest_date)
