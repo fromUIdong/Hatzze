@@ -1,0 +1,9 @@
+{
+  "_readme": "로컬 dev 서버에서만 지표 설명/서브값을 미리 볼 때 쓰는 오버레이 예시입니다. 이 파일을 dev-overrides.json으로 복사(cp dev-overrides.example.json dev-overrides.json)한 뒤 원하는 slug만 남겨 값을 채우세요. dev-overrides.json은 .gitignore라 커밋/배포되지 않고, NODE_ENV=development에서만 적용됩니다. 확인이 끝나면 실제 운영 DB에 반영하고 dev-overrides.json 내용을 비우면 됩니다.",
+  "descriptions": {
+    "vkospi": "여기에 미리 볼 새 설명 텍스트를 넣으면 로컬 카드에 바로 반영됩니다"
+  },
+  "details": {
+    "buffett_index": { "gdp": 2600000000000000, "market_cap": 2700000000000000 }
+  }
+}

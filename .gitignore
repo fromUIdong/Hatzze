@@ -18,6 +18,9 @@ data-pipeline/.env
 # claude code local settings
 .claude/settings.local.json
 
+# local dev-only description/details overlay (never deployed; see dev-overrides.example.json)
+dev-overrides.json
+
 # misc
 .DS_Store
 *.pem

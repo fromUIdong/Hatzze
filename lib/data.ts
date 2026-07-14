@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getDevOverrides } from "@/lib/dev-overrides";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
 export type DailyScore = {
@@ -101,15 +102,23 @@ export async function getPublicIndicators(): Promise<IndicatorWithLatestValue[]>
     }[];
   };
 
+  // 로컬 dev 전용 오버레이(운영 빌드에선 no-op). 설명/서브값을 운영 DB에 쓰기
+  // 전에 로컬에서만 미리 보기 위해 slug별로 덮어쓴다.
+  const overrides = getDevOverrides();
+
   return ((data ?? []) as unknown as RawRow[]).map((row) => {
     const iv = row.indicator_values[0];
+    const descOverride = overrides.descriptions?.[row.slug];
+    const detailsOverride = overrides.details?.[row.slug];
+    const baseDetails =
+      (iv as { details?: IndicatorDetails | null } | undefined)?.details ?? null;
     return {
       id: row.id,
       slug: row.slug,
       name: row.name,
       headline: row.headline,
       category: normalizeCategory(row.category),
-      description_beginner: row.description_beginner,
+      description_beginner: descOverride ?? row.description_beginner,
       unit: row.unit,
       direction: row.direction,
       latest: iv
@@ -118,8 +127,9 @@ export async function getPublicIndicators(): Promise<IndicatorWithLatestValue[]>
             raw_value: iv.raw_value,
             normalized_score: iv.normalized_score,
             threshold: iv.threshold,
-            details:
-              (iv as { details?: IndicatorDetails | null }).details ?? null,
+            details: detailsOverride
+              ? { ...(baseDetails ?? {}), ...detailsOverride }
+              : baseDetails,
           }
         : null,
     };
