@@ -105,7 +105,7 @@ COMPOSITE_META = {
     "slug": COMPOSITE_SLUG,
     "name": "레버리지 ETF·선물 미결제약정 종합 지수",
     "category": "시장",
-    "description_beginner": "레버리지 상품 거래와 선물 미결제약정을 같이 보면, 개인들이 얼마나 공격적으로, 그리고 얼마나 오래 베팅을 이어가고 있는지 알 수 있어요",
+    "description_beginner": "레버리지 ETF 거래대금과 코스피200 선물 미결제약정을 함께 봐요. 개인들이 빚내서 두 배로, 그리고 얼마나 오래 공격적으로 베팅을 이어가고 있는지 가늠할 수 있어요",
     "unit": "pt",
 }
 

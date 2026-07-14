@@ -568,7 +568,7 @@ function VixPctRow({ flag, label, pct, color }: { flag: string; label: string; p
       <div style={{ flex: 1, height: 9, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
         <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, pct))}%`, background: color, borderRadius: 999 }} />
       </div>
-      <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 800, color: C.sub, width: 46, textAlign: "right" }}>{Math.round(pct)}%ile</span>
+      <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 800, color: C.sub, width: 46, textAlign: "right" }}>{Math.round(pct)}점</span>
     </div>
   );
 }
@@ -814,7 +814,7 @@ function CardVixSpread({ v }: { v: Pick }) {
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 10 }}>
         {hasPct ? (
           <>
-            <div style={{ fontSize: 9, color: "#8a919e", fontWeight: 700 }}>각자 최근 1년 대비 현재 변동성 수준(백분위)</div>
+            <div style={{ fontSize: 9, color: "#8a919e", fontWeight: 700 }}>각자 최근 1년 변동성 대비 현재 위치 (0=최저 ~ 100=최고)</div>
             <VixPctRow flag="🇺🇸" label="VIX" pct={dt!.vix_pct} color={C.mania} />
             <VixPctRow flag="🇰🇷" label="VKOSPI" pct={dt!.vkospi_pct} color={C.cold} />
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.bg, borderRadius: 10, padding: 9 }}>
@@ -894,7 +894,7 @@ function SubRatio({ v, icon, label, note }: { v: Pick; icon: string; label: stri
       <div style={{ position: "relative", height: 10, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
         <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${v.capped ?? 0}%`, background: `linear-gradient(90deg,${C.hot},${C.mania})`, borderRadius: 999 }} />
       </div>
-      <p style={{ margin: "12px 0 0", fontSize: 11, color: C.sub, fontWeight: 600, lineHeight: 1.5 }}>{note}</p>
+      <p style={{ margin: "12px 0 0", paddingTop: 12, borderTop: "1px solid rgba(0,0,0,0.05)", fontSize: 11, color: C.sub, fontWeight: 600, lineHeight: 1.5 }}>{note}</p>
     </div>
   );
 }
@@ -1153,7 +1153,7 @@ function SubSpend({ v, icon }: { v: Pick; icon: string }) {
       <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
         <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>
       </div>
-      <p style={{ margin: "10px 0 0", fontSize: 11, color: C.sub, fontWeight: 600, lineHeight: 1.5 }}>{v.desc}</p>
+      <p style={{ margin: "12px 0 0", paddingTop: 12, borderTop: "1px solid rgba(0,0,0,0.05)", fontSize: 11, color: C.sub, fontWeight: 600, lineHeight: 1.5 }}>{v.desc}</p>
     </div>
   );
 }

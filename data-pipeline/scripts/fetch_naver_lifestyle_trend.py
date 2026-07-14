@@ -41,8 +41,8 @@ GROUP_CONFIGS = [
             "slug": "fine_dining_search_index",
             "name": "오마카세·파인다이닝 웨이팅 검색 지수",
             "category": "감성",
-            "description_beginner": "오마카세, 파인다이닝 웨이팅 검색이 늘어나면, 사람들이 여윳돈으로 경험 소비에 돈을 쓰고 있다는 신호일 수 있어요",
-            "unit": "지수",
+            "description_beginner": "오마카세·파인다이닝 웨이팅 검색이 늘어나면, 사람들이 여윳돈으로 값비싼 경험 소비에 지갑을 열고 있다는 뜻이에요. 씀씀이가 커질수록 시장 분위기도 들떠 있을 수 있어요",
+            "unit": "pt",
         },
     },
     {
@@ -53,8 +53,8 @@ GROUP_CONFIGS = [
             "slug": "small_business_crisis_index",
             "name": "자영업 폐업·권리금 검색 지수",
             "category": "감성",
-            "description_beginner": "자영업 폐업 관련 검색이 늘어나는데 증시는 뜨겁다면, 실물경제와 주식시장 사이에 괴리가 커지고 있다는 위험한 신호일 수 있어요",
-            "unit": "지수",
+            "description_beginner": "자영업 폐업·권리금 관련 검색이 늘어나는데 증시만 뜨겁다면, 실물경제와 주식시장 사이의 괴리가 그만큼 벌어지고 있다는 뜻이에요. 화려함 뒤에 숨은 위험한 신호일 수 있어요",
+            "unit": "pt",
         },
     },
 ]
