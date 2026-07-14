@@ -519,12 +519,22 @@ function DivRow({ label, w, color }: { label: string; w: number; color: string }
   );
 }
 
-// 아시아 카드의 4개국 상대 막대 (KOSPI=100 기준)
-function AsiaBar({ label, sub, index, maxIndex, color }: { label: string; sub: string; index: number; maxIndex: number; color: string }) {
+// 비교 막대들의 차이를 시각적으로 강조한다 — 0이 아니라 최솟값 기준으로 스케일해
+// 작은 차이도 눈에 띄게 만든다(정확한 크기는 각 막대의 숫자/배지로 전달). 값이 모두
+// 같으면 전부 100으로 둔다.
+function emphasizedHeights(values: number[], floorPct = 30): number[] {
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  if (max <= min) return values.map(() => 100);
+  return values.map((v) => floorPct + ((v - min) / (max - min)) * (100 - floorPct));
+}
+
+// 아시아 카드의 4개국 상대 막대 (KOSPI=100 기준). heightPct는 차이를 강조한 0~100.
+function AsiaBar({ label, sub, index, heightPct, color }: { label: string; sub: string; index: number; heightPct: number; color: string }) {
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
       <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color }}>{Math.round(index)}</span>
-      <div style={{ width: "100%", height: Math.max(8, (index / maxIndex) * 108), background: color, borderRadius: "6px 6px 0 0" }} />
+      <div style={{ width: "100%", height: Math.max(10, (heightPct / 100) * 108), background: color, borderRadius: "6px 6px 0 0" }} />
       <span style={{ fontSize: 9, fontWeight: 800, color: C.sub, textAlign: "center", lineHeight: 1.25 }}>
         {label}
         <br />
@@ -576,7 +586,7 @@ function CardBuffett({ v }: { v: Pick }) {
       {v.isHit && <HitBadge />}
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="payments" iconSize={30} color={v.color} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="당일 기준" />
-      <Big disp={v.disp} unit={v.unit} color={v.color} size={52} sub={ratio !== null ? `${ratio.toFixed(1)}배 · 과열도 ${v.capped !== null ? Math.round(v.capped) : "-"}` : undefined} />
+      <Big disp={v.disp} unit={v.unit} color={v.color} size={52} sub={ratio !== null ? `${ratio.toFixed(1)}배` : undefined} />
       <div style={{ background: C.bg, borderRadius: 14, padding: "18px 18px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 6 }}>
@@ -627,7 +637,7 @@ function CardLeverage({ v }: { v: Pick }) {
       {v.isHit && <HitBadge />}
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="rocket_launch" iconSize={30} color={v.color} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="당일 기준" />
-      <Big disp={v.disp} unit={v.unit} color={v.color} size={44} sub={v.capped !== null ? `과열도 ${Math.round(v.capped)}` : undefined} />
+      <Big disp={v.disp} unit={v.unit} color={v.color} size={44} />
       <div style={{ background: C.bg, borderRadius: 14, padding: 18, display: "flex", flexDirection: "column", gap: 16 }}>
         <div>
           <div style={{ position: "relative", height: 12, background: C.line, borderRadius: 999 }}>
@@ -831,7 +841,7 @@ function CardAsia({ v }: { v: Pick }) {
     return (
       <Shell span={2} minH={230}>
         <Tag text={v.headline} color={v.color} />
-        <TitleRow icon="public" name={v.name} color={v.color} />
+        <TitleRow icon="public" name={v.name} color={v.color} badge="최근 20거래일" />
         <Big disp={v.raw !== null && v.raw > 0 ? `+${v.disp}` : v.disp} unit={v.unit} color={v.color} size={40} sub="아시아 3국 평균 대비" />
         <HeatBar v={v} />
         <Foot text={v.desc} />
@@ -845,19 +855,19 @@ function CardAsia({ v }: { v: Pick }) {
     { label: "HangSeng", sub: "홍콩", index: 100 + ((dt.hangseng ?? 0) - k), color: C.cold },
     { label: "Taiex", sub: "대만", index: 100 + ((dt.taiex ?? 0) - k), color: C.neutral },
   ];
-  const maxIndex = Math.max(...bars.map((b) => b.index), 1);
+  const heights = emphasizedHeights(bars.map((b) => b.index));
   return (
     <Shell span={2} minH={230}>
       <Tag text={v.headline} color={v.color} />
-      <TitleRow icon="public" name={v.name} color={v.color} />
+      <TitleRow icon="public" name={v.name} color={v.color} badge="최근 20거래일" />
       <div style={{ fontSize: 9, color: "#8a919e", fontWeight: 700, marginBottom: 4 }}>
         KOSPI를 100으로 둔 상대 지수 · 코스피 초과수익률 {v.raw !== null && v.raw > 0 ? "+" : ""}
         {v.disp}
         {v.unit}
       </div>
       <div style={{ flex: 1, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, paddingTop: 6 }}>
-        {bars.map((b) => (
-          <AsiaBar key={b.label} label={b.label} sub={b.sub} index={b.index} maxIndex={maxIndex} color={b.color} />
+        {bars.map((b, i) => (
+          <AsiaBar key={b.label} label={b.label} sub={b.sub} index={b.index} heightPct={heights[i]} color={b.color} />
         ))}
       </div>
       <Foot text={v.desc} />
@@ -907,9 +917,7 @@ function CardVolume({ v }: { v: Pick }) {
   const dt = v.details;
   const avg = dt?.avg_30d ?? null;
   const today = v.raw ?? null;
-  const maxV = avg !== null && today !== null ? Math.max(avg, today, 1) : 1;
-  const avgH = avg !== null && today !== null ? (avg / maxV) * 100 : 70;
-  const todayH = avg !== null && today !== null ? (today / maxV) * 100 : 100;
+  const [avgH, todayH] = avg !== null && today !== null ? emphasizedHeights([avg, today]) : [70, 100];
   const avgFmt = avg !== null ? formatIndicatorValue(avg, "억원") : null;
   const surge = dt?.surge_pct ?? null;
   return (
@@ -955,7 +963,6 @@ function CardFx({ v }: { v: Pick }) {
       <TitleRow icon="waves" name={v.name} color={v.color} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
         <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>±{v.disp}{v.unit}</span>
-        <span style={{ fontSize: 11, fontWeight: 800, color: v.color }}>과열도 {v.capped !== null ? Math.round(v.capped) : "-"}</span>
       </div>
       <div style={{ flex: 1, position: "relative", minHeight: 50, display: "flex", alignItems: "center" }}>
         <svg width="100%" height="50" viewBox="0 0 100 50" preserveAspectRatio="none" style={{ position: "absolute", inset: 0 }}>
@@ -1004,7 +1011,6 @@ function CardCopper({ v }: { v: Pick }) {
       <TitleRow icon="bolt" name={v.name} color={v.color} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
         <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.raw !== null && v.raw > 0 ? "+" : ""}{v.disp}{v.unit}</span>
-        <span style={{ fontSize: 11, fontWeight: 800, color: v.color }}>과열도 {v.capped !== null ? Math.round(v.capped) : "-"}</span>
       </div>
       <div style={{ flex: 1, position: "relative", minHeight: 56 }}>
         <TrendLine color={v.color} down={v.raw !== null && v.raw < 0} />
@@ -1045,7 +1051,6 @@ function CardTrend({ v, icon }: { v: Pick; icon: string }) {
       <TitleRow icon={icon} name={v.name} iconSize={22} color={v.color} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
         <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}{v.unit}</span>
-        <span style={{ fontSize: 10, fontWeight: 800, color: v.color }}>과열도 {v.capped !== null ? Math.round(v.capped) : "-"}</span>
       </div>
       <div style={{ flex: 1, position: "relative", minHeight: 52 }}>
         <TrendLine color={v.color} down={(v.score ?? 0) < 33} />
@@ -1109,7 +1114,7 @@ function CardSentiment({ v, icon, span = 1 }: { v: Pick; icon: string; span?: 1 
 // 유튜브 — 평소(기준) vs 오늘 막대 (HIT)
 function CardYoutube({ v }: { v: Pick }) {
   const ratio = v.raw && v.threshold ? v.raw / v.threshold : null;
-  const baseH = v.raw && v.threshold ? Math.max(15, Math.min(100, (v.threshold / v.raw) * 100)) : 34;
+  const [baseH, todayH] = v.raw && v.threshold ? emphasizedHeights([v.threshold, v.raw]) : [34, 100];
   return (
     <Shell hit={v.isHit} minH={210}>
       {v.isHit && <HitBadge label="✨ HIT" small />}
@@ -1122,7 +1127,7 @@ function CardYoutube({ v }: { v: Pick }) {
             <span style={{ fontSize: 8, fontWeight: 700, color: C.sub }}>평소</span>
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, height: "100%" }}>
-            <div style={{ width: 26, height: "100%", background: v.color, borderRadius: "5px 5px 0 0" }} />
+            <div style={{ width: 26, height: `${todayH}%`, background: v.color, borderRadius: "5px 5px 0 0" }} />
             <span style={{ fontSize: 8, fontWeight: 700, color: C.sub }}>오늘</span>
           </div>
         </div>
@@ -1147,7 +1152,6 @@ function SubSpend({ v, icon }: { v: Pick; icon: string }) {
       </div>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
         <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>
-        <span style={{ fontSize: 10, fontWeight: 800, color: v.color, paddingBottom: 4 }}>과열도 {v.capped !== null ? Math.round(v.capped) : "-"}</span>
       </div>
       <p style={{ margin: "10px 0 0", fontSize: 11, color: C.sub, fontWeight: 600, lineHeight: 1.5 }}>{v.desc}</p>
     </div>
@@ -1196,16 +1200,22 @@ function CardUpbit({ v }: { v: Pick }) {
 }
 
 // 서울 맑은 날씨 — 아이콘 + 게이지 바
+// 서울 맑은 날씨 — raw는 "맑음지수 = 10 - 전운량"(0~10, 클수록 맑음). "pt"는 뜻이
+// 안 통해서, 날씨 표현(쾌청/맑음/흐림)과 "맑음지수 N/10"으로 직관적으로 보여준다.
 function CardWeather({ v }: { v: Pick }) {
+  const raw = v.raw ?? 0;
+  const label = raw >= 8 ? "쾌청" : raw >= 6 ? "맑음" : raw >= 4 ? "구름 조금" : raw >= 2 ? "구름 많음" : "흐림";
+  const clear = raw >= 5;
   return (
     <Shell minH={210}>
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="wb_sunny" iconSize={22} name={v.name} color={v.color} />
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
-        <Icon name={(v.score ?? 0) >= 50 ? "clear_day" : "cloudy"} style={{ fontSize: 52, color: v.color }} />
-        <span style={{ fontFamily: MONO, fontSize: 20, fontWeight: 800, color: C.ink }}>{v.disp}{v.unit}</span>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
+        <Icon name={clear ? "clear_day" : "cloudy"} style={{ fontSize: 48, color: v.color }} />
+        <span style={{ fontSize: 20, fontWeight: 800, color: C.ink }}>{label}</span>
+        <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.sub }}>맑음지수 {raw.toFixed(1)} / 10</span>
         <div style={{ width: "100%", height: 8, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
-          <div style={{ height: "100%", width: `${v.capped ?? 0}%`, background: `linear-gradient(90deg,${C.neutral},${C.hot})` }} />
+          <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, raw * 10))}%`, background: `linear-gradient(90deg,${C.neutral},${C.hot})` }} />
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", width: "100%", fontSize: 9, fontWeight: 700, color: C.sub }}>
           <span>흐림</span>
