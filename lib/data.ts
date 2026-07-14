@@ -108,6 +108,7 @@ export async function getPublicIndicators(): Promise<IndicatorWithLatestValue[]>
 
   return ((data ?? []) as unknown as RawRow[]).map((row) => {
     const iv = row.indicator_values[0];
+    const nameOverride = overrides.names?.[row.slug];
     const descOverride = overrides.descriptions?.[row.slug];
     const detailsOverride = overrides.details?.[row.slug];
     const baseDetails =
@@ -115,7 +116,7 @@ export async function getPublicIndicators(): Promise<IndicatorWithLatestValue[]>
     return {
       id: row.id,
       slug: row.slug,
-      name: row.name,
+      name: nameOverride ?? row.name,
       headline: row.headline,
       category: normalizeCategory(row.category),
       description_beginner: descOverride ?? row.description_beginner,

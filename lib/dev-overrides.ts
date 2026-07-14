@@ -15,6 +15,7 @@ import type { IndicatorDetails } from "@/lib/data";
 // - dev에선 매 요청마다 파일을 다시 읽으므로, JSON을 고치고 새로고침하면
 //   서버 재시작 없이 바로 반영된다.
 export type DevOverrides = {
+  names?: Record<string, string>;
   descriptions?: Record<string, string>;
   details?: Record<string, IndicatorDetails>;
 };
