@@ -291,7 +291,7 @@ function HeatBar({ v }: { v: Pick }) {
 
 // ── 히어로 ────────────────────────────────────────────────────────
 const STAGE_META: Record<string, { emoji: string; color: string; zone: string }> = {
-  냉정: { emoji: "🧊", color: C.cold, zone: "냉정 구간" },
+  공포: { emoji: "🧊", color: C.cold, zone: "공포 구간" },
   보통: { emoji: "⚖️", color: C.neutral, zone: "보통 구간" },
   과열: { emoji: "🔥", color: C.hot, zone: "과열 구간" },
   광기: { emoji: "🚨", color: C.mania, zone: "광기 구간" },
@@ -356,7 +356,7 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
           </div>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", width: 300, padding: "0 6px", fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-          <span style={{ color: C.cold }}>냉정</span>
+          <span style={{ color: C.cold }}>공포</span>
           <span style={{ color: C.neutral }}>보통</span>
           <span style={{ color: C.hot }}>과열</span>
           <span style={{ color: C.mania }}>광기</span>

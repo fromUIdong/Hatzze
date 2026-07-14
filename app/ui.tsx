@@ -2,7 +2,7 @@
 // 색은 전부 CSS 변수(app/globals.css)를 참조하므로, data-theme 전환 시 사용처를
 // 하나도 안 건드리고 라이트/다크가 함께 바뀐다.
 export const C = {
-  cold: "var(--c-cold)", // 냉정
+  cold: "var(--c-cold)", // 공포
   neutral: "var(--c-neutral)", // 보통
   hot: "var(--c-hot)", // 과열
   mania: "var(--c-mania)", // 광기

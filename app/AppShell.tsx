@@ -14,7 +14,7 @@ const NAV = [
 ];
 
 const STAGE_COLOR: Record<string, string> = {
-  냉정: C.cold,
+  공포: C.cold,
   보통: C.neutral,
   과열: C.hot,
   광기: C.mania,
@@ -33,8 +33,8 @@ function Sidebar() {
     >
       <div style={{ padding: "0 32px", marginBottom: 48 }}>
         <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, color: C.blue, letterSpacing: "-0.04em" }}>HATZZE</h1>
-        <p style={{ margin: "6px 0 0", fontSize: 10, fontWeight: 700, color: C.sub, textTransform: "uppercase", letterSpacing: "0.2em" }}>
-          시장 과열도 분석
+        <p style={{ margin: "8px 0 0", fontSize: 11, fontWeight: 700, color: C.sub, letterSpacing: "0.02em", lineHeight: 1.5 }}>
+          데이터와 감성으로 읽는 시장
         </p>
       </div>
       <nav style={{ flex: 1, padding: "0 16px", display: "flex", flexDirection: "column", gap: 8 }}>
