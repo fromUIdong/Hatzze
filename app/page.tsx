@@ -1057,19 +1057,48 @@ function CardTrend({ v, icon }: { v: Pick; icon: string }) {
 }
 
 // 중앙 기준 감성/카운트 바 (커뮤니티/뉴스)
+// 감성 지표(뉴스·커뮤니티) — 과열도가 아니라 비관↔낙관 양극 게이지로 보여준다.
+// raw = (긍정-부정)/전체*100 이라 -100~+100 범위. 중앙=중립, 좌=비관, 우=낙관.
 function CardSentiment({ v, icon, span = 1 }: { v: Pick; icon: string; span?: 1 | 2 }) {
+  const raw = v.raw ?? 0;
+  const pos = Math.max(0, Math.min(100, (raw + 100) / 2)); // -100..+100 → 0..100 (중립=50)
+  const optimistic = raw >= 0;
+  const barColor = raw === 0 ? C.neutral : optimistic ? C.hot : C.cold;
   return (
     <Shell span={span} minH={210}>
-      <Tag text={v.headline} color={v.color} />
-      <TitleRow icon={icon} iconSize={22} color={v.color} name={v.name} right={<span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>} />
+      <Tag text={v.headline} color={barColor} />
+      <TitleRow
+        icon={icon}
+        iconSize={22}
+        color={barColor}
+        name={v.name}
+        right={
+          <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 800, color: barColor }}>
+            {raw > 0 ? "+" : ""}
+            {v.disp}
+            {v.unit}
+          </span>
+        }
+      />
       <div style={{ marginTop: "auto" }}>
-        <div style={{ position: "relative", height: 16, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
-          <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${v.capped ?? 0}%`, background: v.isHit ? `linear-gradient(90deg,${C.hot},${C.mania})` : v.color, borderRadius: 999 }} />
+        <div style={{ position: "relative", height: 16, background: C.bg, borderRadius: 999 }}>
+          <div style={{ position: "absolute", left: "50%", top: -3, bottom: -3, width: 2, background: "rgba(32,38,50,0.35)" }} />
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              bottom: 0,
+              background: barColor,
+              borderRadius: 999,
+              ...(optimistic ? { left: "50%", width: `${pos - 50}%` } : { right: "50%", width: `${50 - pos}%` }),
+            }}
+          />
+          <div style={{ position: "absolute", top: "50%", left: `${pos}%`, transform: "translate(-50%,-50%)", width: 14, height: 14, borderRadius: 999, background: barColor, border: `3px solid ${C.card}`, boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 800, color: C.sub, marginTop: 8 }}>
-          <span>안심</span>
-          {v.thDisp && <span>기준 {v.thDisp} {v.dirLabel}</span>}
-          <span style={{ color: C.hot }}>과열 100</span>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 800, marginTop: 8 }}>
+          <span style={{ color: C.cold }}>비관 −100</span>
+          <span style={{ color: C.sub }}>중립</span>
+          <span style={{ color: C.hot }}>낙관 +100</span>
         </div>
       </div>
       <Foot text={v.desc} />
