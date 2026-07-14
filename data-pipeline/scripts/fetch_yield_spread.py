@@ -38,7 +38,7 @@ INDICATOR_META = {
     "name": "미국 장단기 금리차 (10년물-2년물)",
     "category": "시장",
     "headline": "채권시장이 보내는 경고",
-    "description_beginner": "장기 금리가 단기보다 낮아지는 '역전'은 경기 침체의 대표 신호로 유명해요",
+    "description_beginner": "장단기 금리가 역전되면 경기 침체의 대표 신호로 유명해요",
     "unit": "%p",
     "weight": 3,
 }

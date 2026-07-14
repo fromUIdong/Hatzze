@@ -34,7 +34,7 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "VKOSPI (변동성지수)",
     "category": "시장",
-    "description_beginner": "코스피의 '공포지수'예요. 너무 낮으면 다들 위험을 잊고 방심하고 있다는 신호일 수 있어요",
+    "description_beginner": "코스피 '공포지수'예요. 너무 낮으면 다들 위험을 잊고 방심했다는 신호예요",
     "unit": "pt",
 }
 

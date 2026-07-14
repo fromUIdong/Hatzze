@@ -24,7 +24,7 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "미국 10년물 국채금리",
     "category": "시장",
-    "description_beginner": "미국 10년물 금리가 오르면, 안전한 채권으로 돈이 옮겨가 주식에서 빠져나갈 수 있어요",
+    "description_beginner": "금리가 오르면 안전한 채권으로 돈이 옮겨가, 주식에서 빠질 수 있어요",
     "unit": "%",
 }
 

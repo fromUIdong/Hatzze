@@ -37,7 +37,7 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "경제·재테크 도서 베스트셀러 비중",
     "category": "감성",
-    "description_beginner": "베스트셀러 상위에 재테크 책이 몰릴수록, 대중의 관심이 이미 쏠릴 대로 쏠린 국면일 수 있어요",
+    "description_beginner": "베스트셀러에 재테크 책이 많으면, 관심이 쏠렸다는 신호",
     "unit": "%",
 }
 

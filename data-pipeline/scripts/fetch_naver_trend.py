@@ -14,6 +14,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.config import NAVER_CLIENT_ID, NAVER_CLIENT_SECRET  # noqa: E402
+from common.details import store_vs_average_details  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 
 NAVER_DATALAB_URL = "https://openapi.naver.com/v1/datalab/search"
@@ -26,7 +27,7 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "주식 초보 검색량 지수",
     "category": "감성",
-    "description_beginner": "'주식 초보' 같은 검색이 늘어 다들 이제서야 뛰어든다면, 이미 많이 오른 뒤늦은 국면일 수 있어요",
+    "description_beginner": "다들 이제서야 '주식 초보'를 검색하면, 뒤늦은 국면일 수 있어요",
     "unit": "pt",
 }
 
@@ -105,6 +106,11 @@ def main() -> None:
 
     upsert_all(client, indicator_id, data_points)
     print(f"[Supabase] indicator_values upsert 완료: {len(data_points)}건")
+
+    # 카드가 'pt' 대신 '평소 대비 N배'를 보여줄 수 있게 30일 평균 대비 배수를
+    # details에 채운다.
+    updated = store_vs_average_details(client, indicator_id)
+    print(f"[Supabase] 평소 대비 배수 details 저장 완료: {updated}건")
 
 
 if __name__ == "__main__":

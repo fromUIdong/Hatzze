@@ -24,6 +24,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.config import NAVER_CLIENT_ID, NAVER_CLIENT_SECRET  # noqa: E402
+from common.details import store_vs_average_details  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 
 NAVER_DATALAB_URL = "https://openapi.naver.com/v1/datalab/search"
@@ -53,7 +54,7 @@ GROUP_CONFIGS = [
             "slug": "small_business_crisis_index",
             "name": "자영업 폐업·권리금 검색 지수",
             "category": "감성",
-            "description_beginner": "자영업 폐업 검색이 느는데 증시만 뜨겁다면, 실물경제와 시장의 괴리가 벌어진다는 위험 신호예요",
+            "description_beginner": "폐업 검색이 느는데 증시만 뜨겁다면, 실물과 시장의 괴리 신호예요",
             "unit": "pt",
         },
     },
@@ -146,6 +147,11 @@ def main() -> None:
 
         upsert_all(client, indicator_id, data_points)
         print(f"[Supabase] indicator_values upsert 완료: {len(data_points)}건")
+
+        # 카드가 'pt' 대신 '평소 대비 N배'를 보여줄 수 있게 30일 평균 대비 배수를
+        # details에 채운다.
+        updated = store_vs_average_details(client, indicator_id)
+        print(f"[Supabase] 평소 대비 배수 details 저장 완료: {updated}건")
 
 
 if __name__ == "__main__":
