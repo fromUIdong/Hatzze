@@ -35,6 +35,7 @@ type Pick = {
   thDisp: string | null;
   dirLabel: string;
   details: Record<string, number> | null;
+  history: number[];
 };
 
 function pick(ind: Ind | undefined): Pick {
@@ -64,6 +65,7 @@ function pick(ind: Ind | undefined): Pick {
     thDisp: tf ? `${tf.display}${tf.displayUnit}` : null,
     dirLabel: ind?.direction === "low" ? "이하" : "이상",
     details: ind?.latest?.details ?? null,
+    history: ind?.history ?? [],
   };
 }
 
@@ -418,6 +420,43 @@ function TrendLine({ color, down = false }: { color: string; down?: boolean }) {
   );
 }
 
+// 최근 값들의 실제 추세 스파크라인. data는 시간순(오래된→최신). 차트는 위 영역을
+// 꽉 채우고(선 두께는 non-scaling-stroke로 일정), 라벨은 차트에 겹치지 않게 아래
+// 오른쪽에 둔다.
+function Sparkline({ data, color, label = "최근 30일" }: { data: number[]; color: string; label?: string }) {
+  if (data.length < 2) {
+    return (
+      <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: C.sub }}>
+        추세 데이터 쌓이는 중
+      </div>
+    );
+  }
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const W = 100;
+  const H = 40;
+  const pad = 4;
+  const pts = data.map((val, i) => {
+    const x = (i / (data.length - 1)) * W;
+    const y = pad + (1 - (val - min) / range) * (H - 2 * pad);
+    return [x, y] as const;
+  });
+  const line = pts.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+  const area = `${line} L${W} ${H} L0 ${H} Z`;
+  return (
+    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      <div style={{ flex: 1, position: "relative" }}>
+        <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ position: "absolute", inset: 0 }}>
+          <path d={area} fill={color} opacity={0.12} />
+          <path d={line} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        </svg>
+      </div>
+      <span style={{ alignSelf: "flex-end", fontSize: 9, fontWeight: 700, color: C.sub, marginTop: 4 }}>{label}</span>
+    </div>
+  );
+}
+
 // 레버리지 카드의 서브 진행률 바 (ETF 거래대금 / 선물 미결제약정)
 function LevSubBar({ label, amount, value, color }: { label: string; amount: string | null; value: number; color: string }) {
   return (
@@ -586,12 +625,10 @@ function CardBuffett({ v }: { v: Pick }) {
 // 2. 레버리지 지수 — 역대 범위 바 + ETF/선물 서브 진행률 (details 있으면 목업 원본)
 function CardLeverage({ v }: { v: Pick }) {
   const dt = v.details;
-  // 역대 최저/최고 사이에서 '지금' 위치. min/max가 있으면 실제 범위로, 없으면 과열도로.
-  const hasRange =
-    !!dt && dt.hist_max !== undefined && dt.hist_min !== undefined && dt.hist_max > dt.hist_min && v.raw !== null;
-  const pos = hasRange
-    ? Math.max(0, Math.min(100, ((v.raw! - dt!.hist_min) / (dt!.hist_max - dt!.hist_min)) * 100))
-    : v.capped ?? 0;
+  // 종합 과열도 = ETF 거래대금·선물 미결제약정 과열도의 평균(아래 두 서브바의 평균).
+  const heat = dt
+    ? Math.round(((dt.etf_progress ?? 0) + (dt.futures_progress ?? 0)) / 2)
+    : Math.round(v.capped ?? 0);
   const etfAmount =
     dt?.etf_value != null
       ? (() => {
@@ -606,17 +643,20 @@ function CardLeverage({ v }: { v: Pick }) {
       {v.isHit && <HitBadge />}
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="rocket_launch" iconSize={30} color={v.color} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="당일 기준" />
-      <Big disp={`${Math.round(pos)}%`} color={v.color} size={44} />
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 12 }}>
+        <span style={{ fontFamily: MONO, fontSize: 44, fontWeight: 800, color: v.color, lineHeight: 1, letterSpacing: "-0.03em" }}>{heat}</span>
+        <span style={{ fontSize: 18, fontWeight: 800, color: "var(--c-faint)" }}>/ 100</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: C.sub, paddingBottom: 4 }}>종합 과열도</span>
+      </div>
       <div style={{ background: C.bg, borderRadius: 14, padding: 18, display: "flex", flexDirection: "column", gap: 16 }}>
         <div>
           <div style={{ position: "relative", height: 12, background: C.line, borderRadius: 999 }}>
-            <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${pos}%`, background: `linear-gradient(90deg,${C.hot},${C.mania})`, borderRadius: 999 }} />
-            <div style={{ position: "absolute", top: "50%", left: `${pos}%`, transform: "translate(-50%,-50%)", width: 14, height: 14, borderRadius: 999, background: v.color, border: `3px solid ${C.card}`, boxShadow: "0 1px 3px var(--c-shadow-strong)" }} />
+            <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.min(100, heat)}%`, background: `linear-gradient(90deg,${C.hot},${C.mania})`, borderRadius: 999 }} />
+            <div style={{ position: "absolute", top: "50%", left: `${Math.min(100, heat)}%`, transform: "translate(-50%,-50%)", width: 14, height: 14, borderRadius: 999, background: v.color, border: `3px solid ${C.card}`, boxShadow: "0 1px 3px var(--c-shadow-strong)" }} />
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 700, color: C.sub, marginTop: 7 }}>
-            <span>역대 최저</span>
-            <span style={{ color: v.color }}>지금 {Math.round(pos)}%</span>
-            <span style={{ color: C.hot }}>역대 최고</span>
+            <span>안심</span>
+            <span style={{ color: C.hot }}>과열</span>
           </div>
         </div>
         {dt && (
@@ -944,11 +984,8 @@ function CardFx({ v }: { v: Pick }) {
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
         <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>±{v.disp}{v.unit}</span>
       </div>
-      <div style={{ flex: 1, position: "relative", minHeight: 50, display: "flex", alignItems: "center" }}>
-        <svg width="100%" height="50" viewBox="0 0 100 50" preserveAspectRatio="none" style={{ position: "absolute", inset: 0 }}>
-          <line x1="0" y1="25" x2="100" y2="25" stroke={C.line} strokeWidth="0.8" strokeDasharray="2,2" />
-          <path d="M0 25 C5 20 9 20 13 25 S21 30 26 25 S34 20 39 25 S47 30 52 25 S60 20 65 25 S73 30 78 25 S86 20 91 25 S99 29 100 25" fill="none" stroke={v.color} strokeWidth="2.2" strokeLinecap="round" />
-        </svg>
+      <div style={{ flex: 1, position: "relative", minHeight: 50 }}>
+        <Sparkline data={v.history} color={v.color} />
       </div>
       <Foot text={v.desc} />
     </Shell>
@@ -971,7 +1008,7 @@ function CardRangeRate({ v, icon, warn = false }: { v: Pick; icon: string; warn?
           <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: `${pos}%`, background: v.color }} />
         </div>
         <div style={{ position: "relative", height: 0 }}>
-          <div className={warn ? "hz-pulse-red" : undefined} style={{ position: "absolute", top: -13, transform: "translateX(-50%)", left: `${pos}%`, width: 16, height: 16, borderRadius: 999, background: v.color, border: `3px solid ${C.card}`, boxShadow: "0 1px 4px var(--c-shadow-strong)" }} />
+          <div className={warn && v.raw !== null && v.raw < 0 ? "hz-pulse-red" : undefined} style={{ position: "absolute", top: -13, transform: "translateX(-50%)", left: `${pos}%`, width: 16, height: 16, borderRadius: 999, background: v.color, border: `3px solid ${C.card}`, boxShadow: "0 1px 4px var(--c-shadow-strong)" }} />
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 800, color: C.sub, marginTop: 10 }}>
           <span>낮음</span>
@@ -993,7 +1030,7 @@ function CardCopper({ v }: { v: Pick }) {
         <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.raw !== null && v.raw > 0 ? "+" : ""}{v.disp}{v.unit}</span>
       </div>
       <div style={{ flex: 1, position: "relative", minHeight: 56 }}>
-        <TrendLine color={v.color} down={v.raw !== null && v.raw < 0} />
+        <Sparkline data={v.history} color={v.color} />
       </div>
       <Foot text={v.desc} />
     </Shell>

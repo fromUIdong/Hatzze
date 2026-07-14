@@ -40,6 +40,8 @@ export type IndicatorWithLatestValue = {
     threshold: number | null;
     details: IndicatorDetails | null;
   } | null;
+  // 최근 ~30일 raw_value(시간순, 오래된→최신). 카드가 추세 스파크라인을 그릴 때 쓴다.
+  history: number[];
 };
 
 export async function getLatestDailyScore(): Promise<DailyScore | null> {
@@ -68,7 +70,7 @@ export async function getPublicIndicators(): Promise<IndicatorWithLatestValue[]>
       .eq("is_public", true)
       .order("created_at", { ascending: true })
       .order("date", { referencedTable: "indicator_values", ascending: false })
-      .limit(1, { referencedTable: "indicator_values" });
+      .limit(30, { referencedTable: "indicator_values" });
 
   // details(JSONB) 컬럼이 아직 없는 환경(마이그레이션 전)에서도 페이지가 죽지
   // 않도록, details 포함 조회가 실패하면 details 없이 한 번 더 조회한다.
@@ -133,6 +135,8 @@ export async function getPublicIndicators(): Promise<IndicatorWithLatestValue[]>
               : baseDetails,
           }
         : null,
+      // 조회는 최신순이므로 뒤집어 시간순(오래된→최신)으로 둔다.
+      history: [...row.indicator_values].reverse().map((v) => v.raw_value),
     };
   });
 }
