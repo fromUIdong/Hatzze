@@ -1340,8 +1340,8 @@ export default async function Home() {
                 <CardVolume v={p("kospi_volume_surge")} />
                 <CardFx v={p("usdkrw_volatility")} />
                 <CardRangeRate v={p("us10y")} icon="account_balance" />
-                <CardCopper v={p("copper_price_momentum")} />
                 <CardRangeRate v={p("yield_curve_spread")} icon="trending_down" warn />
+                <CardCopper v={p("copper_price_momentum")} />
                 <CardComingSoon />
                 {extra("시장").map((i) => (
                   <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["시장"]} />

@@ -36,7 +36,7 @@ REQUEST_TIMEOUT_SEC = 15
 INDICATOR_SLUG = "github_trading_bot_repos"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
-    "name": "GitHub 트레이딩봇 저장소 생성 수",
+    "name": "깃헙 트레이딩봇 저장소 생성 수",
     "category": "감성",
     "headline": "개발자들도 뛰어드는 순간",
     "description_beginner": "개발자까지 트레이딩 봇을 만들 만큼 관심이 높아졌어요",

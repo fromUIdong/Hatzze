@@ -27,7 +27,7 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "주식 초보 검색량 지수",
     "category": "감성",
-    "description_beginner": "다들 이제서야 '주식 초보'를 검색하면, 뒤늦은 국면일 수 있어요",
+    "description_beginner": "주식 입문자를 위한 검색량이 늘어나면 뒤늦은 국면일 수 있어요",
     "unit": "pt",
 }
 
