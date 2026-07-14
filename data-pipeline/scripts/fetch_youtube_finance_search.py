@@ -46,7 +46,7 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "재테크 유튜브 검색 콘텐츠 조회수",
     "category": "감성",
-    "description_beginner": "재테크 키워드로 유튜브를 검색했을 때, 최근 일주일 내 올라온 인기 영상들의 평균 조회수예요. 갑자기 확 뛰면 재테크 콘텐츠가 평소보다 훨씬 빠르게 퍼지고 있다는 신호일 수 있어요",
+    "description_beginner": "재테크 유튜브 인기 영상 조회수가 확 뛰면, 관련 콘텐츠가 평소보다 빠르게 퍼지고 있다는 신호예요",
     "unit": "회",
 }
 

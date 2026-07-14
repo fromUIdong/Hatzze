@@ -24,7 +24,7 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "미국 10년물 국채금리",
     "category": "시장",
-    "description_beginner": "미국 10년물 국채금리가 오르면 안전한 예금·채권의 매력이 커져서 위험자산인 주식에서 돈이 빠져나갈 수 있어요. 전 세계 자산 가격의 기준이 되는 가장 중요한 금리예요",
+    "description_beginner": "미국 10년물 금리가 오르면, 안전한 채권으로 돈이 옮겨가 주식에서 빠져나갈 수 있어요",
     "unit": "%",
 }
 

@@ -49,7 +49,7 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "서울 맑은 날씨 지수",
     "category": "감성",
-    "description_beginner": "화창한 날엔 사람들 기분이 좋아져서 위험한 투자에도 더 대범해진다는 연구가 실제로 있어요. 오늘 서울 하늘이 얼마나 맑은지를 보여드려요 (재미로 보는 지표예요!)",
+    "description_beginner": "화창한 날엔 위험한 투자에도 대범해진다는 연구가 있어요. 오늘 서울 하늘을 보여드려요 (재미로!)",
     "unit": "pt",
 }
 

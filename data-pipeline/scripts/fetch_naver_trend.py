@@ -26,7 +26,7 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "주식 초보 검색량 지수",
     "category": "감성",
-    "description_beginner": "'주식 초보', '주식 시작하는 법' 같은 검색이 얼마나 늘었는지 보여줘요. 다들 이제서야 계좌를 트고 뛰어들고 있다면, 시장이 이미 많이 오른 뒤늦은 국면일 수 있어요",
+    "description_beginner": "'주식 초보' 같은 검색이 늘어 다들 이제서야 뛰어든다면, 이미 많이 오른 뒤늦은 국면일 수 있어요",
     "unit": "pt",
 }
 

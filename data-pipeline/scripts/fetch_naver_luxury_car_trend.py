@@ -43,7 +43,7 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "명품·수입차 소비 검색 지수",
     "category": "감성",
-    "description_beginner": "샤넬·벤츠 같은 명품·수입차 브랜드 검색이 늘어나면, 사람들이 여윳돈으로 과시성 소비에 지갑을 열고 있다는 신호예요. 씀씀이가 커질수록 시장도 들떠 있을 수 있어요",
+    "description_beginner": "명품·수입차 검색이 늘면, 사람들이 여윳돈으로 과시성 소비에 지갑을 열고 있다는 신호예요",
     "unit": "pt",
 }
 

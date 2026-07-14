@@ -33,7 +33,7 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "코스피 거래대금 급증도",
     "category": "시장",
-    "description_beginner": "사람들이 최근 거래일에 얼마나 활발하게 사고팔았는지 30일 평균과 비교해 보여줘요. 평소보다 거래가 훨씬 많이 몰렸다면 다들 흥분해 달려들고 있다는 신호일 수 있어요",
+    "description_beginner": "거래대금이 30일 평균보다 훨씬 많이 몰렸다면, 다들 흥분해 달려들고 있다는 신호일 수 있어요",
     "unit": "억원",
 }
 

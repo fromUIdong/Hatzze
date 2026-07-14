@@ -45,7 +45,7 @@ INDICATOR_META = {
     "name": "VIX 대비 VKOSPI 스프레드",
     "category": "시장",
     "headline": "태평양 건너 공포와 비교하면",
-    "description_beginner": "미국(VIX)과 한국(VKOSPI) 변동성을 각자 최근 1년 대비 백분위로 바꿔 비교해요. 미국은 불안한데 한국만 유독 잠잠할수록(백분위 격차가 클수록) 방심 신호로 봐요",
+    "description_beginner": "미국은 불안한데 한국 증시만 유독 잠잠할수록, 위험을 잊은 방심 신호로 봐요",
     "unit": "pt",
     # raw = VIX 백분위 - VKOSPI 백분위. 양수로 클수록 "한국만 유독 방심" = 과열이므로
     # direction은 high(기본). VIX·VKOSPI는 산출식/스케일이 달라 절대값 뺄셈이 무의미했는데,

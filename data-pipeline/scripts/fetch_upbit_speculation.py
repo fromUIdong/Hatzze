@@ -62,7 +62,7 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "업비트 투기 과열 지수",
     "category": "감성",
-    "description_beginner": "개미들이 코스피만 하는 게 아니에요. 김치프리미엄과 거래대금이 동시에 뛴다면, 코인판으로 흘러든 뜨거운 돈이 코스피에도 이미 들어와 있을 가능성이 높다는 신호로 볼 수 있어요",
+    "description_beginner": "김치프리미엄과 거래대금이 동시에 뛰면, 코인판의 뜨거운 돈이 코스피에도 들어와 있다는 신호예요",
     "unit": "pt",
     "weight": 2,
 }

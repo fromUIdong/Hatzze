@@ -34,7 +34,7 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "VKOSPI (변동성지수)",
     "category": "시장",
-    "description_beginner": "코스피200 옵션 가격으로 계산하는 '공포지수'로, 시장이 앞날을 얼마나 불안해하는지 보여줘요. 너무 낮으면 다들 위험을 잊고 방심하고 있다는 신호일 수 있어요",
+    "description_beginner": "코스피의 '공포지수'예요. 너무 낮으면 다들 위험을 잊고 방심하고 있다는 신호일 수 있어요",
     "unit": "pt",
 }
 

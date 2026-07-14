@@ -29,7 +29,7 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "원/달러 환율 변동성",
     "category": "시장",
-    "description_beginner": "원/달러 환율이 최근 얼마나 출렁이고 있는지 보여줘요. 환율은 외국인 자금 흐름과 직결되는데, 변동성이 지나치게 잔잔하면 시장이 위험을 잊고 방심하고 있다는 역설적인 신호일 수 있어요",
+    "description_beginner": "원/달러 환율 출렁임이 지나치게 잔잔하면, 시장이 위험을 잊고 방심하고 있다는 신호일 수 있어요",
     "unit": "%",
 }
 
