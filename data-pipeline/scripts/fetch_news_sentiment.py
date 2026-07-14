@@ -23,6 +23,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.config import NAVER_CLIENT_ID, NAVER_CLIENT_SECRET  # noqa: E402
+from common.details import store_abs_scale_details  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 from config.news_sentiment_keywords import NEGATIVE_KEYWORDS, POSITIVE_KEYWORDS  # noqa: E402
@@ -43,7 +44,7 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "경제뉴스 헤드라인 감성 지수",
     "category": "감성",
-    "description_beginner": "경제 뉴스 제목마다 장밋빛 전망만 넘쳐난다면, 여론이 한쪽으로 쏠린 과열 신호로 볼 수 있어요",
+    "description_beginner": "뉴스 제목마다 장밋빛 전망만 넘치면, 여론이 한쪽으로 쏠린 신호예요",
     "unit": "pt",
 }
 
@@ -288,6 +289,8 @@ def main() -> None:
 
     if "--backfill" in sys.argv:
         backfill_daily_sentiment(client, indicator_id)
+        # 감성 게이지가 '자기 최근 범위 대비'로 마커를 배치할 수 있게 스케일 저장.
+        store_abs_scale_details(client, indicator_id)
         return
 
     titles = collect_today_titles()
@@ -315,6 +318,10 @@ def main() -> None:
         on_conflict="indicator_id,date",
     ).execute()
     print(f"[Supabase] indicator_values upsert 완료: date={today}, raw_value={score}")
+
+    # 감성 게이지가 '자기 최근 범위 대비'로 마커를 배치할 수 있게 스케일 저장.
+    updated = store_abs_scale_details(client, indicator_id)
+    print(f"[Supabase] 감성 스케일 details 저장 완료: {updated}건")
 
 
 if __name__ == "__main__":

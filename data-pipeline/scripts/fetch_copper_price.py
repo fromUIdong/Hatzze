@@ -32,7 +32,7 @@ INDICATOR_META = {
     "name": '구리 가격 모멘텀 ("닥터 코퍼")',
     "category": "시장",
     "headline": "구리가 먼저 알아채는 경기",
-    "description_beginner": "경기를 먼저 반영하는 '닥터 코퍼' 구리 값이 빠르게 오르면, 경기 확장 기대가 커지는 신호예요",
+    "description_beginner": "구리 값이 빠르게 오르면, 경기 확장 기대가 커진다는 신호예요",
     "unit": "%",
     "weight": 2,
 }

@@ -32,6 +32,7 @@ from bs4 import BeautifulSoup
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from common.details import store_abs_scale_details  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 from config.sentiment_keywords import NEGATIVE_KEYWORDS, POSITIVE_KEYWORDS  # noqa: E402
@@ -66,7 +67,7 @@ OLD_ROW_STREAK_THRESHOLD = 5
 INDICATOR_SLUG = "dcinside_post_count"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
-    "name": "디시인사이드 한국/미국 주식 갤러리 커뮤니티 감성 지수",
+    "name": "디씨 주식 갤러리 감성 지수",
     "category": "감성",
     "description_beginner": "한국·미국 주식 갤러리 게시글이 낙관적인지 비관적인지 여론의 온도를 재요. 다들 들떠서 낙관적인 얘기만 쏟아내고 있다면, 개인 투자 심리가 과열됐다는 신호로 볼 수 있어요",
     "unit": "pt",
@@ -317,6 +318,8 @@ def main() -> None:
 
     if "--backfill" in sys.argv:
         backfill_daily_sentiment(client, indicator_id)
+        # 감성 게이지가 '자기 최근 범위 대비'로 마커를 배치할 수 있게 스케일 저장.
+        store_abs_scale_details(client, indicator_id)
         return
 
     titles = collect_today_titles()
@@ -345,6 +348,10 @@ def main() -> None:
         on_conflict="indicator_id,date",
     ).execute()
     print(f"[Supabase] indicator_values upsert 완료: date={today}, raw_value={score}")
+
+    # 감성 게이지가 '자기 최근 범위 대비'로 마커를 배치할 수 있게 스케일 저장.
+    updated = store_abs_scale_details(client, indicator_id)
+    print(f"[Supabase] 감성 스케일 details 저장 완료: {updated}건")
 
 
 if __name__ == "__main__":

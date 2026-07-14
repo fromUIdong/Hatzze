@@ -305,9 +305,13 @@ def main() -> None:
             "raw_value": round(composite, 2),
             # 카드가 목업 원본대로 ETF 거래대금 / 선물 미결제약정 두 서브바를 그리고,
             # 범위 바에 역대 최저/최고 대비 현재 위치를 찍을 수 있도록 details에 저장.
+            # etf_value(억원)·futures_oi(계약)는 카드가 진행률뿐 아니라 실제 금액/계약수를
+            # 함께 보여줄 수 있게 넣는다.
             "details": {
                 "etf_progress": round(etf_progress, 1),
                 "futures_progress": round(oi_progress, 1),
+                "etf_value": round(etf_values[d], 0),
+                "futures_oi": round(oi_values[d], 0),
                 "hist_min": hist_min,
                 "hist_max": hist_max,
             },

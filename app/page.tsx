@@ -108,7 +108,9 @@ function Shell({
       style={{
         background: C.card,
         borderRadius: 20,
-        padding: span === 2 ? 30 : 24,
+        // 모든 카드의 divider(Foot 등) 가로 위치가 동일하도록 span과 무관하게
+        // 안쪽 여백을 통일한다.
+        padding: 24,
         display: "flex",
         flexDirection: "column",
         position: "relative",
@@ -249,20 +251,27 @@ function Big({
 
 function Foot({ text, color = C.sub }: { text: string; color?: string }) {
   return (
-    <p
-      style={{
-        margin: "auto 0 0",
-        paddingTop: 16,
-        fontSize: 12,
-        color,
-        fontWeight: 600,
-        borderTop: "1px solid rgba(0,0,0,0.05)",
-        marginTop: 16,
-        lineHeight: 1.5,
-      }}
-    >
-      {text}
-    </p>
+    // 바깥 div: marginTop auto 로 카드 바닥에 붙이고(같은 줄 divider 높이 일치),
+    // paddingTop 으로 divider 위에 항상 여백을 둔다 — 콘텐츠가 카드를 꽉 채워
+    // auto 여백이 0이 돼도 divider가 콘텐츠에 붙지 않도록. 설명 영역은 2줄
+    // (minHeight)로 통일한다.
+    <div style={{ marginTop: "auto", paddingTop: 20 }}>
+      <p
+        style={{
+          margin: 0,
+          boxSizing: "border-box",
+          minHeight: 53,
+          paddingTop: 16,
+          fontSize: 12,
+          color,
+          fontWeight: 600,
+          borderTop: "1px solid rgba(0,0,0,0.05)",
+          lineHeight: 1.5,
+        }}
+      >
+        {text}
+      </p>
+    </div>
   );
 }
 
@@ -490,11 +499,13 @@ function TrendLine({ color, down = false }: { color: string; down?: boolean }) {
 }
 
 // 레버리지 카드의 서브 진행률 바 (ETF 거래대금 / 선물 미결제약정)
-function LevSubBar({ label, value, color }: { label: string; value: number; color: string }) {
+function LevSubBar({ label, amount, value, color }: { label: string; amount: string | null; value: number; color: string }) {
   return (
     <div style={{ flex: 1 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 6 }}>
-        <span>{label}</span>
+      <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 4 }}>{label}</div>
+      {amount && <div style={{ fontFamily: MONO, fontSize: 15, fontWeight: 800, color: C.ink, marginBottom: 7 }}>{amount}</div>}
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 700, color: C.sub, marginBottom: 5 }}>
+        <span>과열도</span>
         <span style={{ color }}>
           {Math.round(value)}
           <span style={{ color: "#a9b0bd" }}>/100</span>
@@ -554,6 +565,35 @@ function UpbitSubBar({ label, value, pct, color }: { label: string; value: strin
       </div>
       <div style={{ height: 8, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
         <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, pct))}%`, background: color }} />
+      </div>
+    </div>
+  );
+}
+
+// 김치 프리미엄 전용 양극 바 — 0을 중앙에 두고 음수(역프)면 왼쪽(파랑), 양수면
+// 오른쪽(빨강)으로 채운다. ±10%를 최대로 스케일한다(업비트 기준값과 동일).
+function UpbitKimchiBar({ premium }: { premium: number }) {
+  const norm = Math.max(-1, Math.min(1, premium / 10));
+  const pos = 50 + norm * 50;
+  const color = premium >= 0 ? C.hot : C.cold;
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 6 }}>
+        <span>김치 프리미엄</span>
+        <span style={{ color }}>{premium > 0 ? "+" : ""}{premium.toFixed(1)}%</span>
+      </div>
+      <div style={{ position: "relative", height: 8, background: C.bg, borderRadius: 999 }}>
+        <div style={{ position: "absolute", left: "50%", top: -2, bottom: -2, width: 2, background: "rgba(32,38,50,0.3)" }} />
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            background: color,
+            borderRadius: 999,
+            ...(premium >= 0 ? { left: "50%", width: `${pos - 50}%` } : { right: "50%", width: `${50 - pos}%` }),
+          }}
+        />
       </div>
     </div>
   );
@@ -632,12 +672,21 @@ function CardLeverage({ v }: { v: Pick }) {
   const pos = hasRange
     ? Math.max(0, Math.min(100, ((v.raw! - dt!.hist_min) / (dt!.hist_max - dt!.hist_min)) * 100))
     : v.capped ?? 0;
+  const etfAmount =
+    dt?.etf_value != null
+      ? (() => {
+          const f = formatIndicatorValue(dt.etf_value, "억원");
+          return `${f.display}${f.displayUnit}`;
+        })()
+      : null;
+  const oiAmount =
+    dt?.futures_oi != null ? `${Math.round(dt.futures_oi).toLocaleString("ko-KR")}계약` : null;
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
       {v.isHit && <HitBadge />}
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="rocket_launch" iconSize={30} color={v.color} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="당일 기준" />
-      <Big disp={v.disp} unit={v.unit} color={v.color} size={44} />
+      <Big disp={`${Math.round(pos)}%`} color={v.color} size={44} />
       <div style={{ background: C.bg, borderRadius: 14, padding: 18, display: "flex", flexDirection: "column", gap: 16 }}>
         <div>
           <div style={{ position: "relative", height: 12, background: C.line, borderRadius: 999 }}>
@@ -654,8 +703,8 @@ function CardLeverage({ v }: { v: Pick }) {
           <>
             <div style={{ height: 1, background: "rgba(0,0,0,0.07)" }} />
             <div style={{ display: "flex", gap: 22 }}>
-              <LevSubBar label="ETF 거래대금" value={dt.etf_progress ?? 0} color={C.hot} />
-              <LevSubBar label="선물 미결제약정" value={dt.futures_progress ?? 0} color={C.mania} />
+              <LevSubBar label="ETF 거래대금" amount={etfAmount} value={dt.etf_progress ?? 0} color={C.hot} />
+              <LevSubBar label="선물 미결제약정" amount={oiAmount} value={dt.futures_progress ?? 0} color={C.mania} />
             </div>
           </>
         )}
@@ -685,11 +734,10 @@ function CardMarketActions({ v }: { v: Pick }) {
     <Shell span={2} hit={v.isHit} minH={236}>
       {v.isHit && <HitBadge />}
       <Tag text={v.headline} color={v.color} />
-      <TitleRow icon="speed" iconSize={30} color={v.color} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="최근 30일" />
+      <TitleRow icon="speed" iconSize={30} color={v.color} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="최근 한 달" />
       {verdict ? (
         <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginBottom: 12 }}>
           <span style={{ fontSize: 34, fontWeight: 800, color: verdict.c, lineHeight: 1 }}>{verdict.t}</span>
-          <span style={{ fontSize: 12, fontWeight: 700, color: C.sub, paddingBottom: 4 }}>최근 30일 안전장치</span>
         </div>
       ) : (
         <Big disp={v.raw !== null && v.raw > 0 ? `+${v.disp}` : v.disp} color={v.color} size={44} sub="최근 30일 순 쏠림" />
@@ -841,7 +889,7 @@ function CardAsia({ v }: { v: Pick }) {
     return (
       <Shell span={2} minH={230}>
         <Tag text={v.headline} color={v.color} />
-        <TitleRow icon="public" name={v.name} color={v.color} badge="최근 20거래일" />
+        <TitleRow icon="public" name={v.name} color={v.color} badge="최근 한 달" />
         <Big disp={v.raw !== null && v.raw > 0 ? `+${v.disp}` : v.disp} unit={v.unit} color={v.color} size={40} sub="아시아 3국 평균 대비" />
         <HeatBar v={v} />
         <Foot text={v.desc} />
@@ -859,7 +907,7 @@ function CardAsia({ v }: { v: Pick }) {
   return (
     <Shell span={2} minH={230}>
       <Tag text={v.headline} color={v.color} />
-      <TitleRow icon="public" name={v.name} color={v.color} badge="최근 20거래일" />
+      <TitleRow icon="public" name={v.name} color={v.color} badge="최근 한 달" />
       <div style={{ fontSize: 9, color: "#8a919e", fontWeight: 700, marginBottom: 4 }}>
         KOSPI를 100으로 둔 상대 지수 · 코스피 초과수익률 {v.raw !== null && v.raw > 0 ? "+" : ""}
         {v.disp}
@@ -876,7 +924,7 @@ function CardAsia({ v }: { v: Pick }) {
 }
 
 // 9. 위험자산 vs 안전자산 — 금/코스닥 두 지표 결합 (둘 다 실제 값)
-function SubRatio({ v, icon, label, note }: { v: Pick; icon: string; label: string; note: string }) {
+function SubRatio({ v, icon, label }: { v: Pick; icon: string; label: string }) {
   return (
     <div style={{ flex: 1 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
@@ -894,8 +942,15 @@ function SubRatio({ v, icon, label, note }: { v: Pick; icon: string; label: stri
       <div style={{ position: "relative", height: 10, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
         <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${v.capped ?? 0}%`, background: `linear-gradient(90deg,${C.hot},${C.mania})`, borderRadius: 999 }} />
       </div>
-      <p style={{ margin: "12px 0 0", paddingTop: 12, borderTop: "1px solid rgba(0,0,0,0.05)", fontSize: 11, color: C.sub, fontWeight: 600, lineHeight: 1.5 }}>{note}</p>
     </div>
+  );
+}
+
+// 결합 카드는 두 서브값을 위쪽 행에, 두 간단 설명을 아래쪽 행에 나눠 담고, 그 사이에
+// 카드 전체 폭 divider를 둔다 — 다른 카드들과 divider 가로 위치를 맞추기 위해서다.
+function SubNote({ text }: { text: string }) {
+  return (
+    <p style={{ flex: 1, margin: 0, fontSize: 11, color: C.sub, fontWeight: 600, lineHeight: 1.5 }}>{text}</p>
   );
 }
 
@@ -903,10 +958,15 @@ function CardRiskAssets({ gold, kosdaq }: { gold: Pick; kosdaq: Pick }) {
   return (
     <Shell span={2} minH={230}>
       <Tag text="위험자산 vs 안전자산" color={C.sub} />
-      <div style={{ display: "flex", gap: 32 }}>
-        <SubRatio v={gold} icon="balance" label="코스피 강도 (vs 금)" note={gold.desc} />
+      <div style={{ display: "flex", gap: 32, flex: 1 }}>
+        <SubRatio v={gold} icon="balance" label="코스피 강도 (vs 금)" />
         <div style={{ width: 1, background: C.line }} />
-        <SubRatio v={kosdaq} icon="celebration" label="코스닥 강도 (vs 코스피)" note={kosdaq.desc} />
+        <SubRatio v={kosdaq} icon="celebration" label="코스닥 강도 (vs 코스피)" />
+      </div>
+      <div style={{ display: "flex", gap: 32, marginTop: 16, paddingTop: 16, borderTop: "1px solid rgba(0,0,0,0.05)" }}>
+        <SubNote text={gold.desc} />
+        <div style={{ width: 1 }} />
+        <SubNote text={kosdaq.desc} />
       </div>
     </Shell>
   );
@@ -986,7 +1046,7 @@ function CardRangeRate({ v, icon, warn = false }: { v: Pick; icon: string; warn?
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 20 }}>
         <span style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}{v.unit}</span>
       </div>
-      <div style={{ marginTop: "auto" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
         <div style={{ position: "relative", height: 12, borderRadius: 999, background: C.bg, overflow: "hidden" }}>
           <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: `${pos}%`, background: v.color }} />
         </div>
@@ -1043,19 +1103,57 @@ function CardComingSoon() {
 
 // ── 소셜 지표 카드들 ──────────────────────────────────────────────
 
+// '평소 대비 N배' — 절대 건수가 없는 네이버 검색지수(0~100 상대지수)를 직관적으로
+// 보여준다. ratio = 현재 / 최근 30일 평균. 가운데 눈금(1배=평소)을 기준으로
+// 오른쪽으로 넘으면 평소보다 활발(과열 방향).
+function VsAvg({ ratio, size = 26 }: { ratio: number; size?: number }) {
+  const c = ratio > 1.05 ? C.hot : ratio < 0.95 ? C.cold : C.sub;
+  const arrow = ratio > 1.05 ? "↑" : ratio < 0.95 ? "↓" : "";
+  const fill = Math.max(4, Math.min(100, (ratio / 2) * 100)); // 2배 = 꽉 참, 1배 = 50%
+  return (
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 2 }}>평소 대비</div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 4, whiteSpace: "nowrap" }}>
+        <span style={{ fontFamily: MONO, fontSize: size, fontWeight: 800, color: c, letterSpacing: "-0.03em" }}>{ratio.toFixed(1)}배</span>
+        <span style={{ fontSize: 15, fontWeight: 800, color: c }}>{arrow}</span>
+      </div>
+      <div style={{ position: "relative", height: 8, background: C.bg, borderRadius: 999, marginTop: 8, overflow: "hidden" }}>
+        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${fill}%`, background: c, borderRadius: 999 }} />
+        <div style={{ position: "absolute", left: "50%", top: -2, bottom: -2, width: 2, background: "rgba(32,38,50,0.35)" }} />
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, fontWeight: 700, color: C.sub, marginTop: 5 }}>
+        <span>적음</span>
+        <span>평소(1배)</span>
+        <span>많음</span>
+      </div>
+    </div>
+  );
+}
+
 // 라인+마커형 (초보검색/재테크도서/GitHub/자영업)
+// 네이버 검색지수(초보검색/자영업)는 details.vs_avg가 있어 '평소 대비 N배'로,
+// 그 외(재테크도서·GitHub)는 기존 값+과열기준 라인으로 보여준다.
 function CardTrend({ v, icon }: { v: Pick; icon: string }) {
+  const vsAvg = v.details?.vs_avg ?? null;
   return (
     <Shell minH={210}>
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon={icon} name={v.name} iconSize={22} color={v.color} />
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
-        <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}{v.unit}</span>
-      </div>
-      <div style={{ flex: 1, position: "relative", minHeight: 52 }}>
-        <TrendLine color={v.color} down={(v.score ?? 0) < 33} />
-        {v.thDisp && <span style={{ position: "absolute", top: 1, left: 2, fontSize: 8, fontWeight: 800, color: C.hot }}>과열 기준 {v.thDisp}</span>}
-      </div>
+      {vsAvg !== null ? (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+          <VsAvg ratio={vsAvg} />
+        </div>
+      ) : (
+        <>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+            <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}{v.unit}</span>
+          </div>
+          <div style={{ flex: 1, position: "relative", minHeight: 52 }}>
+            <TrendLine color={v.color} down={(v.score ?? 0) < 33} />
+            {v.thDisp && <span style={{ position: "absolute", top: 1, left: 2, fontSize: 8, fontWeight: 800, color: C.hot }}>과열 기준 {v.thDisp}</span>}
+          </div>
+        </>
+      )}
       <Foot text={v.desc} />
     </Shell>
   );
@@ -1066,7 +1164,15 @@ function CardTrend({ v, icon }: { v: Pick; icon: string }) {
 // raw = (긍정-부정)/전체*100 이라 -100~+100 범위. 중앙=중립, 좌=비관, 우=낙관.
 function CardSentiment({ v, icon, span = 1 }: { v: Pick; icon: string; span?: 1 | 2 }) {
   const raw = v.raw ?? 0;
-  const pos = Math.max(0, Math.min(100, (raw + 100) / 2)); // -100..+100 → 0..100 (중립=50)
+  // 감성 점수는 지표마다 크기가 크게 달라(디시 ±1, 뉴스 ±30) 절대 ±100 축에선
+  // 한쪽이 늘 정중앙처럼 보인다. details.scale(자기 최근 |최대|)이 있으면 그걸로
+  // 정규화해 '자기 최근 범위 대비'로 보여주되, 마커가 중앙 ±12(=38~62%)에서만
+  // 움직이게 해 과하지 않게(은은하게) 한다. 0(중립)은 항상 중앙.
+  const scale = v.details?.scale ?? null;
+  const pos =
+    scale && scale > 0
+      ? 50 + Math.max(-1, Math.min(1, raw / scale)) * 12
+      : Math.max(0, Math.min(100, (raw + 100) / 2));
   const optimistic = raw >= 0;
   const barColor = raw === 0 ? C.neutral : optimistic ? C.hot : C.cold;
   return (
@@ -1085,7 +1191,7 @@ function CardSentiment({ v, icon, span = 1 }: { v: Pick; icon: string; span?: 1 
           </span>
         }
       />
-      <div style={{ marginTop: "auto" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
         <div style={{ position: "relative", height: 16, background: C.bg, borderRadius: 999 }}>
           <div style={{ position: "absolute", left: "50%", top: -3, bottom: -3, width: 2, background: "rgba(32,38,50,0.35)" }} />
           <div
@@ -1101,9 +1207,9 @@ function CardSentiment({ v, icon, span = 1 }: { v: Pick; icon: string; span?: 1 
           <div style={{ position: "absolute", top: "50%", left: `${pos}%`, transform: "translate(-50%,-50%)", width: 14, height: 14, borderRadius: 999, background: barColor, border: `3px solid ${C.card}`, boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 800, marginTop: 8 }}>
-          <span style={{ color: C.cold }}>비관 −100</span>
+          <span style={{ color: C.cold }}>비관</span>
           <span style={{ color: C.sub }}>중립</span>
-          <span style={{ color: C.hot }}>낙관 +100</span>
+          <span style={{ color: C.hot }}>낙관</span>
         </div>
       </div>
       <Foot text={v.desc} />
@@ -1150,10 +1256,13 @@ function SubSpend({ v, icon }: { v: Pick; icon: string }) {
         <Icon name={icon} style={{ fontSize: 18, color: C.sub }} />
         <span style={{ fontSize: 12, fontWeight: 700, wordBreak: "keep-all" }}>{v.name}</span>
       </div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
-        <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>
-      </div>
-      <p style={{ margin: "12px 0 0", paddingTop: 12, borderTop: "1px solid rgba(0,0,0,0.05)", fontSize: 11, color: C.sub, fontWeight: 600, lineHeight: 1.5 }}>{v.desc}</p>
+      {v.details?.vs_avg != null ? (
+        <VsAvg ratio={v.details.vs_avg} />
+      ) : (
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
+          <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -1162,10 +1271,15 @@ function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick }) {
   return (
     <Shell span={2} minH={210}>
       <h3 style={{ margin: "0 0 18px", fontSize: 15, fontWeight: 800 }}>여윳돈이 향하는 곳</h3>
-      <div style={{ display: "flex", gap: 32 }}>
+      <div style={{ display: "flex", gap: 32, flex: 1 }}>
         <SubSpend v={luxury} icon="shopping_bag" />
         <div style={{ width: 1, background: C.line }} />
         <SubSpend v={dining} icon="restaurant" />
+      </div>
+      <div style={{ display: "flex", gap: 32, marginTop: 16, paddingTop: 16, borderTop: "1px solid rgba(0,0,0,0.05)" }}>
+        <SubNote text={luxury.desc} />
+        <div style={{ width: 1 }} />
+        <SubNote text={dining.desc} />
       </div>
     </Shell>
   );
@@ -1178,16 +1292,14 @@ function CardUpbit({ v }: { v: Pick }) {
   return (
     <Shell minH={210}>
       <Tag text={v.headline} color={v.color} />
-      <TitleRow icon="currency_bitcoin" iconSize={22} color={v.color} name={v.name} right={<span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>} />
-      <div style={{ marginTop: "auto" }}>
+      <TitleRow icon="currency_bitcoin" iconSize={22} color={v.color} name={v.name} />
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+        <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}{v.unit}</span>
+      </div>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
         {dt ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <UpbitSubBar
-              label="김치 프리미엄"
-              value={`${(dt.kimchi_premium ?? 0) > 0 ? "+" : ""}${(dt.kimchi_premium ?? 0).toFixed(1)}%`}
-              pct={dt.kimchi_progress ?? 0}
-              color={(dt.kimchi_premium ?? 0) >= 0 ? C.hot : C.cold}
-            />
+            <UpbitKimchiBar premium={dt.kimchi_premium ?? 0} />
             <UpbitSubBar label="거래량 강도" value={volLabel(dt.volume_progress ?? 0)} pct={dt.volume_progress ?? 0} color={C.hot} />
           </div>
         ) : (
@@ -1205,7 +1317,8 @@ function CardUpbit({ v }: { v: Pick }) {
 function CardWeather({ v }: { v: Pick }) {
   const raw = v.raw ?? 0;
   const label = raw >= 8 ? "쾌청" : raw >= 6 ? "맑음" : raw >= 4 ? "구름 조금" : raw >= 2 ? "구름 많음" : "흐림";
-  const clear = raw >= 5;
+  // 아이콘 기준을 라벨과 맞춘다 — 맑음(≥6)부터 해 아이콘, 그 아래는 구름 아이콘.
+  const clear = raw >= 6;
   return (
     <Shell minH={210}>
       <Tag text={v.headline} color={v.color} />
@@ -1262,7 +1375,7 @@ function GenericCard({ v, icon }: { v: Pick; icon: string }) {
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon={icon} iconSize={22} name={v.name} color={v.color} />
       <Big disp={v.disp} unit={v.unit} color={v.color} size={30} />
-      <div style={{ marginTop: "auto" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
         <HeatBar v={v} />
       </div>
       <Foot text={v.desc} />

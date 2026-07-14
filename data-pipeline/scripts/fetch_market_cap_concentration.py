@@ -39,7 +39,7 @@ INDICATOR_META = {
     "name": "코스피 시가총액 상위 10종목 쏠림도",
     "category": "시장",
     "headline": "몇몇 대장주가 이끄는 지수",
-    "description_beginner": "코스피 상승이 몇몇 대형주에만 쏠려 있을수록, 대장주가 흔들리면 시장 전체가 함께 휘청일 수 있어요",
+    "description_beginner": "몇몇 대형주에만 쏠려 오르면, 흔들릴 때 시장도 휘청여요",
     "unit": "%",
     "weight": 3,
 }

@@ -35,7 +35,7 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "코스피 대비 코스닥 상대강도",
     "category": "시장",
-    "description_beginner": "중소형·테마주 위주인 코스닥이 대형주 코스피보다 얼마나 강한지 보여줘요. 코스닥이 유독 앞서가면 투기성 자금이 위험을 무릅쓰고 몰리고 있다는 신호일 수 있어요",
+    "description_beginner": "코스닥이 유독 앞서가면 투기성 자금이 위험을 무릅쓰고 몰리고 있다는 신호일 수 있어요",
     "unit": "배",
 }
 
