@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { DailyScore } from "@/lib/data";
 import { formatIndicatorValue } from "@/lib/format";
@@ -29,7 +29,7 @@ function Sidebar() {
   return (
     <aside
       className="hz-sidebar"
-      style={{ width: 248, flexShrink: 0, background: C.card, borderRight: `1px solid ${C.line}`, padding: "32px 0" }}
+      style={{ width: 210, flexShrink: 0, background: C.card, borderRight: `1px solid ${C.line}`, padding: "32px 0" }}
     >
       <div style={{ padding: "0 32px", marginBottom: 48 }}>
         <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, color: C.blue, letterSpacing: "-0.04em" }}>HATZZE</h1>
@@ -117,7 +117,39 @@ function TickerItem({ q }: { q: Quote }) {
   );
 }
 
+// 시세 로드 전 자리표시. /api/ticker 응답이 오면 실데이터로 교체된다.
+const PLACEHOLDER: Quote[] = [
+  { label: "나스닥 선물", value: "—", change: null },
+  { label: "코스피", value: "—", change: null },
+  { label: "코스닥", value: "—", change: null },
+  { label: "삼성전자", value: "—", change: null },
+  { label: "SK하이닉스", value: "—", change: null },
+  { label: "비트코인", value: "—", change: null },
+  { label: "원/달러", value: "—", change: null },
+];
+
 function TopBar({ dailyScore, theme }: { dailyScore: DailyScore | null; theme: "light" | "dark" }) {
+  // 햇쩨 지수는 일간 값이라 서버 prop을 쓰고, 나머지 시세는 10분마다 폴링한다.
+  const [live, setLive] = useState<Quote[]>(PLACEHOLDER);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const res = await fetch("/api/ticker");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (active && Array.isArray(data.quotes)) setLive(data.quotes as Quote[]);
+      } catch {}
+    };
+    load();
+    const id = setInterval(load, 600_000); // 10분
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, []);
+
   const hatzze: Quote = dailyScore
     ? {
         label: "햇쩨 지수",
@@ -127,20 +159,12 @@ function TopBar({ dailyScore, theme }: { dailyScore: DailyScore | null; theme: "
       }
     : { label: "햇쩨 지수", value: "—", change: null };
 
-  // 5분 시세 연동 전까지 자리표시(—). 연동 시 이 배열만 실데이터로 교체된다.
-  const quotes: Quote[] = [
-    hatzze,
-    { label: "코스피", value: "—", change: null },
-    { label: "코스닥", value: "—", change: null },
-    { label: "SK하이닉스", value: "—", change: null },
-    { label: "삼성전자", value: "—", change: null },
-    { label: "원/달러", value: "—", change: null },
-  ];
+  const quotes: Quote[] = [hatzze, ...live];
 
   return (
     <header
       style={{
-        height: 64,
+        height: 54,
         flexShrink: 0,
         background: C.card,
         borderBottom: `1px solid ${C.line}`,
@@ -151,16 +175,15 @@ function TopBar({ dailyScore, theme }: { dailyScore: DailyScore | null; theme: "
         padding: "0 24px",
       }}
     >
-      <div
-        className="hz-ticker"
-        style={{ display: "flex", alignItems: "center", gap: 22, overflowX: "auto", minWidth: 0 }}
-      >
-        {quotes.map((q, i) => (
-          <div key={q.label} style={{ display: "flex", alignItems: "center", gap: 22 }}>
-            {i > 0 && <span style={{ width: 1, height: 18, background: C.line, flexShrink: 0 }} />}
-            <TickerItem q={q} />
-          </div>
-        ))}
+      <div className="hz-ticker-wrap">
+        <div className="hz-ticker-track">
+          {[...quotes, ...quotes].map((q, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 22, paddingRight: 22 }}>
+              <span style={{ width: 1, height: 18, background: C.line, flexShrink: 0 }} />
+              <TickerItem q={q} />
+            </div>
+          ))}
+        </div>
       </div>
       <ThemeToggle initial={theme} />
     </header>

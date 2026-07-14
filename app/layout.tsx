@@ -59,7 +59,10 @@ export default async function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="font-sans">
+      {/* 일부 브라우저 확장(예: ColorZilla의 cz-shortcut-listen)이 hydration 전에
+          <body>에 속성을 주입해 불일치 경고를 낸다. body 자신의 속성 불일치만
+          무시한다 — 내부 컴포넌트 hydration 검사에는 영향 없다. */}
+      <body className="font-sans" suppressHydrationWarning>
         <AppShell dailyScore={dailyScore} theme={theme}>
           {children}
         </AppShell>

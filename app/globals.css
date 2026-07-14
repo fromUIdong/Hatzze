@@ -134,6 +134,22 @@ body {
   border: 3px solid var(--c-scrollbar-border);
 }
 
-/* 티커 가로 스크롤(모바일)에서 스크롤바 감춤 */
-.hz-ticker::-webkit-scrollbar { display: none; }
-.hz-ticker { scrollbar-width: none; }
+/* 탑바 시세 티커 — 항목이 넘치므로 가로로 천천히 흐르게(마퀴) 하고, 마우스를
+   올리면 멈춰 읽을 수 있게 한다. 트랙에 항목을 두 벌 넣고 -50% 이동해 이어붙인다. */
+@keyframes hz-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.hz-ticker-wrap {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.hz-ticker-track {
+  display: flex;
+  width: max-content;
+  animation: hz-marquee 42s linear infinite;
+}
+.hz-ticker-wrap:hover .hz-ticker-track {
+  animation-play-state: paused;
+}
