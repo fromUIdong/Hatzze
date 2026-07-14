@@ -1,21 +1,71 @@
 @import "tailwindcss";
 
+/* ── 테마 팔레트 (라이트 기본 / 다크 오버라이드) ────────────────────
+   카드가 인라인 스타일 위주라, 색은 전부 CSS 변수로 두고 app/ui.tsx의 C가
+   var(--c-*)를 참조한다. data-theme="dark"를 <html>에 붙이면 전체가 전환된다.
+   강조색(cold/neutral/hot/mania)은 두 테마 공통, 구조색(배경/카드/텍스트/보더)만
+   다르게 둔다. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --c-cold: #5ea8d8;
+  --c-neutral: #a89f95;
+  --c-hot: #ff9a4d;
+  --c-mania: #ff6b81;
+  --c-blue: #0064ff;
+
+  --c-ink: #202632;
+  --c-ink-soft: #3a4453;
+  --c-sub: #6b7684;
+  --c-muted: #8a919e;
+  --c-faint: #a9b0bd;
+  --c-hint: #8a93a8;
+
+  --c-card: #e8eefe;
+  --c-bg: #d4daea;
+  --c-line: #c2c6d8;
+  --c-track: #c2c6d8;
+
+  --c-divider: rgba(0, 0, 0, 0.05);
+  --c-divider-strong: rgba(0, 0, 0, 0.07);
+  --c-shadow: rgba(0, 0, 0, 0.08);
+  --c-shadow-strong: rgba(0, 0, 0, 0.2);
+  --c-marker: rgba(32, 38, 50, 0.35);
+  --c-blue-tint: rgba(0, 100, 255, 0.08);
+  --c-scrollbar: #c2c6d8;
+  --c-scrollbar-border: #d4daea;
+
+  --background: var(--c-bg);
+  --foreground: var(--c-ink);
+}
+
+:root[data-theme="dark"] {
+  --c-blue: #4d8dff;
+
+  --c-ink: #e7eaf1;
+  --c-ink-soft: #c3c9d4;
+  --c-sub: #9aa3b2;
+  --c-muted: #7e8798;
+  --c-faint: #5c6474;
+  --c-hint: #6e7686;
+
+  --c-card: #1a2130;
+  --c-bg: #0e131c;
+  --c-line: #2b3344;
+  --c-track: #2b3344;
+
+  --c-divider: rgba(255, 255, 255, 0.07);
+  --c-divider-strong: rgba(255, 255, 255, 0.1);
+  --c-shadow: rgba(0, 0, 0, 0.45);
+  --c-shadow-strong: rgba(0, 0, 0, 0.6);
+  --c-marker: rgba(231, 234, 241, 0.4);
+  --c-blue-tint: rgba(77, 141, 255, 0.16);
+  --c-scrollbar: #2b3344;
+  --c-scrollbar-border: #0e131c;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-pretendard);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
@@ -79,7 +129,11 @@ body {
 
 .hz-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
 .hz-scroll::-webkit-scrollbar-thumb {
-  background: #c2c6d8;
+  background: var(--c-scrollbar);
   border-radius: 999px;
-  border: 3px solid #d4daea;
+  border: 3px solid var(--c-scrollbar-border);
 }
+
+/* 티커 가로 스크롤(모바일)에서 스크롤바 감춤 */
+.hz-ticker::-webkit-scrollbar { display: none; }
+.hz-ticker { scrollbar-width: none; }
