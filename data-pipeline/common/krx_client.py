@@ -28,10 +28,13 @@ import time
 import requests
 
 from common.config import KRX_API_KEY
+from common.retry import backoff_delay
 
-KRX_REQUEST_TIMEOUT_SEC = 15
-KRX_MAX_RETRIES = 3
-KRX_RETRY_DELAY_SEC = 3
+# 해외 러너→KRX 간헐 타임아웃 대응: 넉넉한 타임아웃 + 다회 재시도 + 지수 백오프.
+KRX_REQUEST_TIMEOUT_SEC = 30
+KRX_MAX_RETRIES = 6
+KRX_RETRY_BASE_DELAY_SEC = 2
+KRX_RETRY_MAX_DELAY_SEC = 20
 
 
 def krx_get(url: str, bas_dd: str) -> requests.Response | None:
@@ -54,14 +57,14 @@ def krx_get(url: str, bas_dd: str) -> requests.Response | None:
             last_error = str(e)
             print(f"[KRX] {bas_dd} 요청 실패 ({attempt}/{KRX_MAX_RETRIES}): {e}")
             if attempt < KRX_MAX_RETRIES:
-                time.sleep(KRX_RETRY_DELAY_SEC)
+                time.sleep(backoff_delay(attempt, KRX_RETRY_BASE_DELAY_SEC, KRX_RETRY_MAX_DELAY_SEC))
             continue
 
         if resp.status_code >= 500:
             last_error = f"서버 오류 {resp.status_code}"
             print(f"[KRX] {bas_dd} {last_error} ({attempt}/{KRX_MAX_RETRIES})")
             if attempt < KRX_MAX_RETRIES:
-                time.sleep(KRX_RETRY_DELAY_SEC)
+                time.sleep(backoff_delay(attempt, KRX_RETRY_BASE_DELAY_SEC, KRX_RETRY_MAX_DELAY_SEC))
             continue
 
         return resp
