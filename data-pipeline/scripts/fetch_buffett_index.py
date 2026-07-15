@@ -30,6 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.config import ECOS_API_KEY  # noqa: E402
 from common.krx_client import krx_get  # noqa: E402
+from common.retry import backoff_delay  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 
 KRX_URL = "http://data-dbg.krx.co.kr/svc/apis/idx/kospi_dd_trd"
@@ -41,9 +42,11 @@ ECOS_STAT_CODE = "200Y109"  # 국내총생산에 대한 지출(원계열, 명목
 ECOS_ITEM_CODE = "10601"  # 국내총생산에 대한 지출 (= GDP)
 ECOS_CYCLE = "Q"
 ECOS_TRAILING_QUARTERS = 4
-ECOS_REQUEST_TIMEOUT_SEC = 15
-ECOS_MAX_RETRIES = 3
-ECOS_RETRY_DELAY_SEC = 3
+# 해외 러너→ECOS 간헐 타임아웃 대응: 넉넉한 타임아웃 + 다회 재시도 + 지수 백오프.
+ECOS_REQUEST_TIMEOUT_SEC = 30
+ECOS_MAX_RETRIES = 6
+ECOS_RETRY_BASE_DELAY_SEC = 2
+ECOS_RETRY_MAX_DELAY_SEC = 20
 
 
 class EcosUnavailableError(Exception):
@@ -127,7 +130,7 @@ def fetch_ecos_payload(url: str) -> dict:
             last_error = e
             print(f"[ECOS] 요청 실패 ({attempt}/{ECOS_MAX_RETRIES}): {e}")
             if attempt < ECOS_MAX_RETRIES:
-                time.sleep(ECOS_RETRY_DELAY_SEC)
+                time.sleep(backoff_delay(attempt, ECOS_RETRY_BASE_DELAY_SEC, ECOS_RETRY_MAX_DELAY_SEC))
 
     raise EcosUnavailableError(
         f"ECOS API 요청이 {ECOS_MAX_RETRIES}번 모두 실패했습니다 (타임아웃/연결 실패 — "
