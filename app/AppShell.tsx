@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import type { DailyScore } from "@/lib/data";
 import { formatIndicatorValue } from "@/lib/format";
 import { C, Icon, MONO } from "./ui";
+import { LogoLockup } from "./Logo";
 
 const NAV = [
   { href: "/", label: "시장 브리핑", icon: "monitoring" },
@@ -32,7 +33,9 @@ function Sidebar() {
       style={{ width: 210, flexShrink: 0, background: C.card, borderRight: `1px solid ${C.line}`, padding: "32px 0" }}
     >
       <div style={{ padding: "0 32px", marginBottom: 48 }}>
-        <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, color: C.blue, letterSpacing: "-0.04em" }}>HATZZE</h1>
+        <h1 style={{ margin: 0 }}>
+          <LogoLockup symbolSize={29} wordmarkSize={30} gap={7} />
+        </h1>
         <p style={{ margin: "8px 0 0", fontSize: 11, fontWeight: 700, color: C.sub, letterSpacing: "0.02em", lineHeight: 1.5 }}>
           데이터와 감성으로 읽는 시장
         </p>

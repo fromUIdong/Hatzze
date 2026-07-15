@@ -14,6 +14,7 @@
 
   --c-ink: #202632;
   --c-ink-soft: #3a4453;
+  --c-logo-ink: oklch(0.24 0.02 260); /* 로고 워드마크 잉크(≈#25262F) — handoff 10a */
   --c-sub: #6b7684;
   --c-muted: #8a919e;
   --c-faint: #a9b0bd;
@@ -42,6 +43,7 @@
 
   --c-ink: #e7eaf1;
   --c-ink-soft: #c3c9d4;
+  --c-logo-ink: #ffffff; /* on-dark 워드마크 — handoff 10a */
   --c-sub: #9aa3b2;
   --c-muted: #7e8798;
   --c-faint: #5c6474;
