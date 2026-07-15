@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 
 import type { DailyScore } from "@/lib/data";
 import { formatIndicatorValue } from "@/lib/format";
-import { C, Icon, MONO } from "./ui";
+import { C, Icon, MONO, stageForScore } from "./ui";
 import { LogoLockup } from "./Logo";
 import Footer from "./Footer";
 
@@ -16,10 +16,10 @@ const NAV = [
 ];
 
 const STAGE_COLOR: Record<string, string> = {
-  공포: C.cold,
-  보통: C.neutral,
-  과열: C.hot,
-  광기: C.mania,
+  저온: C.cold,
+  상온: C.neutral,
+  고온: C.hot,
+  초고온: C.mania,
 };
 
 // 탑바 시세 티커. 햇쩨 지수는 서버에서 받은 일간 점수를 쓰고, 나머지 종목/지수/
@@ -154,12 +154,14 @@ function TopBar({ dailyScore, theme }: { dailyScore: DailyScore | null; theme: "
     };
   }, []);
 
+  // 저장된 stage 대신 점수에서 직접 구간을 계산 — 히어로와 항상 일치하고 라벨 변경에 견고.
+  const stageLabel = dailyScore ? stageForScore(dailyScore.score) : "";
   const hatzze: Quote = dailyScore
     ? {
         label: "햇쩨 지수",
-        value: `${formatIndicatorValue(dailyScore.score, "%").display}% · ${dailyScore.stage}`,
+        value: `${formatIndicatorValue(dailyScore.score, "%").display}% · ${stageLabel}`,
         change: null,
-        color: STAGE_COLOR[dailyScore.stage] ?? C.ink,
+        color: STAGE_COLOR[stageLabel] ?? C.ink,
       }
     : { label: "햇쩨 지수", value: "—", change: null };
 

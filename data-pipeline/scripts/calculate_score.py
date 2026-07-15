@@ -52,7 +52,7 @@ daily_score.score("햇쩨 지수")는 지표별 capped_progress의 가중 평균
 합계에도 포함하지 않음) — get_latest_value가 InsufficientHistoryError를
 던지는 no_value 케이스가 이 경우다.
 
-stage(공포/보통/과열/광기)는 이 가중 평균 점수 자체를 4구간으로 나눠 정한다
+stage(저온/상온/고온/초고온)는 이 가중 평균 점수 자체를 4구간으로 나눠 정한다
 (stage_for_score) — hit_count 비율로 정하지 않는다. hit_count는 화면의 Hit
 배지 표시용으로 계속 계산하지만, stage 산정에는 관여하지 않는다.
 """
@@ -197,12 +197,12 @@ def cap_progress(progress: float) -> float:
 
 def stage_for_score(score: float) -> str:
     if score < 25:
-        return "공포"
+        return "저온"
     if score < 50:
-        return "보통"
+        return "상온"
     if score < 75:
-        return "과열"
-    return "광기"
+        return "고온"
+    return "초고온"
 
 
 def main() -> None:

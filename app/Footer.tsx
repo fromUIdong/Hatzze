@@ -76,9 +76,7 @@ export default function Footer() {
       {/* 하단 바: 면책 + 저작권 */}
       <div
         style={{
-          marginTop: 36,
-          paddingTop: 20,
-          borderTop: "1px solid var(--c-divider)",
+          marginTop: 28,
           display: "flex",
           flexWrap: "wrap",
           gap: "8px 20px",
@@ -87,7 +85,7 @@ export default function Footer() {
         }}
       >
         <p style={{ margin: 0, fontSize: 11, color: "var(--c-muted)" }}>
-          이 서비스는 정보 제공 목적이며, 투자 조언이나 매수·매도 추천이 아닙니다.
+          이 서비스는 재미와 참고를 위한 정보 제공 목적이며, 투자 조언이나 매수·매도 추천이 아닙니다. 모든 투자 판단과 책임은 이용자 본인에게 있습니다.
         </p>
         <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: "var(--c-muted)" }}>Copyright © {year} hatzze. All rights reserved.</p>
       </div>

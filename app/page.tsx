@@ -1,7 +1,7 @@
 import { getLatestDailyScore, getPublicIndicators } from "@/lib/data";
 import type { DailyScore, IndicatorCategory, IndicatorWithLatestValue } from "@/lib/data";
 import { formatIndicatorValue, formatKstDateTime } from "@/lib/format";
-import { C, Icon, MONO } from "./ui";
+import { C, Icon, MONO, stageForScore } from "./ui";
 
 // 지표는 하루 단위(GitHub Actions 배치)로 갱신되므로, 빌드 시점에 정적으로
 // 굳어버리지 않도록 매 요청마다 서버에서 새로 조회한다.
@@ -303,10 +303,10 @@ function HeatBar({ v }: { v: Pick }) {
 
 // ── 히어로 ────────────────────────────────────────────────────────
 const STAGE_META: Record<string, { emoji: string; color: string; zone: string }> = {
-  공포: { emoji: "🧊", color: C.cold, zone: "공포 구간" },
-  보통: { emoji: "⚖️", color: C.neutral, zone: "보통 구간" },
-  과열: { emoji: "🔥", color: C.hot, zone: "과열 구간" },
-  광기: { emoji: "🚨", color: C.mania, zone: "광기 구간" },
+  저온: { emoji: "❄️", color: C.cold, zone: "저온 구간" },
+  상온: { emoji: "🌡️", color: C.neutral, zone: "상온 구간" },
+  고온: { emoji: "🔥", color: C.hot, zone: "고온 구간" },
+  초고온: { emoji: "🌋", color: C.mania, zone: "초고온 구간" },
 };
 
 function HeroGauge({ score }: { score: number }) {
@@ -342,7 +342,9 @@ function HeroGauge({ score }: { score: number }) {
 }
 
 function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tradHits: number; socialHits: number }) {
-  const stage = STAGE_META[dailyScore.stage] ?? { emoji: "📊", color: C.neutral, zone: dailyScore.stage };
+  // 저장된 stage 문자열 대신 점수에서 직접 구간을 계산해, 라벨 변경/과거 데이터에도 견고.
+  const stageLabel = stageForScore(dailyScore.score);
+  const stage = STAGE_META[stageLabel] ?? { emoji: "📊", color: C.neutral, zone: stageLabel };
   const scoreDisplay = formatIndicatorValue(dailyScore.score, "%").display;
   return (
     <section
@@ -368,26 +370,29 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
           </div>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", width: 300, padding: "0 6px", fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-          <span style={{ color: C.cold }}>공포</span>
-          <span style={{ color: C.neutral }}>보통</span>
-          <span style={{ color: C.hot }}>과열</span>
-          <span style={{ color: C.mania }}>광기</span>
+          <span style={{ color: C.cold }}>저온</span>
+          <span style={{ color: C.neutral }}>상온</span>
+          <span style={{ color: C.hot }}>고온</span>
+          <span style={{ color: C.mania }}>초고온</span>
         </div>
       </div>
       <div style={{ flex: 1, minWidth: 280 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
           <span style={{ fontSize: 15, fontWeight: 800, color: C.blue }}>Hatzze Overheating Index</span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: `${stage.color}24`, color: stage.color, fontWeight: 800, fontSize: 16, padding: "5px 14px", borderRadius: 999, whiteSpace: "nowrap" }}>
-            {stage.emoji} {dailyScore.stage}
+            {stage.emoji} {stageLabel}
           </span>
         </div>
         <p style={{ margin: "0 0 4px", fontSize: 11, color: C.sub, fontFamily: MONO }}>최종 업데이트 · {formatKstDateTime(dailyScore.updated_at)}</p>
         <div style={{ marginTop: 20, background: C.bg, borderRadius: 16, padding: "22px 24px", display: "flex", gap: 14 }}>
           <Icon name="auto_awesome" style={{ color: C.blue, fontSize: 22 }} />
           <p style={{ margin: 0, fontSize: 15, lineHeight: 1.6, color: "var(--c-ink-soft)", fontWeight: 500 }}>
-            오늘은 시장 지표 <b style={{ color: C.ink }}>{tradHits}개</b>, 감성 지표 <b style={{ color: C.ink }}>{socialHits}개</b>가 기준선을 넘었어요. 지표들이 가리키는 현재 시장 온도는 <b style={{ color: stage.color }}>{dailyScore.stage}</b> 구간이에요.
+            오늘은 시장 지표 <b style={{ color: C.ink }}>{tradHits}개</b>, 감성 지표 <b style={{ color: C.ink }}>{socialHits}개</b>가 기준선을 넘었어요. 지표들이 가리키는 현재 시장 온도는 <b style={{ color: stage.color }}>{stageLabel}</b> 구간이에요.
           </p>
         </div>
+        <p style={{ margin: "12px 2px 0", fontSize: 11, lineHeight: 1.5, color: "var(--c-muted)" }}>
+          저온·상온·고온·초고온은 시장의 과열 정도를 나타낸 표현일 뿐, 재미·참고용이며 매수·매도 신호가 아니에요.
+        </p>
       </div>
     </section>
   );
