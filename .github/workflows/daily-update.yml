@@ -2,12 +2,17 @@ name: Daily Indicator Update
 
 on:
   schedule:
-    - cron: "0 0 * * *" # UTC 00:00 = KST(UTC+9) 09:00
+    - cron: "0 0 * * *" # UTC 00:00 = KST(UTC+9) 09:00 — 아침 실행
+    - cron: "0 8 * * *" # UTC 08:00 = KST 17:00 — 오후 재실행(아침 실패 시 자동 만회)
   workflow_dispatch:
 
 jobs:
   update:
     runs-on: ubuntu-latest
+    # 실패 시 알림 이슈를 열 수 있도록 issues 쓰기 권한 부여(감지 레이어).
+    permissions:
+      contents: read
+      issues: write
     env:
       FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
       NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
@@ -175,6 +180,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           failed=0
+          failed_list=""
           for i in "${!names[@]}"; do
             script="${names[$i]}"
             outcome="${outcomes[$i]}"
@@ -184,10 +190,35 @@ jobs:
             else
               echo "| $script | $outcome |" >> "$GITHUB_STEP_SUMMARY"
               failed=1
+              failed_list="${failed_list:+$failed_list, }$script"
             fi
           done
 
           if [ "$failed" = "1" ]; then
+            # 실패한 스크립트 목록을 다음(알림) 스텝에서 쓸 수 있게 넘긴다.
+            echo "FAILED_SCRIPTS=$failed_list" >> "$GITHUB_ENV"
             echo "One or more scripts failed. Check the step logs above for details."
             exit 1
+          fi
+
+      # 감지 레이어: 실행이 실패하면 알림용 GitHub 이슈를 열거나(없으면) 코멘트를
+      # 추가한다. 별도 외부 설정 없이 기본 GITHUB_TOKEN만 쓴다. 같은 제목의 열린
+      # 이슈가 있으면 새로 만들지 않고 코멘트만 달아 스팸을 막는다.
+      - name: Alert on failure (open/update GitHub issue)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          failed="${FAILED_SCRIPTS:-요약 탭에서 확인}"
+          title="⚠️ 데일리 파이프라인 실패"
+          note=$(printf '데일리 업데이트 실행이 실패했습니다.\n\n- 시각(UTC): %s\n- 실패 스텝: %s\n- 로그/요약: %s\n\n다음 예약 실행(하루 2회)이 성공하면 데이터는 자동으로 만회됩니다. 계속 실패하면 확인이 필요합니다.' \
+            "$(date -u '+%Y-%m-%d %H:%M')" "$failed" "$run_url")
+          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$note"
+            echo "기존 알림 이슈 #$existing 에 코멘트 추가"
+          else
+            gh issue create --title "$title" --body "$note"
+            echo "새 알림 이슈 생성"
           fi
