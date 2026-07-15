@@ -15,6 +15,17 @@ function heatColor(score: number | null): string {
   return C.cold;
 }
 
+// 0~100 "과열도" 게이지용 색 — 히어로 지수의 stage 구간(공포<25·보통<50·과열<75·광기)과
+// 동일한 경계를 쓴다. heatColor는 "기준선 대비 진행률(100=Hit)" 의미라 70을 과열
+// 경계로 두지만, 이런 게이지는 50이 과열 시작이라 별도 매핑이 맞다.
+function overheatColor(pct: number | null): string {
+  if (pct === null) return C.sub;
+  if (pct >= 75) return C.mania;
+  if (pct >= 50) return C.hot;
+  if (pct >= 25) return C.neutral;
+  return C.cold;
+}
+
 
 // ── 지표 데이터 픽 ────────────────────────────────────────────────
 type Ind = IndicatorWithLatestValue;
@@ -257,11 +268,12 @@ function Foot({ text, color = C.sub }: { text: string; color?: string }) {
 // 과열도 진행 바 (세부 데이터가 없는 카드의 공용 시각화).
 function HeatBar({ v }: { v: Pick }) {
   if (v.capped === null) return null;
+  const c = overheatColor(v.capped); // 과열도 게이지는 stage 구간(50=과열) 색을 쓴다
   return (
     <div style={{ background: C.bg, borderRadius: 14, padding: "16px 18px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 800, marginBottom: 8 }}>
         <span style={{ color: C.sub }}>과열도</span>
-        <span style={{ color: v.color, fontFamily: MONO }}>
+        <span style={{ color: c, fontFamily: MONO }}>
           {Math.round(v.capped)}
           <span style={{ color: "var(--c-faint)" }}>/100</span>
         </span>
@@ -271,7 +283,7 @@ function HeatBar({ v }: { v: Pick }) {
           style={{
             height: "100%",
             width: `${v.capped}%`,
-            background: v.isHit ? `linear-gradient(90deg, ${C.hot}, ${C.mania})` : v.color,
+            background: v.isHit ? `linear-gradient(90deg, ${C.hot}, ${C.mania})` : c,
             borderRadius: 999,
           }}
         />
@@ -499,6 +511,14 @@ function emphasizedHeights(values: number[], floorPct = 30): number[] {
   return values.map((v) => floorPct + ((v - min) / (max - min)) * (100 - floorPct));
 }
 
+// "평소/평균 대비 오늘" 비교 막대 높이 [평소, 오늘]. 평소를 중간 높이(baseH)에
+// 고정하고 오늘을 비율만큼 비례시킨다 — 비율이 1이면 둘 다 같은 높이, 2배면 오늘이
+// 두 배 높이. emphasizedHeights와 달리 작은 차이를 과장하지 않는다(1.0배≈동일 높이).
+function ratioBarHeights(baseline: number | null, current: number | null, baseH = 55): [number, number] {
+  if (!baseline || !current || baseline <= 0) return [baseH, baseH];
+  return [baseH, Math.max(10, Math.min(100, (current / baseline) * baseH))];
+}
+
 // 아시아 카드의 4개국 상대 막대 (KOSPI=100 기준). heightPct는 차이를 강조한 0~100.
 function AsiaBar({ label, sub, index, heightPct, color }: { label: string; sub: string; index: number; heightPct: number; color: string }) {
   return (
@@ -629,6 +649,9 @@ function CardLeverage({ v }: { v: Pick }) {
   const heat = dt
     ? Math.round(((dt.etf_progress ?? 0) + (dt.futures_progress ?? 0)) / 2)
     : Math.round(v.capped ?? 0);
+  // 종합 과열도(0~100) 자체의 구간 색을 쓴다 — v.color(기준선 진행률 기준)와 달리
+  // 이 게이지는 50이 과열 시작이라 heat값을 그대로 stage 색에 매핑한다.
+  const heatC = overheatColor(heat);
   const etfAmount =
     dt?.etf_value != null
       ? (() => {
@@ -641,10 +664,10 @@ function CardLeverage({ v }: { v: Pick }) {
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
       {v.isHit && <HitBadge />}
-      <Tag text={v.headline} color={v.color} />
-      <TitleRow icon="rocket_launch" iconSize={30} color={v.color} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="당일 기준" />
+      <Tag text={v.headline} color={heatC} />
+      <TitleRow icon="rocket_launch" iconSize={30} color={heatC} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="당일 기준" />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 12 }}>
-        <span style={{ fontFamily: MONO, fontSize: 44, fontWeight: 800, color: v.color, lineHeight: 1, letterSpacing: "-0.03em" }}>{heat}</span>
+        <span style={{ fontFamily: MONO, fontSize: 44, fontWeight: 800, color: heatC, lineHeight: 1, letterSpacing: "-0.03em" }}>{heat}</span>
         <span style={{ fontSize: 18, fontWeight: 800, color: "var(--c-faint)" }}>/ 100</span>
         <span style={{ fontSize: 13, fontWeight: 700, color: C.sub, paddingBottom: 4 }}>종합 과열도</span>
       </div>
@@ -652,7 +675,7 @@ function CardLeverage({ v }: { v: Pick }) {
         <div>
           <div style={{ position: "relative", height: 12, background: C.line, borderRadius: 999 }}>
             <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.min(100, heat)}%`, background: `linear-gradient(90deg,${C.hot},${C.mania})`, borderRadius: 999 }} />
-            <div style={{ position: "absolute", top: "50%", left: `${Math.min(100, heat)}%`, transform: "translate(-50%,-50%)", width: 14, height: 14, borderRadius: 999, background: v.color, border: `3px solid ${C.card}`, boxShadow: "0 1px 3px var(--c-shadow-strong)" }} />
+            <div style={{ position: "absolute", top: "50%", left: `${Math.min(100, heat)}%`, transform: "translate(-50%,-50%)", width: 14, height: 14, borderRadius: 999, background: heatC, border: `3px solid ${C.card}`, boxShadow: "0 1px 3px var(--c-shadow-strong)" }} />
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 700, color: C.sub, marginTop: 7 }}>
             <span>안심</span>
@@ -779,16 +802,17 @@ function CardHighGap({ v }: { v: Pick }) {
 
 // 6. VKOSPI — 반원 게이지 (과열도 + 실제 값)
 function CardVkospi({ v }: { v: Pick }) {
+  const c = overheatColor(v.capped); // 과열도 게이지는 stage 구간(50=과열) 색
   return (
     <Shell minH={230}>
-      <Tag text={v.headline} color={v.color} />
-      <TitleRow icon="monitor_heart" name={v.name} color={v.color} />
+      <Tag text={v.headline} color={c} />
+      <TitleRow icon="monitor_heart" name={v.name} color={c} />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
-        <HalfGauge score={v.capped ?? 0} color={v.color} />
+        <HalfGauge score={v.capped ?? 0} color={c} />
         <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-          <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: v.color, lineHeight: 1 }}>{v.capped !== null ? Math.round(v.capped) : "-"}</span>
+          <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: c, lineHeight: 1 }}>{v.capped !== null ? Math.round(v.capped) : "-"}</span>
           <span style={{ fontSize: 13, fontWeight: 800, color: "var(--c-faint)" }}>/100</span>
-          <span style={{ fontSize: 11, fontWeight: 800, color: v.color, marginLeft: 2 }}>과열도</span>
+          <span style={{ fontSize: 11, fontWeight: 800, color: c, marginLeft: 2 }}>과열도</span>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", width: 182, fontSize: 9, fontWeight: 800, marginTop: 2 }}>
           <span style={{ color: C.cold }}>안심</span>
@@ -863,7 +887,9 @@ function CardAsia({ v }: { v: Pick }) {
     { label: "HangSeng", sub: "홍콩", index: 100 + ((dt.hangseng ?? 0) - k), color: C.cold },
     { label: "Taiex", sub: "대만", index: 100 + ((dt.taiex ?? 0) - k), color: C.neutral },
   ];
-  const heights = emphasizedHeights(bars.map((b) => b.index));
+  // floorPct를 55로 올려 강조는 유지하되 과하지 않게 — 최소 막대가 55%까지만
+  // 내려가 100 vs 117 같은 차이가 지나치게 벌어지지 않는다.
+  const heights = emphasizedHeights(bars.map((b) => b.index), 55);
   return (
     <Shell span={2} minH={230}>
       <Tag text={v.headline} color={v.color} />
@@ -897,7 +923,7 @@ function SubRatio({ v, icon, label }: { v: Pick; icon: string; label: string }) 
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, fontWeight: 800, marginBottom: 6 }}>
         <span style={{ color: C.sub }}>과열도</span>
-        <span style={{ color: v.color }}>{v.capped !== null ? Math.round(v.capped) : "-"} / 100</span>
+        <span style={{ color: overheatColor(v.capped) }}>{v.capped !== null ? Math.round(v.capped) : "-"} / 100</span>
       </div>
       <div style={{ position: "relative", height: 10, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
         <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${v.capped ?? 0}%`, background: `linear-gradient(90deg,${C.hot},${C.mania})`, borderRadius: 999 }} />
@@ -937,7 +963,7 @@ function CardVolume({ v }: { v: Pick }) {
   const dt = v.details;
   const avg = dt?.avg_30d ?? null;
   const today = v.raw ?? null;
-  const [avgH, todayH] = avg !== null && today !== null ? emphasizedHeights([avg, today]) : [70, 100];
+  const [avgH, todayH] = ratioBarHeights(avg, today);
   const avgFmt = avg !== null ? formatIndicatorValue(avg, "억원") : null;
   const surge = dt?.surge_pct ?? null;
   return (
@@ -1177,7 +1203,7 @@ function CardSentiment({ v, icon, span = 1 }: { v: Pick; icon: string; span?: 1 
 // 유튜브 — 평소(기준) vs 오늘 막대 (HIT)
 function CardYoutube({ v }: { v: Pick }) {
   const ratio = v.raw && v.threshold ? v.raw / v.threshold : null;
-  const [baseH, todayH] = v.raw && v.threshold ? emphasizedHeights([v.threshold, v.raw]) : [34, 100];
+  const [baseH, todayH] = ratioBarHeights(v.threshold, v.raw);
   return (
     <Shell hit={v.isHit} minH={210}>
       {v.isHit && <HitBadge label="✨ HIT" small />}
