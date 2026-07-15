@@ -1436,10 +1436,6 @@ export default async function Home() {
                 </a>
               </div>
             </section>
-
-      <p style={{ fontSize: 12, color: "var(--c-muted)", textAlign: "center", paddingBottom: 8 }}>
-        이 서비스는 정보 제공 목적이며, 투자 조언이나 매수·매도 추천이 아닙니다.
-      </p>
     </div>
   );
 }

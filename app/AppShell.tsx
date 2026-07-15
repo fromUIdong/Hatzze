@@ -8,6 +8,7 @@ import type { DailyScore } from "@/lib/data";
 import { formatIndicatorValue } from "@/lib/format";
 import { C, Icon, MONO } from "./ui";
 import { LogoLockup } from "./Logo";
+import Footer from "./Footer";
 
 const NAV = [
   { href: "/", label: "시장 브리핑", icon: "monitoring" },
@@ -219,6 +220,7 @@ export default function AppShell({
         <TopBar dailyScore={dailyScore} theme={theme} />
         <main className="hz-scroll" style={{ flex: 1, overflowY: "auto", padding: 40 }}>
           {children}
+          <Footer />
         </main>
       </div>
     </div>
