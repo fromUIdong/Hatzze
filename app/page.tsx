@@ -15,8 +15,8 @@ function heatColor(score: number | null): string {
   return C.cold;
 }
 
-// 0~100 "과열도" 게이지용 색 — 히어로 지수의 stage 구간(공포<25·보통<50·과열<75·광기)과
-// 동일한 경계를 쓴다. heatColor는 "기준선 대비 진행률(100=Hit)" 의미라 70을 과열
+// 0~100 "과열도" 게이지용 색 — 히어로 지수의 stage 구간(저온<25·상온<50·고온<75·초고온)과
+// 동일한 경계를 쓴다. heatColor는 "기준선 대비 진행률(100=임계값 도달)" 의미라 70을 과열
 // 경계로 두지만, 이런 게이지는 50이 과열 시작이라 별도 매핑이 맞다.
 function overheatColor(pct: number | null): string {
   if (pct === null) return C.sub;
@@ -69,7 +69,9 @@ function pick(ind: Ind | undefined): Pick {
     score,
     capped,
     threshold,
-    isHit: (score ?? 0) >= 100,
+    // Hit = 초고온 구간(진행률 ≥ 75) 진입 — 모든 지표의 진행률이 '과열도(0~100)'로 통일돼
+    // 있어(youtube는 surge_map으로 평균 대비 급증을 매핑) 예외 없이 동일 기준.
+    isHit: (capped ?? 0) >= 75,
     color: heatColor(score),
     disp: f.display,
     unit: f.displayUnit,
@@ -111,6 +113,7 @@ function Shell({
         border: hit ? "2px solid rgba(255,107,129,0.18)" : "2px solid transparent",
       }}
     >
+      {hit && <HitBadge small={span === 1} />}
       {children}
     </div>
   );
@@ -607,7 +610,6 @@ function CardBuffett({ v }: { v: Pick }) {
   const jo = (won: number) => Math.round(won / 1e12).toLocaleString("ko-KR"); // 원 → 조원
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
-      {v.isHit && <HitBadge />}
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="payments" iconSize={30} color={v.color} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="당일 기준" />
       <Big disp={v.disp} unit={v.unit} color={v.color} size={52} sub={ratio !== null ? `${ratio.toFixed(1)}배` : undefined} />
@@ -668,7 +670,6 @@ function CardLeverage({ v }: { v: Pick }) {
     dt?.futures_oi != null ? `${Math.round(dt.futures_oi).toLocaleString("ko-KR")}계약` : null;
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
-      {v.isHit && <HitBadge />}
       <Tag text={v.headline} color={heatC} />
       <TitleRow icon="rocket_launch" iconSize={30} color={heatC} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="당일 기준" />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 12 }}>
@@ -720,7 +721,6 @@ function CardMarketActions({ v }: { v: Pick }) {
         : { t: "균형", c: C.neutral };
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
-      {v.isHit && <HitBadge />}
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="speed" iconSize={30} color={v.color} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="최근 한 달" />
       {verdict ? (
@@ -759,7 +759,7 @@ function CardMarketActions({ v }: { v: Pick }) {
 function CardTop10({ v }: { v: Pick }) {
   const pct = v.raw ?? 0;
   return (
-    <Shell minH={230}>
+    <Shell hit={v.isHit} minH={230}>
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="pie_chart" name={v.name} color={v.color} />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
@@ -785,7 +785,7 @@ function CardHighGap({ v }: { v: Pick }) {
   const gap = v.raw ?? 0;
   const fillH = Math.max(0, Math.min(100, 100 - Math.abs(gap)));
   return (
-    <Shell minH={230}>
+    <Shell hit={v.isHit} minH={230}>
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="vertical_align_top" name={v.name} color={v.color} />
       <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1 }}>
@@ -809,7 +809,7 @@ function CardHighGap({ v }: { v: Pick }) {
 function CardVkospi({ v }: { v: Pick }) {
   const c = overheatColor(v.capped); // 과열도 게이지는 stage 구간(50=과열) 색
   return (
-    <Shell minH={230}>
+    <Shell hit={v.isHit} minH={230}>
       <Tag text={v.headline} color={c} />
       <TitleRow icon="monitor_heart" name={v.name} color={c} />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
@@ -845,7 +845,7 @@ function CardVixSpread({ v }: { v: Pick }) {
         ? { label: "한국이 더 출렁", color: C.cold }
         : { label: "미·한 비슷", color: C.sub };
   return (
-    <Shell minH={230}>
+    <Shell hit={v.isHit} minH={230}>
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="compare_arrows" name={v.name} color={v.color} />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 10 }}>
@@ -876,7 +876,7 @@ function CardAsia({ v }: { v: Pick }) {
   const dt = v.details;
   if (!dt) {
     return (
-      <Shell span={2} minH={230}>
+      <Shell span={2} hit={v.isHit} minH={230}>
         <Tag text={v.headline} color={v.color} />
         <TitleRow icon="public" name={v.name} color={v.color} badge="최근 한 달" />
         <Big disp={v.raw !== null && v.raw > 0 ? `+${v.disp}` : v.disp} unit={v.unit} color={v.color} size={40} sub="아시아 3국 평균 대비" />
@@ -896,7 +896,7 @@ function CardAsia({ v }: { v: Pick }) {
   // 내려가 100 vs 117 같은 차이가 지나치게 벌어지지 않는다.
   const heights = emphasizedHeights(bars.map((b) => b.index), 55);
   return (
-    <Shell span={2} minH={230}>
+    <Shell span={2} hit={v.isHit} minH={230}>
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="public" name={v.name} color={v.color} badge="최근 한 달" />
       <div style={{ fontSize: 9, color: "var(--c-muted)", fontWeight: 700, marginBottom: 4 }}>
@@ -947,7 +947,7 @@ function SubNote({ text }: { text: string }) {
 
 function CardRiskAssets({ gold, kosdaq }: { gold: Pick; kosdaq: Pick }) {
   return (
-    <Shell span={2} minH={230}>
+    <Shell span={2} hit={gold.isHit || kosdaq.isHit} minH={230}>
       <Tag text="위험자산 vs 안전자산" color={C.sub} />
       <div style={{ display: "flex", gap: 32, flex: 1 }}>
         <SubRatio v={gold} icon="balance" label="코스피 강도 (vs 금)" />
@@ -972,7 +972,7 @@ function CardVolume({ v }: { v: Pick }) {
   const avgFmt = avg !== null ? formatIndicatorValue(avg, "억원") : null;
   const surge = dt?.surge_pct ?? null;
   return (
-    <Shell minH={230}>
+    <Shell hit={v.isHit} minH={230}>
       <Tag text={v.headline} color={v.color} />
       <TitleRow
         icon="groups"
@@ -1009,7 +1009,7 @@ function CardVolume({ v }: { v: Pick }) {
 // 11. 원/달러 환율 변동성 — 값 + 장식 파동 + 과열도
 function CardFx({ v }: { v: Pick }) {
   return (
-    <Shell minH={230}>
+    <Shell hit={v.isHit} minH={230}>
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="waves" name={v.name} color={v.color} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
@@ -1027,7 +1027,7 @@ function CardFx({ v }: { v: Pick }) {
 function CardRangeRate({ v, icon, warn = false }: { v: Pick; icon: string; warn?: boolean }) {
   const pos = v.capped !== null ? Math.max(4, Math.min(96, v.capped)) : 50;
   return (
-    <Shell minH={230}>
+    <Shell hit={v.isHit} minH={230}>
       {warn && v.raw !== null && v.raw < 0 && <HitBadge label="⚠ 역전" small />}
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon={icon} name={v.name} color={v.color} />
@@ -1054,7 +1054,7 @@ function CardRangeRate({ v, icon, warn = false }: { v: Pick; icon: string; warn?
 // 13. 구리 가격 모멘텀 — 값 + 장식 상승 라인 + 과열도
 function CardCopper({ v }: { v: Pick }) {
   return (
-    <Shell minH={230}>
+    <Shell hit={v.isHit} minH={230}>
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="bolt" name={v.name} color={v.color} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
@@ -1148,7 +1148,6 @@ function CardDivergence({ v }: { v: Pick }) {
   const c = overheatColor(div);
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
-      {v.isHit && <HitBadge />}
       <Tag text={v.headline} color={c} />
       <TitleRow
         icon="compare_arrows"
@@ -1178,7 +1177,7 @@ function CardDivergence({ v }: { v: Pick }) {
 function CardTrend({ v, icon }: { v: Pick; icon: string }) {
   const vsAvg = v.details?.vs_avg ?? null;
   return (
-    <Shell minH={210}>
+    <Shell hit={v.isHit} minH={210}>
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon={icon} name={v.name} iconSize={22} color={v.color} />
       {vsAvg !== null ? (
@@ -1215,7 +1214,7 @@ function CardSentiment({ v, icon, span = 1 }: { v: Pick; icon: string; span?: 1 
   const optimistic = raw >= 0;
   const barColor = raw === 0 ? C.neutral : optimistic ? C.hot : C.cold;
   return (
-    <Shell span={span} minH={210}>
+    <Shell span={span} hit={v.isHit} minH={210}>
       <Tag text={v.headline} color={barColor} />
       <TitleRow icon={icon} iconSize={22} color={barColor} name={v.name} />
       <div style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: barColor, letterSpacing: "-0.03em", margin: "8px 0 0" }}>
@@ -1255,7 +1254,6 @@ function CardYoutube({ v }: { v: Pick }) {
   const [baseH, todayH] = ratioBarHeights(v.threshold, v.raw);
   return (
     <Shell hit={v.isHit} minH={210}>
-      {v.isHit && <HitBadge label="✨ HIT" small />}
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="play_circle" iconSize={22} name={v.name} color={v.color} />
       <div style={{ flex: 1, display: "flex", alignItems: "flex-end", gap: 14 }}>
@@ -1301,7 +1299,7 @@ function SubSpend({ v, icon }: { v: Pick; icon: string }) {
 
 function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick }) {
   return (
-    <Shell span={2} minH={210}>
+    <Shell span={2} hit={luxury.isHit || dining.isHit} minH={210}>
       <h3 style={{ margin: "0 0 18px", fontSize: 15, fontWeight: 800 }}>여윳돈이 향하는 곳</h3>
       <div style={{ display: "flex", gap: 32, flex: 1 }}>
         <SubSpend v={luxury} icon="shopping_bag" />
@@ -1322,7 +1320,7 @@ function CardUpbit({ v }: { v: Pick }) {
   const dt = v.details;
   const volLabel = (p: number) => (p >= 100 ? "HIGH" : p >= 60 ? "MID" : "LOW");
   return (
-    <Shell minH={210}>
+    <Shell hit={v.isHit} minH={210}>
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="currency_bitcoin" iconSize={22} color={v.color} name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
@@ -1352,7 +1350,7 @@ function CardWeather({ v }: { v: Pick }) {
   // 아이콘 기준을 라벨과 맞춘다 — 맑음(≥6)부터 해 아이콘, 그 아래는 구름 아이콘.
   const clear = raw >= 6;
   return (
-    <Shell minH={210}>
+    <Shell hit={v.isHit} minH={210}>
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon="wb_sunny" iconSize={22} name={v.name} color={v.color} />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
@@ -1403,7 +1401,6 @@ const FALLBACK_ICONS: Record<string, string> = {
 function GenericCard({ v, icon }: { v: Pick; icon: string }) {
   return (
     <Shell hit={v.isHit} minH={210}>
-      {v.isHit && <HitBadge label="🎯 HIT" small />}
       <Tag text={v.headline} color={v.color} />
       <TitleRow icon={icon} iconSize={22} name={v.name} color={v.color} />
       <Big disp={v.disp} unit={v.unit} color={v.color} size={30} />
@@ -1420,8 +1417,9 @@ export default async function Home() {
 
   const bySlug = new Map(indicators.map((i) => [i.slug, i]));
   const p = (slug: string) => pick(bySlug.get(slug));
+  // 카드 isHit과 완전히 동일한 기준(youtube 예외 포함)으로 히어로 카운트를 맞춘다.
   const countHits = (cat: IndicatorCategory) =>
-    indicators.filter((i) => i.category === cat && (i.latest?.normalized_score ?? 0) >= 100).length;
+    indicators.filter((i) => i.category === cat && pick(i).isHit).length;
 
   const extra = (cat: IndicatorCategory) =>
     indicators.filter((i) => i.category === cat && !LAID_OUT.has(i.slug));

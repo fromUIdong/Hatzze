@@ -71,11 +71,13 @@ from config.indicator_thresholds import (  # noqa: E402
     INDICATOR_THRESHOLDS,
     NEGATIVE_CURRENT_CLAMP_SLUGS,
 )
+from config.indicator_weights import INDICATOR_WEIGHTS  # noqa: E402
 
 KOSPI_HIGH_GAP_FALLBACK_FLOOR = -20.0  # kospi_close_raw 히스토리가 부족할 때의 대체값
 KOSPI_CLOSE_RAW_SLUG = "kospi_close_raw"
 MIN_FLOOR_HISTORY_SAMPLES = 5  # kospi_high_gap floor 계산에 필요한 최소 과거 데이터 개수
 NEUTRAL_PROGRESS = 50.0  # 값이 아예 없는 지표(no_value)를 표에 표시할 때 쓰는 자리표시자
+HIT_ZONE = 75.0  # Hit 기준 = 초고온 진입선(진행률 ≥ 75). stage 밴드(25/50/75)의 초고온 경계와 동일.
 
 INDICATOR_ORDER = list(INDICATOR_THRESHOLDS.keys())
 
@@ -93,7 +95,9 @@ def get_indicator(client, slug: str) -> tuple[str, str, float]:
             f"indicator '{slug}'가 존재하지 않습니다. 해당 fetch 스크립트를 먼저 실행하세요."
         )
     row = result.data[0]
-    weight = float(row["weight"]) if row.get("weight") is not None else 1.0
+    # 가중치는 코드(config/indicator_weights.py)가 소스 오브 트루스 — DB weight는 폴백.
+    db_weight = float(row["weight"]) if row.get("weight") is not None else 1.0
+    weight = INDICATOR_WEIGHTS.get(slug, db_weight)
     return row["id"], row["name"], weight
 
 
@@ -185,12 +189,6 @@ def compute_threshold(client, indicator_id: str, config: dict) -> float:
     return statistics.mean(values)
 
 
-def compute_hit(current: float, threshold: float, config: dict) -> bool:
-    if config.get("direction") == "low":
-        return current <= threshold
-    return current >= threshold
-
-
 def compute_progress(slug: str, current: float, threshold: float, config: dict) -> float:
     if slug == "kospi_high_gap":
         # 피스와이즈: kink(−3%)~threshold(0%=ATH)를 75~100%(초고온을 근처로 좁게),
@@ -204,6 +202,13 @@ def compute_progress(slug: str, current: float, threshold: float, config: dict) 
         # 일반 floor-ceiling(버핏 등): floor=0%, threshold(ceiling)=100% 선형.
         floor = config["floor"]
         return (current - floor) / (threshold - floor) * 100
+    if "surge_map" in config:
+        # cumulative_average(youtube): threshold=평균이라 current/threshold*100은 평균=100(정상)이
+        # 돼 과열 척도로 안 맞는다. 평균 대비 급증(%)을 0~100 과열도로 매핑한다 — 평균(급증 0%)이
+        # floor~ceil의 중앙(=상온), ceil에서 초고온. surge_map = {floor, ceil}(급증 % 단위).
+        sm = config["surge_map"]
+        surge = (current / threshold - 1) * 100 if threshold else 0.0
+        return (surge - sm["floor"]) / (sm["ceil"] - sm["floor"]) * 100
     if slug in NEGATIVE_CURRENT_CLAMP_SLUGS and current < 0:
         return 0.0
     if config.get("direction") == "low":
@@ -249,7 +254,6 @@ def main() -> None:
         else:
             no_value = False
             threshold = compute_threshold(client, indicator_id, config)
-            hit = compute_hit(current, threshold, config)
             progress = compute_progress(slug, current, threshold, config)
             capped_progress = cap_progress(progress)
 
@@ -261,10 +265,14 @@ def main() -> None:
                 if surge is not None:
                     progress = (surge - rs["floor"]) / (rs["ceil"] - rs["floor"]) * 100
                     capped_progress = cap_progress(progress)
-                    hit = surge >= rs["hit"]
                     avg = details.get("avg_30d")
                     if avg:
                         threshold = round(avg * (1 + rs["hit"] / 100), 2)  # 표시용: 평균+20%
+
+            # Hit = 초고온 진입(capped_progress ≥ HIT_ZONE). 임계값(=진행률 100) 완전 도달이
+            # 아니라 초고온 구간에 들어서면 켜진다. progress가 이미 방향(direction)을 반영하므로
+            # low/high 구분 없이 동일 기준.
+            hit = capped_progress >= HIT_ZONE
 
         results.append(
             {
@@ -298,7 +306,7 @@ def main() -> None:
         divergence = (real_stress * market_strength) ** 0.5
         sb["progress"] = divergence
         sb["capped_progress"] = cap_progress(divergence)
-        sb["hit"] = divergence >= 75.0  # 괴리 초고온(≥75)일 때 Hit
+        sb["hit"] = sb["capped_progress"] >= HIT_ZONE  # 괴리 초고온(≥75)일 때 Hit
         # 카드 인포그래픽용: 두 축(실물/증시) progress를 details에 남긴다.
         sb["details"] = {
             "real_stress": round(real_stress, 1),
