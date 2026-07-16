@@ -1023,51 +1023,6 @@ function CardFx({ v }: { v: Pick }) {
   );
 }
 
-// 12·14. 미국 10년물 금리 / 장단기 금리차 — 범위 바 + 마커
-function CardRangeRate({ v, icon, warn = false }: { v: Pick; icon: string; warn?: boolean }) {
-  const pos = v.capped !== null ? Math.max(4, Math.min(96, v.capped)) : 50;
-  return (
-    <Shell hit={v.isHit} minH={230}>
-      {warn && v.raw !== null && v.raw < 0 && <HitBadge label="⚠ 역전" small />}
-      <Tag text={v.headline} color={v.color} />
-      <TitleRow icon={icon} name={v.name} color={v.color} />
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 20 }}>
-        <span style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}{v.unit}</span>
-      </div>
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-        <div style={{ position: "relative", height: 12, borderRadius: 999, background: C.bg, overflow: "hidden" }}>
-          <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: `${pos}%`, background: v.color }} />
-        </div>
-        <div style={{ position: "relative", height: 0 }}>
-          <div className={warn && v.raw !== null && v.raw < 0 ? "hz-pulse-red" : undefined} style={{ position: "absolute", top: -13, transform: "translateX(-50%)", left: `${pos}%`, width: 16, height: 16, borderRadius: 999, background: v.color, border: `3px solid ${C.card}`, boxShadow: "0 1px 4px var(--c-shadow-strong)" }} />
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 800, color: C.sub, marginTop: 10 }}>
-          <span>낮음</span>
-          <span style={{ color: v.color }}>높음 · 부담</span>
-        </div>
-      </div>
-      <Foot text={v.desc} />
-    </Shell>
-  );
-}
-
-// 13. 구리 가격 모멘텀 — 값 + 장식 상승 라인 + 과열도
-function CardCopper({ v }: { v: Pick }) {
-  return (
-    <Shell hit={v.isHit} minH={230}>
-      <Tag text={v.headline} color={v.color} />
-      <TitleRow icon="bolt" name={v.name} color={v.color} />
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
-        <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.raw !== null && v.raw > 0 ? "+" : ""}{v.disp}{v.unit}</span>
-      </div>
-      <div style={{ flex: 1, position: "relative", minHeight: 56 }}>
-        <Sparkline data={v.history} color={v.color} />
-      </div>
-      <Foot text={v.desc} />
-    </Shell>
-  );
-}
-
 // 15. 신용융자 잔고 — DB 미보유 placeholder ("준비 중")
 function CardComingSoon() {
   return (
@@ -1341,6 +1296,110 @@ function CardUpbit({ v }: { v: Pick }) {
   );
 }
 
+// 개인 순매수 강도 — 최근 5거래일 누적 + 일별 순매수/순매도 다이버징 바
+function CardNetBuy({ v }: { v: Pick }) {
+  const c = overheatColor(v.capped);
+  const cum = v.raw ?? 0;
+  const daily = (v.details as unknown as { daily5?: number[] })?.daily5 ?? [];
+  const maxAbs = Math.max(1, ...daily.map((d) => Math.abs(d)));
+  const isBuy = cum >= 0;
+  return (
+    <Shell hit={v.isHit} minH={210}>
+      <Tag text={v.headline} color={c} />
+      <TitleRow icon="person" iconSize={22} name={v.name} color={c} />
+      <div style={{ margin: "6px 0 2px" }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: C.sub }}>최근 5거래일 누적</span>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+          <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 800, color: isBuy ? C.hot : C.cold, letterSpacing: "-0.03em" }}>
+            {cum >= 0 ? "+" : ""}{Math.round(cum).toLocaleString()}
+          </span>
+          <span style={{ fontSize: 12, fontWeight: 800, color: isBuy ? C.hot : C.cold }}>억 {isBuy ? "순매수" : "순매도"}</span>
+        </div>
+      </div>
+      <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, minHeight: 60 }}>
+        {daily.map((d, i) => {
+          const px = Math.round((Math.abs(d) / maxAbs) * 24);
+          const buy = d >= 0;
+          return (
+            <div key={i} style={{ flex: 1, position: "relative", height: 56 }}>
+              <div style={{ position: "absolute", left: 0, right: 0, top: "50%", height: 1, background: C.line }} />
+              <div style={{ position: "absolute", left: "22%", right: "22%", height: px, background: buy ? C.hot : C.cold, borderRadius: 2, ...(buy ? { bottom: "50%" } : { top: "50%" }) }} />
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, fontWeight: 700, color: "var(--c-faint)", marginTop: -4, marginBottom: 2 }}>
+        <span>5일 전</span>
+        <span>어제</span>
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+// 투자자예탁금 — 대기 매수 자금(조원) + 최근 추이
+function CardDeposit({ v }: { v: Pick }) {
+  const c = overheatColor(v.capped);
+  const jo = (v.details as unknown as { jo?: number })?.jo ?? (v.raw ?? 0) / 10000;
+  const recent = (v.details as unknown as { recent_jo?: number[] })?.recent_jo ?? [];
+  const change = recent.length >= 2 ? recent[recent.length - 1] - recent[0] : 0;
+  return (
+    <Shell hit={v.isHit} minH={210}>
+      <Tag text={v.headline} color={c} />
+      <TitleRow icon="savings" iconSize={22} name={v.name} color={c} />
+      <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "6px 0 4px" }}>
+        <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: c, letterSpacing: "-0.03em" }}>{jo.toFixed(1)}</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: C.sub }}>조원</span>
+        <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 800, color: change >= 0 ? C.hot : C.cold }}>
+          최근 {change >= 0 ? "+" : ""}{change.toFixed(1)}조
+        </span>
+      </div>
+      <div style={{ flex: 1, position: "relative", minHeight: 52 }}>
+        <Sparkline data={recent} color={c} />
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+// 옵션 풋/콜 비율 — 콜(탐욕) vs 풋(공포) 거래량 비중. (KRX 옵션 API 승인 전까지 임시 데이터)
+function CardPutCall({ v }: { v: Pick }) {
+  const dt = v.details as unknown as { put_vol?: number; call_vol?: number } | null;
+  const put = dt?.put_vol ?? 0;
+  const call = dt?.call_vol ?? 0;
+  const total = put + call || 1;
+  const callShare = (call / total) * 100;
+  const ratio = call > 0 ? put / call : 0; // 풋/콜
+  const greedy = callShare >= 50;
+  const c = greedy ? C.hot : C.cold;
+  return (
+    <Shell hit={v.isHit} minH={210}>
+      <Tag text={v.headline} color={c} />
+      <TitleRow icon="casino" iconSize={22} name={v.name} color={c} />
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "6px 0 14px" }}>
+        <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 800, color: c, letterSpacing: "-0.03em" }}>{ratio.toFixed(2)}</span>
+        <span style={{ fontSize: 11, fontWeight: 700, color: C.sub }}>풋/콜</span>
+        <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: c }}>{greedy ? "콜 우세 · 탐욕" : "풋 우세 · 공포"}</span>
+      </div>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 8 }}>
+        <div style={{ display: "flex", height: 24, borderRadius: 8, overflow: "hidden" }}>
+          <div style={{ width: `${callShare}%`, background: C.hot, display: "flex", alignItems: "center", paddingLeft: 8 }}>
+            <span style={{ fontSize: 10, fontWeight: 800, color: "#fff" }}>콜 {Math.round(callShare)}%</span>
+          </div>
+          <div style={{ width: `${100 - callShare}%`, background: C.cold, display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 8 }}>
+            <span style={{ fontSize: 10, fontWeight: 800, color: "#fff" }}>풋 {Math.round(100 - callShare)}%</span>
+          </div>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, fontWeight: 800 }}>
+          <span style={{ color: C.hot }}>콜 = 상승 베팅(탐욕)</span>
+          <span style={{ color: C.cold }}>풋 = 하락 대비(공포)</span>
+        </div>
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
 // 증권 앱 인기차트 순위 — 차트인 앱 수 + 최고 순위 + 앱 목록 (details 활용)
 function CardBrokerage({ v }: { v: Pick }) {
   const c = overheatColor(v.capped);
@@ -1390,7 +1449,7 @@ const LAID_OUT = new Set([
   "buffett_index", "leverage_etf_volume", "market_actions_30d", "top10_market_cap_concentration",
   "kospi_high_gap", "vkospi", "vix_vkospi_spread", "kospi_asia_relative_strength",
   "kospi_gold_ratio", "kosdaq_kospi_ratio", "kospi_volume_surge", "usdkrw_volatility",
-  "us10y", "copper_price_momentum", "yield_curve_spread",
+  "individual_net_buy", "put_call_ratio", "investor_deposit",
   "naver_search_trend", "dcinside_post_count", "news_sentiment", "bestseller_finance_ratio",
   "youtube_finance_search_views", "luxury_consumption_index", "fine_dining_search_index",
   "upbit_speculation_index", "github_trading_bot_repos", "brokerage_app_rank",
@@ -1452,10 +1511,10 @@ export default async function Home() {
                 <CardAsia v={p("kospi_asia_relative_strength")} />
                 <CardRiskAssets gold={p("kospi_gold_ratio")} kosdaq={p("kosdaq_kospi_ratio")} />
                 <CardVolume v={p("kospi_volume_surge")} />
+                <CardNetBuy v={p("individual_net_buy")} />
+                <CardDeposit v={p("investor_deposit")} />
+                <CardPutCall v={p("put_call_ratio")} />
                 <CardFx v={p("usdkrw_volatility")} />
-                <CardRangeRate v={p("us10y")} icon="account_balance" />
-                <CardRangeRate v={p("yield_curve_spread")} icon="trending_down" warn />
-                <CardCopper v={p("copper_price_momentum")} />
                 <CardComingSoon />
                 {extra("시장").map((i) => (
                   <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["시장"]} />

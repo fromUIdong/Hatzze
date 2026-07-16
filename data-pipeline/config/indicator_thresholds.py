@@ -29,7 +29,6 @@ INDICATOR_THRESHOLDS = {
     # floor −30%~−3% = 0~75%. floor=−30%는 "약세장(−20%)도 아직 과열 끼가 남는" 시장 맥락
     # (−20%인데 약세장 느낌 안 남)을 반영해 크래시급에서만 저온으로 본다.
     "kospi_high_gap": {"kind": "fixed", "threshold": 0.0, "floor": -30.0, "kink": -3.0},
-    "us10y": {"kind": "fixed", "threshold": 5.0},
     "naver_search_trend": {"kind": "fixed", "threshold": 70.0},
     "dcinside_post_count": {"kind": "fixed", "threshold": 25.0},
     # kospi_volume_surge: 절대 거래대금이 아니라 "30일 평균 대비 %"(details.surge_pct)로 판단.
@@ -74,10 +73,6 @@ INDICATOR_THRESHOLDS = {
     # 도달한 수준"을 의미한다. 여기서 다시 나누는 건 사실상 그대로 통과시키는
     # 것에 가깝다.
     "upbit_speculation_index": {"kind": "fixed", "threshold": 100.0},
-    # copper_price_momentum: 20거래일 만에 15% 이상 오르면 뚜렷한 상승 모멘텀으로
-    # 보는 논리적 추정치다 — kospi_asia_relative_strength와 마찬가지로 실측 분포를
-    # 아직 확인 못 했으니 데이터가 쌓이면 재조정이 필요할 수 있다.
-    "copper_price_momentum": {"kind": "fixed", "threshold": 15.0},
     # github_trading_bot_repos: 사전 추정 근거가 전혀 없는 완전히 새로운 지표라
     # 실행해서 나온 첫 관측값(81건, 2026-07-11)을 기준점으로 삼았다. threshold=150은
     # 그 값의 약 1.85배 — "하루 평균보다 확연히 많이 튀는" 수준을 잠정적으로 잡은
@@ -89,6 +84,14 @@ INDICATOR_THRESHOLDS = {
     # 기준점으로 삼았다. threshold=800은 "증권 앱들이 최상위로 도배(대부분 top20~1위)"되는
     # 과열 수준의 잠정 추정치라, 며칠~몇 주 쌓이면 실제 분포로 반드시 재조정해야 한다.
     "brokerage_app_rank": {"kind": "fixed", "threshold": 800.0},
+    # individual_net_buy: 코스피 개인 순매수의 최근 5거래일 누적(억원). 개미가 순매수로
+    # 몰릴수록 froth. threshold=100,000억(+10조)은 "개미가 5일간 대량 순매수"하는 과열의
+    # 잠정 추정치 — 실측 분포가 쌓이면 재조정 필요. 순매도(음수)는 progress 0으로 바닥.
+    "individual_net_buy": {"kind": "fixed", "threshold": 100_000.0},
+    # investor_deposit: 고객예탁금(대기 매수 자금, 억원). 수준이 구조적으로 크고 우상향하므로
+    # youtube처럼 '최근 평균(cumulative_average) 대비 급증(surge_map)'으로 froth를 본다 —
+    # 평균이면 상온(50), 평균 대비 +15%면 초고온(100). 예탁금 변동폭이 작아 ±15%로 잡았다.
+    "investor_deposit": {"kind": "cumulative_average", "surge_map": {"floor": -15.0, "ceil": 15.0}},
     # market_actions_30d: raw_value = (매수 사이드카 - 매도 사이드카) - CB발동×4를
     # 실제 KIND 공시로 1년치(2025-07~2026-07) 백필해 매일의 롤링 30일 값을 계산해보니
     # 최댓값이 3.0에 그쳤다 — 사이드카는 연간 매수17건/매도18건으로 거의 균형이라
@@ -97,11 +100,6 @@ INDICATOR_THRESHOLDS = {
     # 않았다. 대신 threshold=2.0은 1년 366일 중 상위 4.4%(16일)만 도달한 수준으로,
     # "매수 쪽이 뚜렷하게 우세"에 해당하는 현실적인 기준값이다.
     "market_actions_30d": {"kind": "fixed", "threshold": 2.0},
-    # yield_curve_spread: FRED DGS10-DGS2 실측 2년치(2024-07~2026-07, 498거래일)로
-    # 분포를 확인해보니 -0.30%p(역전)~0.74%p(정상화 정점) 범위였고, 중앙값은
-    # 0.49%p, 최근값(2026-07-09)은 0.39%p였다. threshold=0.6%p는 상위 12.2%(61일)
-    # 수준으로, 관측 범위 상단부에 해당하는 "뚜렷하게 정상화·확대된" 스프레드다.
-    "yield_curve_spread": {"kind": "fixed", "threshold": 0.6},
     # top10_market_cap_concentration: sto/stk_bydd_trd API가 아직 미승인이라 직접
     # 계산은 못 했지만(2026-07-11 기준 401), 공개된 자료 기준 코스피 상위 10종목
     # 시가총액 비중은 통상 40~45% 수준이고(삼성전자 단독 약 22%), 2026년 들어
@@ -129,6 +127,8 @@ INDICATOR_THRESHOLDS = {
 NEGATIVE_CURRENT_CLAMP_SLUGS = {
     "dcinside_post_count",
     "news_sentiment",
+    # 개인 순매도(음수 누적)는 froth의 반대(개미 이탈)라 progress=0으로 바닥 처리.
+    "individual_net_buy",
     # 한국이 미국보다 오히려 더 출렁이면(백분위 스프레드 음수) 방심과 반대라 progress=0.
     "vix_vkospi_spread",
 }

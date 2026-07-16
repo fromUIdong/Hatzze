@@ -37,15 +37,6 @@ jobs:
       - name: Install dependencies
         run: pip install -r data-pipeline/requirements.txt
 
-      - name: Fetch US 10Y treasury yield
-        id: us10y
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_us10y.py
-
-      - name: Fetch US 10Y-2Y yield spread
-        id: yield_spread
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_yield_spread.py
 
       - name: Fetch KOSPI 52-week-high gap
         id: kospi_high_gap
@@ -143,10 +134,6 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_upbit_speculation.py
 
-      - name: Fetch copper price momentum
-        id: copper_price
-        continue-on-error: true
-        run: python data-pipeline/scripts/fetch_copper_price.py
 
       - name: Fetch GitHub trading bot repo count
         id: github_trading_repos
@@ -157,6 +144,16 @@ jobs:
         id: brokerage_app_rank
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_brokerage_app_rank.py
+
+      - name: Fetch individual investor net buying
+        id: individual_net_buy
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_individual_net_buy.py
+
+      - name: Fetch investor deposit (대기 매수 자금)
+        id: investor_deposit
+        continue-on-error: true
+        run: python data-pipeline/scripts/fetch_investor_deposit.py
 
       - name: Fetch market actions (sidecar/CB) index
         id: market_actions
@@ -171,8 +168,8 @@ jobs:
       - name: Summarize results
         if: always()
         run: |
-          names=("fetch_us10y.py" "fetch_yield_spread.py" "fetch_kospi_high_gap.py" "fetch_buffett_index.py" "fetch_market_cap_concentration.py" "fetch_naver_trend.py" "fetch_naver_luxury_car_trend.py" "fetch_naver_lifestyle_trend.py" "fetch_dcinside_stock.py" "fetch_kospi_volume.py" "fetch_vkospi.py" "fetch_vix_vkospi_spread.py" "fetch_news_sentiment.py" "fetch_gold_ratio.py" "fetch_kosdaq_ratio.py" "fetch_usdkrw_volatility.py" "fetch_leverage_etf_volume.py" "fetch_bestseller_ratio.py" "fetch_youtube_finance_search.py" "fetch_asia_relative_strength.py" "fetch_upbit_speculation.py" "fetch_copper_price.py" "fetch_github_trading_repos.py" "fetch_brokerage_app_rank.py" "fetch_market_actions.py" "calculate_score.py")
-          outcomes=("${{ steps.us10y.outcome }}" "${{ steps.yield_spread.outcome }}" "${{ steps.kospi_high_gap.outcome }}" "${{ steps.buffett_index.outcome }}" "${{ steps.market_cap_concentration.outcome }}" "${{ steps.naver_trend.outcome }}" "${{ steps.naver_luxury_car_trend.outcome }}" "${{ steps.naver_lifestyle_trend.outcome }}" "${{ steps.dcinside.outcome }}" "${{ steps.kospi_volume.outcome }}" "${{ steps.vkospi.outcome }}" "${{ steps.vix_vkospi_spread.outcome }}" "${{ steps.news_sentiment.outcome }}" "${{ steps.gold_ratio.outcome }}" "${{ steps.kosdaq_ratio.outcome }}" "${{ steps.usdkrw_volatility.outcome }}" "${{ steps.leverage_etf.outcome }}" "${{ steps.bestseller_ratio.outcome }}" "${{ steps.youtube_finance_search.outcome }}" "${{ steps.asia_relative_strength.outcome }}" "${{ steps.upbit_speculation.outcome }}" "${{ steps.copper_price.outcome }}" "${{ steps.github_trading_repos.outcome }}" "${{ steps.brokerage_app_rank.outcome }}" "${{ steps.market_actions.outcome }}" "${{ steps.calculate_score.outcome }}")
+          names=("fetch_kospi_high_gap.py" "fetch_buffett_index.py" "fetch_market_cap_concentration.py" "fetch_naver_trend.py" "fetch_naver_luxury_car_trend.py" "fetch_naver_lifestyle_trend.py" "fetch_dcinside_stock.py" "fetch_kospi_volume.py" "fetch_vkospi.py" "fetch_vix_vkospi_spread.py" "fetch_news_sentiment.py" "fetch_gold_ratio.py" "fetch_kosdaq_ratio.py" "fetch_usdkrw_volatility.py" "fetch_leverage_etf_volume.py" "fetch_bestseller_ratio.py" "fetch_youtube_finance_search.py" "fetch_asia_relative_strength.py" "fetch_upbit_speculation.py" "fetch_github_trading_repos.py" "fetch_brokerage_app_rank.py" "fetch_individual_net_buy.py" "fetch_investor_deposit.py" "fetch_market_actions.py" "calculate_score.py")
+          outcomes=("${{ steps.kospi_high_gap.outcome }}" "${{ steps.buffett_index.outcome }}" "${{ steps.market_cap_concentration.outcome }}" "${{ steps.naver_trend.outcome }}" "${{ steps.naver_luxury_car_trend.outcome }}" "${{ steps.naver_lifestyle_trend.outcome }}" "${{ steps.dcinside.outcome }}" "${{ steps.kospi_volume.outcome }}" "${{ steps.vkospi.outcome }}" "${{ steps.vix_vkospi_spread.outcome }}" "${{ steps.news_sentiment.outcome }}" "${{ steps.gold_ratio.outcome }}" "${{ steps.kosdaq_ratio.outcome }}" "${{ steps.usdkrw_volatility.outcome }}" "${{ steps.leverage_etf.outcome }}" "${{ steps.bestseller_ratio.outcome }}" "${{ steps.youtube_finance_search.outcome }}" "${{ steps.asia_relative_strength.outcome }}" "${{ steps.upbit_speculation.outcome }}" "${{ steps.github_trading_repos.outcome }}" "${{ steps.brokerage_app_rank.outcome }}" "${{ steps.individual_net_buy.outcome }}" "${{ steps.investor_deposit.outcome }}" "${{ steps.market_actions.outcome }}" "${{ steps.calculate_score.outcome }}")
 
           {
             echo "## Daily update summary"
