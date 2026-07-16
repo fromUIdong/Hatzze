@@ -1341,6 +1341,39 @@ function CardUpbit({ v }: { v: Pick }) {
   );
 }
 
+// 증권 앱 인기차트 순위 — 차트인 앱 수 + 최고 순위 + 앱 목록 (details 활용)
+function CardBrokerage({ v }: { v: Pick }) {
+  const c = overheatColor(v.capped);
+  const count = v.details?.count ?? 0;
+  const topRank = v.details?.top_rank ?? null;
+  const charted =
+    (v.details as unknown as { charted?: { name: string; rank: number }[] })?.charted ?? [];
+  // 긴 앱 이름을 짧게: 첫 구분자(-, (, ,) 앞부분만, 18자 제한
+  const shortName = (n: string) => (n.split(/[-(,]/)[0].trim().slice(0, 18) || n);
+  return (
+    <Shell hit={v.isHit} minH={210}>
+      <Tag text={v.headline} color={c} />
+      <TitleRow icon="leaderboard" iconSize={22} name={v.name} color={c} />
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "6px 0 10px" }}>
+        <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: c, letterSpacing: "-0.03em" }}>{count}</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>개 앱 차트인</span>
+        {topRank !== null && (
+          <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 800, color: c }}>최고 {topRank}위</span>
+        )}
+      </div>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
+        {charted.slice(0, 4).map((app, i) => (
+          <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, fontWeight: 700, gap: 8 }}>
+            <span style={{ color: C.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{shortName(app.name)}</span>
+            <span style={{ fontFamily: MONO, fontWeight: 800, color: C.sub, flexShrink: 0 }}>{app.rank}위</span>
+          </div>
+        ))}
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
 function SectionHeading({ title }: { title: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 28 }}>
@@ -1360,7 +1393,7 @@ const LAID_OUT = new Set([
   "us10y", "copper_price_momentum", "yield_curve_spread",
   "naver_search_trend", "dcinside_post_count", "news_sentiment", "bestseller_finance_ratio",
   "youtube_finance_search_views", "luxury_consumption_index", "fine_dining_search_index",
-  "upbit_speculation_index", "github_trading_bot_repos",
+  "upbit_speculation_index", "github_trading_bot_repos", "brokerage_app_rank",
   "small_business_crisis_index",
 ]);
 
@@ -1441,6 +1474,7 @@ export default async function Home() {
                 <CardYoutube v={p("youtube_finance_search_views")} />
                 <CardSpending luxury={p("luxury_consumption_index")} dining={p("fine_dining_search_index")} />
                 <CardUpbit v={p("upbit_speculation_index")} />
+                <CardBrokerage v={p("brokerage_app_rank")} />
                 <CardTrend v={p("github_trading_bot_repos")} icon="terminal" />
                 <CardTrend v={p("bestseller_finance_ratio")} icon="menu_book" />
                 {extra("감성").map((i) => (

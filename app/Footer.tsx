@@ -12,7 +12,7 @@ const SOURCE_GROUPS: { label: string; items: string }[] = [
   { label: "거시·금리", items: "한국은행(ECOS) · 미 연준(FRED)" },
   { label: "검색·뉴스", items: "네이버 · 유튜브" },
   { label: "커뮤니티·소비", items: "디시인사이드 · 알라딘" },
-  { label: "가상자산·기타", items: "업비트 · 기상청 · GitHub" },
+  { label: "가상자산·기타", items: "업비트 · GitHub · 앱스토어" },
 ];
 
 function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
