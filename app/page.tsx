@@ -1118,8 +1118,62 @@ function VsAvg({ ratio, size = 26 }: { ratio: number; size?: number }) {
   );
 }
 
-// 라인+마커형 (초보검색/재테크도서/GitHub/자영업)
-// 네이버 검색지수(초보검색/자영업)는 details.vs_avg가 있어 '평소 대비 N배'로,
+// 실물–증시 괴리 — 두 축(실물 스트레스/증시 강세)을 나란히 보여준다. 둘 다 높을수록
+// 괴리도(둘의 곱)가 커진다 = "실물 없는 랠리".
+function DivergenceBar({ label, hint, value, color }: { label: string; hint: string; value: number; color: string }) {
+  const level = value >= 66 ? "높음" : value >= 33 ? "보통" : "낮음";
+  return (
+    <div style={{ flex: 1 }}>
+      <div style={{ fontSize: 12, fontWeight: 800, color: C.ink, marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 10, fontWeight: 600, color: C.sub, marginBottom: 6 }}>{hint}</div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, fontWeight: 800, marginBottom: 4 }}>
+        <span style={{ color: C.sub }}>{level}</span>
+        <span style={{ color, fontFamily: MONO }}>
+          {Math.round(value)}
+          <span style={{ color: "var(--c-faint)" }}>/100</span>
+        </span>
+      </div>
+      <div style={{ height: 8, background: C.track, borderRadius: 999, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, value))}%`, background: color, borderRadius: 999 }} />
+      </div>
+    </div>
+  );
+}
+
+function CardDivergence({ v }: { v: Pick }) {
+  const dt = v.details;
+  const real = dt?.real_stress ?? 0;
+  const market = dt?.market_strength ?? 0;
+  const div = dt?.divergence ?? v.capped ?? 0;
+  const c = overheatColor(div);
+  return (
+    <Shell span={2} hit={v.isHit} minH={236}>
+      {v.isHit && <HitBadge />}
+      <Tag text={v.headline} color={c} />
+      <TitleRow
+        icon="compare_arrows"
+        iconSize={30}
+        color={c}
+        name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>}
+        right={
+          <span style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
+            <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: c, letterSpacing: "-0.02em" }}>{Math.round(div)}</span>
+            <span style={{ fontSize: 12, fontWeight: 800, color: "var(--c-faint)" }}>/100</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: C.sub }}>괴리도</span>
+          </span>
+        }
+      />
+      <div style={{ background: C.bg, borderRadius: 14, padding: 16, marginTop: 6, display: "flex", gap: 22 }}>
+        <DivergenceBar label="실물 스트레스" hint="자영업 폐업 검색" value={real} color={C.cold} />
+        <DivergenceBar label="증시 강세" hint="신고가 근접도" value={market} color={C.hot} />
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+// 라인+마커형 (초보검색/재테크도서/GitHub)
+// 네이버 검색지수(초보검색)는 details.vs_avg가 있어 '평소 대비 N배'로,
 // 그 외(재테크도서·GitHub)는 기존 값+과열기준 라인으로 보여준다.
 function CardTrend({ v, icon }: { v: Pick; icon: string }) {
   const vsAvg = v.details?.vs_avg ?? null;
@@ -1152,33 +1206,23 @@ function CardTrend({ v, icon }: { v: Pick; icon: string }) {
 // raw = (긍정-부정)/전체*100 이라 -100~+100 범위. 중앙=중립, 좌=비관, 우=낙관.
 function CardSentiment({ v, icon, span = 1 }: { v: Pick; icon: string; span?: 1 | 2 }) {
   const raw = v.raw ?? 0;
-  // 감성 점수는 지표마다 크기가 크게 달라(디시 ±1, 뉴스 ±30) 절대 ±100 축에선
-  // 한쪽이 늘 정중앙처럼 보인다. details.scale(자기 최근 |최대|)이 있으면 그걸로
-  // 정규화해 '자기 최근 범위 대비'로 보여주되, 마커가 중앙 ±12(=38~62%)에서만
-  // 움직이게 해 과하지 않게(은은하게) 한다. 0(중립)은 항상 중앙.
-  const scale = v.details?.scale ?? null;
-  const pos =
-    scale && scale > 0
-      ? 50 + Math.max(-1, Math.min(1, raw / scale)) * 12
-      : Math.max(0, Math.min(100, (raw + 100) / 2));
+  // 감성 스코어는 뉴스·디시 모두 (긍정-부정)/전체×100 = 순감성%(-100~100)로 같은 단위다.
+  // 예전엔 지표별 details.scale(자기 최근 |최대|)로 정규화했는데, 그러면 디시(-2.71%)가
+  // 자기 범위의 극단이라 뉴스(-20.57%)보다 bar가 더 길어 보이는 착시가 생긴다. 두 카드가
+  // 같은 단위이므로 공유 절대 축으로 바꿔 bar 절반폭(%) = |순감성%|(±50 캡)이 되게 한다 —
+  // -20pt는 -2.7pt보다 항상 bar가 길고, 표시값과 bar가 1:1로 일치한다. 0(중립)은 항상 중앙.
+  const pos = 50 + Math.max(-50, Math.min(50, raw));
   const optimistic = raw >= 0;
   const barColor = raw === 0 ? C.neutral : optimistic ? C.hot : C.cold;
   return (
     <Shell span={span} minH={210}>
       <Tag text={v.headline} color={barColor} />
-      <TitleRow
-        icon={icon}
-        iconSize={22}
-        color={barColor}
-        name={v.name}
-        right={
-          <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 800, color: barColor }}>
-            {raw > 0 ? "+" : ""}
-            {v.disp}
-            {v.unit}
-          </span>
-        }
-      />
+      <TitleRow icon={icon} iconSize={22} color={barColor} name={v.name} />
+      <div style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: barColor, letterSpacing: "-0.03em", margin: "8px 0 0" }}>
+        {raw > 0 ? "+" : ""}
+        {v.disp}
+        {v.unit}
+      </div>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
         <div style={{ position: "relative", height: 16, background: C.bg, borderRadius: 999 }}>
           <div style={{ position: "absolute", left: "50%", top: -3, bottom: -3, width: 2, background: "var(--c-marker)" }} />
@@ -1422,15 +1466,15 @@ export default async function Home() {
               <SectionHeading title="감성 지표" />
               <div className="hz-grid">
                 <CardTrend v={p("naver_search_trend")} icon="search" />
-                <CardSentiment v={p("dcinside_post_count")} icon="forum" span={2} />
+                <CardDivergence v={p("small_business_crisis_index")} />
                 <CardSentiment v={p("news_sentiment")} icon="newspaper" />
-                <CardTrend v={p("bestseller_finance_ratio")} icon="menu_book" />
+                <CardSentiment v={p("dcinside_post_count")} icon="forum" />
                 <CardYoutube v={p("youtube_finance_search_views")} />
                 <CardSpending luxury={p("luxury_consumption_index")} dining={p("fine_dining_search_index")} />
                 <CardUpbit v={p("upbit_speculation_index")} />
                 <CardWeather v={p("weather_sunshine_index")} />
                 <CardTrend v={p("github_trading_bot_repos")} icon="terminal" />
-                <CardTrend v={p("small_business_crisis_index")} icon="storefront" />
+                <CardTrend v={p("bestseller_finance_ratio")} icon="menu_book" />
                 {extra("감성").map((i) => (
                   <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["감성"]} />
                 ))}

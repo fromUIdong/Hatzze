@@ -21,12 +21,21 @@ unit 참고(threshold와 raw_value가 같은 단위인지 확인용): kospi_volu
 """
 
 INDICATOR_THRESHOLDS = {
-    "buffett_index": {"kind": "fixed", "threshold": 100.0},
-    "kospi_high_gap": {"kind": "fixed", "threshold": 0.0},
+    # 버핏지수: floor-ceiling — 시총/GDP 105%=0%(정상), 235%=100%(초고온). 재보정 배경:
+    # 1년 분포상 100%는 사실상 바닥(p10)이라 늘 최대치로 고정됐고, 235%(p90, 상위10%)
+    # 이상에서만 "과열→하락" 신호가 나왔다. ceiling은 기여 상한이지 표시값 상한이 아니다.
+    "buffett_index": {"kind": "fixed", "threshold": 235.0, "floor": 105.0},
+    # kospi_high_gap: ATH 근접도. 피스와이즈 — ATH −3%~0% = 75~100%(초고온을 근처로 좁게),
+    # floor −30%~−3% = 0~75%. floor=−30%는 "약세장(−20%)도 아직 과열 끼가 남는" 시장 맥락
+    # (−20%인데 약세장 느낌 안 남)을 반영해 크래시급에서만 저온으로 본다.
+    "kospi_high_gap": {"kind": "fixed", "threshold": 0.0, "floor": -30.0, "kink": -3.0},
     "us10y": {"kind": "fixed", "threshold": 5.0},
     "naver_search_trend": {"kind": "fixed", "threshold": 70.0},
     "dcinside_post_count": {"kind": "fixed", "threshold": 25.0},
-    "kospi_volume_surge": {"kind": "fixed", "threshold": 500_000.0},  # 억원 (50조원)
+    # kospi_volume_surge: 절대 거래대금이 아니라 "30일 평균 대비 %"(details.surge_pct)로 판단.
+    # 평소(0%)=상온, +20%↑=초고온. floor surge −20%=0%, ceiling surge +33.3%=100%
+    # (→ 0%→37.5%, +20%→75%). 절대값은 baseline drift로 낡아서 상대로 전환.
+    "kospi_volume_surge": {"kind": "fixed", "threshold": 500_000.0, "relative_surge": {"floor": -20.0, "ceil": 33.33, "hit": 20.0}},
     "vkospi": {"kind": "fixed", "threshold": 20.0, "direction": "low"},
     "news_sentiment": {"kind": "fixed", "threshold": 35.0},
     "kospi_gold_ratio": {"kind": "fixed", "threshold": 2.2},
