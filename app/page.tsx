@@ -1118,8 +1118,60 @@ function VsAvg({ ratio, size = 26 }: { ratio: number; size?: number }) {
   );
 }
 
-// 라인+마커형 (초보검색/재테크도서/GitHub/자영업)
-// 네이버 검색지수(초보검색/자영업)는 details.vs_avg가 있어 '평소 대비 N배'로,
+// 실물–증시 괴리 — 두 축(실물 스트레스/증시 강세)을 나란히 보여준다. 둘 다 높을수록
+// 괴리도(둘의 곱)가 커진다 = "실물 없는 랠리".
+function DivergenceBar({ label, hint, value, color }: { label: string; hint: string; value: number; color: string }) {
+  const level = value >= 66 ? "높음" : value >= 33 ? "보통" : "낮음";
+  return (
+    <div style={{ flex: 1 }}>
+      <div style={{ fontSize: 12, fontWeight: 800, color: C.ink, marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 10, fontWeight: 600, color: C.sub, marginBottom: 8 }}>{hint}</div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, fontWeight: 800, marginBottom: 5 }}>
+        <span style={{ color: C.sub }}>{level}</span>
+        <span style={{ color, fontFamily: MONO }}>
+          {Math.round(value)}
+          <span style={{ color: "var(--c-faint)" }}>/100</span>
+        </span>
+      </div>
+      <div style={{ height: 10, background: C.track, borderRadius: 999, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, value))}%`, background: color, borderRadius: 999 }} />
+      </div>
+    </div>
+  );
+}
+
+function CardDivergence({ v }: { v: Pick }) {
+  const dt = v.details;
+  const real = dt?.real_stress ?? 0;
+  const market = dt?.market_strength ?? 0;
+  const div = dt?.divergence ?? v.capped ?? 0;
+  const c = overheatColor(div);
+  return (
+    <Shell span={2} hit={v.isHit} minH={236}>
+      {v.isHit && <HitBadge />}
+      <Tag text={v.headline} color={c} />
+      <TitleRow icon="compare_arrows" iconSize={30} color={c} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="당일 기준" />
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 14 }}>
+        <span style={{ fontFamily: MONO, fontSize: 44, fontWeight: 800, color: c, lineHeight: 1, letterSpacing: "-0.03em" }}>{Math.round(div)}</span>
+        <span style={{ fontSize: 18, fontWeight: 800, color: "var(--c-faint)" }}>/ 100</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: C.sub, paddingBottom: 4 }}>괴리도</span>
+      </div>
+      <div style={{ background: C.bg, borderRadius: 14, padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "flex", gap: 22 }}>
+          <DivergenceBar label="🥶 실물 스트레스" hint="자영업 폐업 검색" value={real} color={C.cold} />
+          <DivergenceBar label="🔥 증시 강세" hint="신고가 근접도" value={market} color={C.hot} />
+        </div>
+        <p style={{ margin: "2px 0 0", fontSize: 11, fontWeight: 700, color: "var(--c-ink-soft)", textAlign: "center" }}>
+          둘 다 높을수록 <span style={{ color: c }}>실물과 증시가 벌어진</span> 상태예요
+        </p>
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+// 라인+마커형 (초보검색/재테크도서/GitHub)
+// 네이버 검색지수(초보검색)는 details.vs_avg가 있어 '평소 대비 N배'로,
 // 그 외(재테크도서·GitHub)는 기존 값+과열기준 라인으로 보여준다.
 function CardTrend({ v, icon }: { v: Pick; icon: string }) {
   const vsAvg = v.details?.vs_avg ?? null;
@@ -1430,7 +1482,7 @@ export default async function Home() {
                 <CardUpbit v={p("upbit_speculation_index")} />
                 <CardWeather v={p("weather_sunshine_index")} />
                 <CardTrend v={p("github_trading_bot_repos")} icon="terminal" />
-                <CardTrend v={p("small_business_crisis_index")} icon="storefront" />
+                <CardDivergence v={p("small_business_crisis_index")} />
                 {extra("감성").map((i) => (
                   <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["감성"]} />
                 ))}

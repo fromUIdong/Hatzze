@@ -290,10 +290,18 @@ def main() -> None:
     sb = by_slug.get("small_business_crisis_index")
     hg = by_slug.get("kospi_high_gap")
     if sb and hg and not sb["no_value"] and not hg["no_value"]:
-        divergence = sb["capped_progress"] * hg["capped_progress"] / 100.0
+        real_stress = sb["capped_progress"]      # 자영업 폐업 검색 = 실물 stress
+        market_strength = hg["capped_progress"]  # 신고가 근접 = 증시 강세
+        divergence = real_stress * market_strength / 100.0
         sb["progress"] = divergence
         sb["capped_progress"] = cap_progress(divergence)
         sb["hit"] = divergence >= 75.0  # 괴리 초고온(≥75)일 때 Hit
+        # 카드 인포그래픽용: 두 축(실물/증시) progress를 details에 남긴다.
+        sb["details"] = {
+            "real_stress": round(real_stress, 1),
+            "market_strength": round(market_strength, 1),
+            "divergence": round(cap_progress(divergence), 1),
+        }
 
     hit_count = sum(1 for r in results if r["hit"])
     weighted_results = [r for r in results if not r["no_value"]]
@@ -331,12 +339,15 @@ def main() -> None:
     )
 
     for r in results:
-        client.table("indicator_values").update(
-            {
-                "normalized_score": round(r["progress"], 2),
-                "threshold": round(r["threshold"], 2) if r["threshold"] is not None else None,
-            }
-        ).eq("indicator_id", r["indicator_id"]).eq("date", r["date"]).execute()
+        payload = {
+            "normalized_score": round(r["progress"], 2),
+            "threshold": round(r["threshold"], 2) if r["threshold"] is not None else None,
+        }
+        if r.get("details") is not None:
+            payload["details"] = r["details"]
+        client.table("indicator_values").update(payload).eq(
+            "indicator_id", r["indicator_id"]
+        ).eq("date", r["date"]).execute()
     print(f"[Supabase] indicator_values.normalized_score upsert 완료 ({len(results)}건, 원본 Progress 저장)")
 
     today = date.today().isoformat()
