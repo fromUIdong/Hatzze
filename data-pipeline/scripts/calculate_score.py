@@ -292,7 +292,10 @@ def main() -> None:
     if sb and hg and not sb["no_value"] and not hg["no_value"]:
         real_stress = sb["capped_progress"]      # 자영업 폐업 검색 = 실물 stress
         market_strength = hg["capped_progress"]  # 신고가 근접 = 증시 강세
-        divergence = real_stress * market_strength / 100.0
+        # 둘 다 높아야 "실물 없는 랠리"라는 AND 성격은 유지하되(어느 한쪽이 0이면 0),
+        # 곱÷100은 한쪽만 낮아도 바닥으로 눌러 지나치게 빡세서(예: 4×28/100=1.1) 기하평균으로
+        # 완화한다. √(4×28)=10.5로 더 합리적. 초고온(≥75)은 둘 다 ~75여야 도달(√(75×75)=75).
+        divergence = (real_stress * market_strength) ** 0.5
         sb["progress"] = divergence
         sb["capped_progress"] = cap_progress(divergence)
         sb["hit"] = divergence >= 75.0  # 괴리 초고온(≥75)일 때 Hit
