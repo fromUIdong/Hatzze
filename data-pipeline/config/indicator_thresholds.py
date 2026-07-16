@@ -47,7 +47,11 @@ INDICATOR_THRESHOLDS = {
     # "두 서브 신호 모두 자기 기준선에 도달한 수준"을 의미한다.
     "leverage_etf_volume": {"kind": "fixed", "threshold": 100.0},
     "bestseller_finance_ratio": {"kind": "fixed", "threshold": 16.0},
-    "youtube_finance_search_views": {"kind": "cumulative_average"},
+    # youtube: 기준선=누적 평균(compute_threshold). 예전엔 progress=현재/평균×100이라 "평균=100%
+    # =정상"인데도 과열 100%로 잡혀(평균 이하도 hit) 점수를 부풀렸다. surge_map으로 "평균 대비
+    # 급증(%)"을 과열도로 매핑한다 — 평균(급증 0%)=진행률 50(상온), +25%=75(초고온 진입/Hit),
+    # +50%=100. 카드의 "평소 대비 X배"는 threshold(=평균) 그대로라 안 깨진다.
+    "youtube_finance_search_views": {"kind": "cumulative_average", "surge_map": {"floor": -50.0, "ceil": 50.0}},
     # weather_sunshine_index: threshold=8은 "전운량 2 이하(구름 거의 없음)"에
     # 해당하는 맑음지수다. 다만 이건 계절과 무관하게 고정된 값이라는 한계가
     # 있다 — 예를 들어 장마철(6~7월)엔 맑은 날 자체가 드물어 이 기준을 거의

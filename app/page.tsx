@@ -69,13 +69,9 @@ function pick(ind: Ind | undefined): Pick {
     score,
     capped,
     threshold,
-    // Hit = 초고온 구간(진행률 ≥ 75) 진입 — 대부분 지표는 기준선이 '과열 극단'이라 이 규칙이
-    // 맞다. 단 youtube는 기준선이 '평균'이라 진행률 100=평균(정상)이므로, 진행률 75면 평균
-    // 이하도 걸려 오탐이 난다. 평균 위(≥100)로 올라설 때만 hit으로 본다(기준선 재보정 시 통일).
-    isHit:
-      ind?.slug === "youtube_finance_search_views"
-        ? (score ?? 0) >= 100
-        : (capped ?? 0) >= 75,
+    // Hit = 초고온 구간(진행률 ≥ 75) 진입 — 모든 지표의 진행률이 '과열도(0~100)'로 통일돼
+    // 있어(youtube는 surge_map으로 평균 대비 급증을 매핑) 예외 없이 동일 기준.
+    isHit: (capped ?? 0) >= 75,
     color: heatColor(score),
     disp: f.display,
     unit: f.displayUnit,

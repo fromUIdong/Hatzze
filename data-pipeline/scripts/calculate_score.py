@@ -71,6 +71,7 @@ from config.indicator_thresholds import (  # noqa: E402
     INDICATOR_THRESHOLDS,
     NEGATIVE_CURRENT_CLAMP_SLUGS,
 )
+from config.indicator_weights import INDICATOR_WEIGHTS  # noqa: E402
 
 KOSPI_HIGH_GAP_FALLBACK_FLOOR = -20.0  # kospi_close_raw 히스토리가 부족할 때의 대체값
 KOSPI_CLOSE_RAW_SLUG = "kospi_close_raw"
@@ -94,7 +95,9 @@ def get_indicator(client, slug: str) -> tuple[str, str, float]:
             f"indicator '{slug}'가 존재하지 않습니다. 해당 fetch 스크립트를 먼저 실행하세요."
         )
     row = result.data[0]
-    weight = float(row["weight"]) if row.get("weight") is not None else 1.0
+    # 가중치는 코드(config/indicator_weights.py)가 소스 오브 트루스 — DB weight는 폴백.
+    db_weight = float(row["weight"]) if row.get("weight") is not None else 1.0
+    weight = INDICATOR_WEIGHTS.get(slug, db_weight)
     return row["id"], row["name"], weight
 
 
@@ -199,6 +202,13 @@ def compute_progress(slug: str, current: float, threshold: float, config: dict) 
         # 일반 floor-ceiling(버핏 등): floor=0%, threshold(ceiling)=100% 선형.
         floor = config["floor"]
         return (current - floor) / (threshold - floor) * 100
+    if "surge_map" in config:
+        # cumulative_average(youtube): threshold=평균이라 current/threshold*100은 평균=100(정상)이
+        # 돼 과열 척도로 안 맞는다. 평균 대비 급증(%)을 0~100 과열도로 매핑한다 — 평균(급증 0%)이
+        # floor~ceil의 중앙(=상온), ceil에서 초고온. surge_map = {floor, ceil}(급증 % 단위).
+        sm = config["surge_map"]
+        surge = (current / threshold - 1) * 100 if threshold else 0.0
+        return (surge - sm["floor"]) / (sm["ceil"] - sm["floor"]) * 100
     if slug in NEGATIVE_CURRENT_CLAMP_SLUGS and current < 0:
         return 0.0
     if config.get("direction") == "low":
@@ -263,10 +273,6 @@ def main() -> None:
             # 아니라 초고온 구간에 들어서면 켜진다. progress가 이미 방향(direction)을 반영하므로
             # low/high 구분 없이 동일 기준.
             hit = capped_progress >= HIT_ZONE
-            if config["kind"] == "cumulative_average":
-                # youtube: 기준선이 '평균'이라 진행률 100=평균(정상). 진행률 75면 평균 이하도
-                # 걸려 오탐이 나므로, 평균 위(진행률 ≥ 100)로 올라설 때만 Hit로 본다.
-                hit = progress >= 100
 
         results.append(
             {
