@@ -764,17 +764,17 @@ function CardTurnover({ v }: { v: Pick }) {
     <Shell hit={v.isHit} minH={230}>
       <Tag text={v.headline} color={c} />
       <TitleRow icon="pie_chart" name={v.name} color={c} />
-      <div style={{ display: "flex", gap: 16, flex: 1, alignItems: "center" }}>
-        <div style={{ position: "relative", width: 104, height: 104, flexShrink: 0 }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
+        <div style={{ position: "relative", width: 116, height: 116 }}>
           <Donut pct={share} color={c} />
           <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ fontFamily: MONO, fontSize: 21, fontWeight: 800, color: c, lineHeight: 1 }}>{Math.round(share)}%</span>
+            <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 800, color: c, lineHeight: 1 }}>{Math.round(share)}%</span>
             <span style={{ fontSize: 8, fontWeight: 700, color: C.sub, marginTop: 2 }}>상위10 거래</span>
           </div>
         </div>
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
+        <div style={{ width: "100%", display: "grid", gridTemplateColumns: "1fr 1fr", columnGap: 18, rowGap: 6 }}>
           {top5.slice(0, 4).map((s, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, fontWeight: 700, gap: 8 }}>
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, fontWeight: 700, gap: 6 }}>
               <span style={{ color: C.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
               <span style={{ fontFamily: MONO, fontWeight: 800, color: C.sub, flexShrink: 0 }}>{s.share}%</span>
             </div>

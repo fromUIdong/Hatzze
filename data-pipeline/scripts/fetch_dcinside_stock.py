@@ -69,7 +69,7 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "디씨 주식 갤러리 감성 지수",
     "category": "감성",
-    "description_beginner": "한국·미국 주식 갤러리 게시글이 낙관적인지 비관적인지 여론의 온도를 재요. 다들 들떠서 낙관적인 얘기만 쏟아내고 있다면, 개인 투자 심리가 과열됐다는 신호로 볼 수 있어요",
+    "description_beginner": "낙관적인 얘기만 쏟아지면, 개인 투자 심리가 과열됐다는 신호예요",
     "unit": "pt",
 }
 

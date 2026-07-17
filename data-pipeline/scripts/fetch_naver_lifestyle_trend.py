@@ -52,8 +52,11 @@ GROUP_CONFIGS = [
         "keywords": ["자영업 폐업", "권리금 없음", "가게 정리", "폐업 세일", "폐업"],
         "meta": {
             "slug": "small_business_crisis_index",
-            "name": "자영업 폐업·권리금 검색 지수",
+            # 자영업 폐업 검색(실물 stress) × 신고가 근접(증시 강세)의 곱으로 재정의된
+            # '실물–증시 괴리' 지표라 이름·설명도 그에 맞춘다(calculate_score의 괴리 override 참고).
+            "name": "실물–증시 괴리 지수",
             "category": "감성",
+            "headline": "실물은 추운데 증시만 뜨겁다",
             "description_beginner": "폐업 검색이 느는데 증시만 뜨겁다면, 실물과 시장의 괴리 신호예요",
             "unit": "pt",
         },
