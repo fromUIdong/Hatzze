@@ -17,3 +17,10 @@ beautifulsoup4>=4.12,<5
 # <2 안쪽이라 메이저 breaking은 막힌다. (로컬 Python을 3.11로 올리면 완전히
 # 같은 버전으로 맞출 수 있다.)
 yfinance>=1.2,<2
+# Telethon — 텔레그램 Client API(MTProto)로 채널·채팅방 메시지/조회수/포워드수를
+# 수집한다(카더라 리포트). 사람 계정 로그인 상태는 파일이 아니라 StringSession
+# 문자열로 뽑아 .env의 TELEGRAM_SESSION으로 주입한다. 현재 확인 버전 1.44.
+telethon>=1.41,<2
+# anthropic — 히어로 카드의 '오늘의 요약'을 Claude(Haiku)로 생성한다
+# (generate_daily_summary.py). 현재 확인 버전 0.117.
+anthropic>=0.117,<1

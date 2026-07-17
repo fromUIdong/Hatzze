@@ -159,7 +159,7 @@ function TopBar({ dailyScore, theme }: { dailyScore: DailyScore | null; theme: "
   const hatzze: Quote = dailyScore
     ? {
         label: "햇쩨 지수",
-        value: `${formatIndicatorValue(dailyScore.score, "%").display}% · ${stageLabel}`,
+        value: `${formatIndicatorValue(dailyScore.score, "%").display}℃ · ${stageLabel}`,
         change: null,
         color: STAGE_COLOR[stageLabel] ?? C.ink,
       }

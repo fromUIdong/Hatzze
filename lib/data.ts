@@ -8,6 +8,9 @@ export type DailyScore = {
   score: number;
   stage: string;
   updated_at: string;
+  // LLM(Claude Haiku)이 생성한 오늘의 요약. 컬럼이 없거나(마이그레이션 전) 아직
+  // 생성 전이면 null이고, 이땐 히어로가 기존 템플릿 문장으로 폴백한다.
+  ai_summary: string | null;
 };
 
 // 지표별 서브값(예: 레버리지의 ETF/선물 진행률, 매수쏠림의 매수/매도/CB 건수,
@@ -45,15 +48,43 @@ export type IndicatorWithLatestValue = {
 };
 
 export async function getLatestDailyScore(): Promise<DailyScore | null> {
-  const { data, error } = await getSupabaseServer()
-    .from("daily_score")
-    .select("date,score,stage,updated_at")
-    .order("date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const query = (cols: string) =>
+    getSupabaseServer()
+      .from("daily_score")
+      .select(cols)
+      .order("date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
+  // ai_summary 컬럼이 아직 없는 환경(마이그레이션 007 전)에서도 페이지가 죽지
+  // 않도록, 포함 조회가 실패하면 그 컬럼 없이 한 번 더 조회한다.
+  let { data, error } = await query("date,score,stage,updated_at,ai_summary");
+  if (error) {
+    ({ data, error } = await query("date,score,stage,updated_at"));
+  }
   if (error) throw error;
-  return data;
+  if (!data) return null;
+
+  // 동적 select라 supabase-js가 타입을 추론하지 못해 명시적으로 캐스팅한다.
+  const row = data as unknown as {
+    date: string;
+    score: number;
+    stage: string;
+    updated_at: string;
+    ai_summary?: string | null;
+  };
+
+  // 로컬 dev 전용 오버레이(운영 빌드에선 no-op). 운영 DB에 요약을 쓰기 전에
+  // 로컬에서만 미리 문장을 얹어 보기 위한 장치.
+  const summaryOverride = getDevOverrides().summary;
+
+  return {
+    date: row.date,
+    score: row.score,
+    stage: row.stage,
+    updated_at: row.updated_at,
+    ai_summary: summaryOverride ?? row.ai_summary ?? null,
+  };
 }
 
 export async function getPublicIndicators(): Promise<IndicatorWithLatestValue[]> {
