@@ -92,6 +92,10 @@ INDICATOR_THRESHOLDS = {
     # youtube처럼 '최근 평균(cumulative_average) 대비 급증(surge_map)'으로 froth를 본다 —
     # 평균이면 상온(50), 평균 대비 +15%면 초고온(100). 예탁금 변동폭이 작아 ±15%로 잡았다.
     "investor_deposit": {"kind": "cumulative_average", "surge_map": {"floor": -15.0, "ceil": 15.0}},
+    # turnover_concentration: 상위10 종목 거래대금 비중(%). KOSPI는 구조적으로 삼성전자·
+    # SK하이닉스에 상시 쏠려(70%+) 절대 threshold가 낡으므로, '최근 평균 대비 쏠림 심화'를
+    # surge_map으로 본다 — 평균이면 상온, 평균 대비 +8% 심화면 초고온.
+    "turnover_concentration": {"kind": "cumulative_average", "surge_map": {"floor": -8.0, "ceil": 8.0}},
     # market_actions_30d: raw_value = (매수 사이드카 - 매도 사이드카) - CB발동×4를
     # 실제 KIND 공시로 1년치(2025-07~2026-07) 백필해 매일의 롤링 30일 값을 계산해보니
     # 최댓값이 3.0에 그쳤다 — 사이드카는 연간 매수17건/매도18건으로 거의 균형이라
@@ -100,14 +104,6 @@ INDICATOR_THRESHOLDS = {
     # 않았다. 대신 threshold=2.0은 1년 366일 중 상위 4.4%(16일)만 도달한 수준으로,
     # "매수 쪽이 뚜렷하게 우세"에 해당하는 현실적인 기준값이다.
     "market_actions_30d": {"kind": "fixed", "threshold": 2.0},
-    # top10_market_cap_concentration: sto/stk_bydd_trd API가 아직 미승인이라 직접
-    # 계산은 못 했지만(2026-07-11 기준 401), 공개된 자료 기준 코스피 상위 10종목
-    # 시가총액 비중은 통상 40~45% 수준이고(삼성전자 단독 약 22%), 2026년 들어
-    # 반도체 쏠림이 심해지며 상위 4종목 비중만도 1월 38.83%에서 5월 49.49%로
-    # 급등했다. threshold=50.0은 "상위 몇 종목이 지수를 사실상 떠받치는" 수준의
-    # 임계선으로 잡은 논리적 추정치다 — API 승인 후 실측 분포를 보고 반드시
-    # 재조정해야 한다.
-    "top10_market_cap_concentration": {"kind": "fixed", "threshold": 50.0},
     # vix_vkospi_spread: raw = VIX 백분위 - VKOSPI 백분위(각자 최근 1년 분포 기준).
     # VIX와 VKOSPI는 산출식·스케일이 달라(VIX~15, KRX "코스피200 변동성지수"~78) 절대값
     # 뺄셈이 무의미해서, 각자 자기 분포 내 백분위로 바꿔 비교한다. 양수로 클수록

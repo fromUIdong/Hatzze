@@ -755,24 +755,30 @@ function CardMarketActions({ v }: { v: Pick }) {
   );
 }
 
-// 4. 상위 10종목 쏠림 — 도넛 (실제 비중으로 복원)
-function CardTop10({ v }: { v: Pick }) {
-  const pct = v.raw ?? 0;
+// 거래대금 쏠림도 — 상위10 거래대금 비중 도넛 + 상위 종목 목록 (details 활용)
+function CardTurnover({ v }: { v: Pick }) {
+  const c = overheatColor(v.capped);
+  const share = v.raw ?? 0; // 상위10 거래대금 비중 %
+  const top5 = (v.details as unknown as { top5?: { name: string; share: number }[] })?.top5 ?? [];
   return (
     <Shell hit={v.isHit} minH={230}>
-      <Tag text={v.headline} color={v.color} />
-      <TitleRow icon="pie_chart" name={v.name} color={v.color} />
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
-        <div style={{ position: "relative", width: 116, height: 116 }}>
-          <Donut pct={pct} color={v.color} />
+      <Tag text={v.headline} color={c} />
+      <TitleRow icon="pie_chart" name={v.name} color={c} />
+      <div style={{ display: "flex", gap: 16, flex: 1, alignItems: "center" }}>
+        <div style={{ position: "relative", width: 104, height: 104, flexShrink: 0 }}>
+          <Donut pct={share} color={c} />
           <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 800, color: v.color, lineHeight: 1 }}>{v.disp}{v.unit}</span>
-            <span style={{ fontSize: 8, fontWeight: 700, color: C.sub, marginTop: 2 }}>Top 10</span>
+            <span style={{ fontFamily: MONO, fontSize: 21, fontWeight: 800, color: c, lineHeight: 1 }}>{Math.round(share)}%</span>
+            <span style={{ fontSize: 8, fontWeight: 700, color: C.sub, marginTop: 2 }}>상위10 거래</span>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 14, fontSize: 10, fontWeight: 700, color: C.sub }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 9, height: 9, borderRadius: 3, background: v.color }} />상위 10 · {v.disp}{v.unit}</span>
-          <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 9, height: 9, borderRadius: 3, background: C.line }} />나머지 · {v.raw !== null ? `${(100 - v.raw).toFixed(1)}%` : "-"}</span>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
+          {top5.slice(0, 4).map((s, i) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, fontWeight: 700, gap: 8 }}>
+              <span style={{ color: C.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
+              <span style={{ fontFamily: MONO, fontWeight: 800, color: C.sub, flexShrink: 0 }}>{s.share}%</span>
+            </div>
+          ))}
         </div>
       </div>
       <Foot text={v.desc} />
@@ -1446,7 +1452,7 @@ function SectionHeading({ title }: { title: string }) {
 // 목업에서 명시적으로 배치·결합·순서가 정해진 slug들. 이 목록에 없는
 // 공개 지표는 각 섹션 끝에 일반 카드로 덧붙여 자동 노출을 유지한다.
 const LAID_OUT = new Set([
-  "buffett_index", "leverage_etf_volume", "market_actions_30d", "top10_market_cap_concentration",
+  "buffett_index", "leverage_etf_volume", "market_actions_30d", "turnover_concentration",
   "kospi_high_gap", "vkospi", "vix_vkospi_spread", "kospi_asia_relative_strength",
   "kospi_gold_ratio", "kosdaq_kospi_ratio", "kospi_volume_surge", "usdkrw_volatility",
   "individual_net_buy", "put_call_ratio", "investor_deposit",
@@ -1504,7 +1510,7 @@ export default async function Home() {
                 <CardBuffett v={p("buffett_index")} />
                 <CardLeverage v={p("leverage_etf_volume")} />
                 <CardMarketActions v={p("market_actions_30d")} />
-                <CardTop10 v={p("top10_market_cap_concentration")} />
+                <CardTurnover v={p("turnover_concentration")} />
                 <CardHighGap v={p("kospi_high_gap")} />
                 <CardVkospi v={p("vkospi")} />
                 <CardVixSpread v={p("vix_vkospi_spread")} />

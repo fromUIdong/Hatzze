@@ -16,7 +16,6 @@ INDICATOR_WEIGHTS = {
     "kospi_volume_surge": 4.0,      # 소매 과열(선행)
     "buffett_index": 3.0,           # 밸류 앵커지만 느림·후행
     "vkospi": 3.0,                  # 방심(동행)
-    "top10_market_cap_concentration": 3.0,  # 구조·동행
     "upbit_speculation_index": 3.0, # 소매 과열(선행)
     "naver_search_trend": 3.0,      # 소매 과열(선행)
     "leverage_etf_volume": 3.0,     # 레버리지 투기(선행)
@@ -36,6 +35,7 @@ INDICATOR_WEIGHTS = {
     "brokerage_app_rank": 1.0,           # 증권 앱 유입(froth 직접), 부트스트랩·관찰
     "individual_net_buy": 2.0,           # 개인 순매수(개미 몰빵=froth), 부트스트랩
     "investor_deposit": 2.0,             # 고객예탁금(대기 매수 자금=froth), 부트스트랩
+    "turnover_concentration": 2.0,       # 거래대금 쏠림(핫종목 추격=froth), 부트스트랩
     # 참고용 (후행 소비 / 노이즈)
     "luxury_consumption_index": 0.5,     # 후행 소비
     "fine_dining_search_index": 0.5,     # 후행 소비
