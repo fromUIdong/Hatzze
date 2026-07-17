@@ -1,6 +1,6 @@
 import { getLatestDailyScore, getPublicIndicators } from "@/lib/data";
 import type { DailyScore, IndicatorCategory, IndicatorWithLatestValue } from "@/lib/data";
-import { formatIndicatorValue, formatKstDateTime } from "@/lib/format";
+import { formatIndicatorValue, formatKstDate } from "@/lib/format";
 import { C, Icon, MONO, stageForScore } from "./ui";
 
 // 지표는 하루 단위(GitHub Actions 배치)로 갱신되므로, 빌드 시점에 정적으로
@@ -312,6 +312,43 @@ const STAGE_META: Record<string, { emoji: string; color: string; zone: string }>
   초고온: { emoji: "🌋", color: C.mania, zone: "초고온 구간" },
 };
 
+// LLM 요약 문장을 서식 있는 노드로 렌더한다.
+//  - **...** → 굵게(중요 부분: 지표 이름·핵심 수치 등)
+//  - 온도 단어(저온/상온/고온/초고온) → 해당 구간 색으로 굵게 (STAGE_META 색 재사용)
+// 서식이 아닌 부분은 그대로 텍스트로 둔다(짝 안 맞는 별표는 글자로 노출).
+function renderRichSummary(text: string): React.ReactNode {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, pi) => {
+    const bold = /^\*\*[^*]+\*\*$/.test(part);
+    const content = bold ? part.slice(2, -2) : part;
+    return content.split(/(저온|상온|고온|초고온)/g).map((seg, si) => {
+      const tempColor = STAGE_META[seg]?.color;
+      if (tempColor) {
+        return (
+          <b key={`${pi}-${si}`} style={{ color: tempColor, fontWeight: 800 }}>
+            {seg}
+          </b>
+        );
+      }
+      if (bold) {
+        return (
+          <b key={`${pi}-${si}`} style={{ color: C.ink }}>
+            {seg}
+          </b>
+        );
+      }
+      return seg;
+    });
+  });
+}
+
+// 문장 끝(. ! ?) 뒤에서 나눠, 요약을 문장별로 줄바꿈해 읽기 편하게 한다.
+function splitSentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 function HeroGauge({ score }: { score: number }) {
   const s = Math.max(0, Math.min(100, score));
   const arcLen = 389.6;
@@ -367,7 +404,7 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
           <div style={{ position: "absolute", left: 0, right: 0, top: 78, textAlign: "center" }}>
             <div style={{ fontFamily: MONO, fontSize: 58, fontWeight: 800, color: C.ink, letterSpacing: "-0.04em", lineHeight: 1 }}>
               {scoreDisplay}
-              <span style={{ fontSize: 30 }}>%</span>
+              <span style={{ fontSize: 30 }}>℃</span>
             </div>
             <div style={{ fontSize: 11, fontWeight: 800, color: stage.color, marginTop: 6 }}>지금 · {stage.zone}</div>
           </div>
@@ -381,17 +418,28 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
       </div>
       <div style={{ flex: 1, minWidth: 280 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-          <span style={{ fontSize: 15, fontWeight: 800, color: C.blue }}>Hatzze Overheating Index</span>
+          <span style={{ fontSize: 22, fontWeight: 800, color: C.blue }}>햇쩨 지수</span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: `${stage.color}24`, color: stage.color, fontWeight: 800, fontSize: 16, padding: "5px 14px", borderRadius: 999, whiteSpace: "nowrap" }}>
             {stage.emoji} {stageLabel}
           </span>
         </div>
-        <p style={{ margin: "0 0 4px", fontSize: 11, color: C.sub, fontFamily: MONO }}>최종 업데이트 · {formatKstDateTime(dailyScore.updated_at)}</p>
+        {/* 데일리 스코어는 매일 아침(KST 09:00) 갱신되는 하루 스냅샷이라, updated_at의
+            분 단위 변동 대신 "그 날짜 · 오전 9시" 라벨로 고정 표시한다. */}
+        <p style={{ margin: "0 0 4px", fontSize: 11, color: C.sub, fontFamily: MONO }}>최종 업데이트 · {formatKstDate(dailyScore.date)} 오전 9:00 기준</p>
         <div style={{ marginTop: 20, background: C.bg, borderRadius: 16, padding: "22px 24px", display: "flex", gap: 14 }}>
-          <Icon name="auto_awesome" style={{ color: C.blue, fontSize: 22 }} />
-          <p style={{ margin: 0, fontSize: 15, lineHeight: 1.6, color: "var(--c-ink-soft)", fontWeight: 500 }}>
-            오늘은 시장 지표 <b style={{ color: C.ink }}>{tradHits}개</b>, 감성 지표 <b style={{ color: C.ink }}>{socialHits}개</b>가 기준선을 넘었어요. 지표들이 가리키는 현재 시장 온도는 <b style={{ color: stage.color }}>{stageLabel}</b> 구간이에요.
-          </p>
+          <Icon name="auto_awesome" style={{ color: C.blue, fontSize: 22, flexShrink: 0 }} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 15, lineHeight: 1.6, color: "var(--c-ink-soft)", fontWeight: 500 }}>
+            {/* 고정 오프너 — 두 문장을 한 문단으로. 이 아래 LLM 문장들이 각각 한 문단씩
+                붙어 전체가 3문단 정도가 된다. */}
+            <p style={{ margin: 0 }}>오늘은 시장 지표 <b style={{ color: C.ink }}>{tradHits}개</b>, 감성 지표 <b style={{ color: C.ink }}>{socialHits}개</b>가 기준선을 넘었어요. 지표들이 가리키는 현재 시장 온도는 <b style={{ color: stage.color }}>{stageLabel}</b> 구간이에요.</p>
+            {/* LLM(generate_daily_summary.py) 상세 요약을 문장별로 줄바꿈해 이어붙인다.
+                없으면(마이그레이션 전이거나 생성 실패) 오프너만 보여준다. */}
+            {dailyScore.ai_summary
+              ? splitSentences(dailyScore.ai_summary).map((sentence, i) => (
+                  <p key={i} style={{ margin: 0 }}>{renderRichSummary(sentence)}</p>
+                ))
+              : null}
+          </div>
         </div>
         <p style={{ margin: "12px 2px 0", fontSize: 11, lineHeight: 1.5, color: "var(--c-muted)" }}>
           저온·상온·고온·초고온은 시장의 과열 정도를 나타낸 표현일 뿐, 재미·참고용이며 매수·매도 신호가 아니에요.

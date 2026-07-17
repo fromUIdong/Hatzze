@@ -18,6 +18,8 @@ export type DevOverrides = {
   names?: Record<string, string>;
   descriptions?: Record<string, string>;
   details?: Record<string, IndicatorDetails>;
+  // 히어로 카드의 '오늘의 요약' 문장을 로컬에서만 미리 보기 위한 오버레이.
+  summary?: string;
 };
 
 const EMPTY: DevOverrides = {};

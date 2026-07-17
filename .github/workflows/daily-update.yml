@@ -23,6 +23,7 @@ jobs:
       YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
       KMA_API_KEY: ${{ secrets.KMA_API_KEY }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
     steps:
@@ -164,6 +165,15 @@ jobs:
         id: calculate_score
         continue-on-error: true
         run: python data-pipeline/scripts/calculate_score.py
+
+      # 점수 계산 뒤, 최신 daily_score/지표들을 LLM으로 2~3문장 요약해
+      # daily_score.ai_summary에 저장한다(히어로 카드용). 비필수 단계라
+      # continue-on-error로 돌리고, 아래 실패 집계(Summarize results)에는
+      # 넣지 않는다 — 요약 생성 실패가 실패 알림 이슈를 열지 않도록.
+      - name: Generate daily AI summary (히어로 요약)
+        id: generate_daily_summary
+        continue-on-error: true
+        run: python data-pipeline/scripts/generate_daily_summary.py
 
       - name: Summarize results
         if: always()
