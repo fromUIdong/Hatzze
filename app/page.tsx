@@ -1,6 +1,6 @@
 import { getLatestDailyScore, getPublicIndicators } from "@/lib/data";
 import type { DailyScore, IndicatorCategory, IndicatorWithLatestValue } from "@/lib/data";
-import { formatIndicatorValue, formatKstDate } from "@/lib/format";
+import { formatIndicatorValue, formatKstUpdate } from "@/lib/format";
 import { C, Icon, MONO, stageForScore } from "./ui";
 
 // 지표는 하루 단위(GitHub Actions 배치)로 갱신되므로, 빌드 시점에 정적으로
@@ -415,9 +415,7 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
             {stage.emoji} {stageLabel}
           </span>
         </div>
-        {/* 데일리 스코어는 매일 아침(KST 09:00) 갱신되는 하루 스냅샷이라, updated_at의
-            분 단위 변동 대신 "그 날짜 · 오전 9시" 라벨로 고정 표시한다. */}
-        <p style={{ margin: "0 0 4px", fontSize: 11, color: C.sub, fontFamily: MONO }}>최종 업데이트 · {formatKstDate(dailyScore.date)} 오전 9:00 기준</p>
+        <p style={{ margin: "0 0 4px", fontSize: 11, color: C.sub, fontFamily: MONO }}>최종 업데이트 · {formatKstUpdate(dailyScore.updated_at)}</p>
         <div style={{ marginTop: 20, background: C.bg, borderRadius: 12, padding: "22px 24px", display: "flex", gap: 14 }}>
           <Icon name="auto_awesome" style={{ color: C.blue, fontSize: 22, flexShrink: 0 }} />
           <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 15, lineHeight: 1.6, color: "var(--c-ink-soft)", fontWeight: 500 }}>
