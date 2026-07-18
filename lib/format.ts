@@ -40,54 +40,30 @@ export function formatIndicatorValue(
   return { display, displayUnit: unit };
 }
 
-const KST_DATETIME_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
+const KST_UPDATE_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
   timeZone: "Asia/Seoul",
   year: "numeric",
   month: "2-digit",
   day: "2-digit",
   weekday: "short",
   hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
-
-const KST_DATE_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
-  timeZone: "Asia/Seoul",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  weekday: "short",
+  hourCycle: "h23",
 });
 
 /**
- * 날짜 문자열("YYYY-MM-DD")을 KST 기준 "YYYY-MM-DD(요일)"로 표시한다.
- * 데일리 스코어는 매일 아침(KST 09:00) 갱신되는 하루 단위 스냅샷이라, 정확한 갱신
- * 시각(updated_at)의 분 단위 변동 대신 "그 날짜 + 오전 9시" 라벨을 쓰기 위한 포맷.
- * (오후 fallback 재실행이 돌아 updated_at이 늦어져도 표시는 흔들리지 않게 한다.)
+ * "최종 업데이트" 라벨. 파이프라인은 KST 09:00(주 실행)·17:00(재실행)에만 도는데,
+ * 실제 완료 시각은 몇 분~몇십 분 늦어질 수 있어(예: 18:19) 그대로 쓰면 헷갈린다.
+ * 그래서 updated_at의 KST 시(hour)로 오전/오후 실행을 판별해 "오전 9:00" 또는
+ * "오후 5:00"으로 스냅해 표시한다. → "YYYY-MM-DD(요일) 오전 9:00 기준"
  */
-export function formatKstDate(dateStr: string): string {
-  // KST 자정으로 고정해 파싱해야 요일/날짜가 달력 날짜와 어긋나지 않는다.
-  const parts = KST_DATE_FORMATTER.formatToParts(new Date(`${dateStr}T00:00:00+09:00`));
-  const get = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((p) => p.type === type)?.value ?? "";
-  const weekday = get("weekday").replace("요일", "");
-  return `${get("year")}-${get("month")}-${get("day")}(${weekday})`;
-}
-
-/**
- * ISO 타임스탬프를 한국시간(KST) 기준 "YYYY-MM-DD(요일) HH:MM 기준" 형식으로 표시한다.
- */
-export function formatKstDateTime(isoString: string): string {
-  const parts = KST_DATETIME_FORMATTER.formatToParts(new Date(isoString));
+export function formatKstUpdate(isoString: string): string {
+  const parts = KST_UPDATE_FORMATTER.formatToParts(new Date(isoString));
   const get = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((p) => p.type === type)?.value ?? "";
 
-  const year = get("year");
-  const month = get("month");
-  const day = get("day");
   const weekday = get("weekday").replace("요일", "");
-  const hour = get("hour");
-  const minute = get("minute");
+  // 9시와 17시의 중간(13시)을 경계로 오전/오후 실행을 가른다.
+  const slot = Number(get("hour")) < 13 ? "오전 9:00" : "오후 5:00";
 
-  return `${year}-${month}-${day}(${weekday}) ${hour}:${minute} 기준`;
+  return `${get("year")}-${get("month")}-${get("day")}(${weekday}) ${slot} 기준`;
 }
