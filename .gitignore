@@ -15,6 +15,11 @@ build/
 .env.*.local
 data-pipeline/.env
 
+# telegram(telethon) 세션은 StringSession으로 .env(TELEGRAM_SESSION)에 넣는다.
+# 혹시 파일 기반 세션이 생겨도 커밋되지 않도록 방어적으로 무시한다.
+data-pipeline/*.session
+data-pipeline/*.session-journal
+
 # claude code local settings
 .claude/settings.local.json
 

@@ -27,3 +27,6 @@ SUPABASE_SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY")
 TELEGRAM_API_ID = os.environ.get("TELEGRAM_API_ID")
 TELEGRAM_API_HASH = os.environ.get("TELEGRAM_API_HASH")
 TELEGRAM_SESSION = os.environ.get("TELEGRAM_SESSION")
+# 분석 대상 채널 목록을 담은 구글시트의 ID(=URL의 /d/<ID>/ 부분). 목록을 public
+# 레포에 커밋하지 않으려 URL이 아니라 ID만 env로 받아 sync가 CSV export를 조립한다.
+TELEGRAM_CHANNELS_SHEET_ID = os.environ.get("TELEGRAM_CHANNELS_SHEET_ID")
