@@ -296,10 +296,11 @@ export default async function TelegramPage() {
                     <span style={{ fontSize: 40, fontWeight: 800, color: C.hot, lineHeight: 1 }}>{sentiment.score}%</span>
                     <span style={{ fontSize: 14, fontWeight: 800, color: C.ink }}>{sentiment.label}</span>
                   </div>
-                  {/* 헤드라인 숫자는 중립을 뺀 낙관↔비관 비율이라, 아래 3분할 막대와
-                      기준이 다르다는 걸 부제에서 분명히 해 둔다 */}
+                  {/* 헤드라인 숫자는 낙관↔비관 비율(중립 제외)이고 아래 막대는 중립 포함이라
+                      기준이 다르다 — 다만 막대에 중립이 버젓이 있는데 부제에 "(중립 제외)"를
+                      달면 서로 부딪혀 보인다. 정확한 계산 기준은 제목 옆 툴팁에 적어 둔다. */}
                   <div style={{ fontSize: 11, color: C.sub, margin: "6px 0 10px" }}>
-                    낙관 ↔ 비관 (중립 제외) · <span style={{ fontFamily: MONO }}>{sentiment.messageCount.toLocaleString("ko-KR")}</span>건 분석
+                    낙관 ↔ 비관 · <span style={{ fontFamily: MONO }}>{sentiment.messageCount.toLocaleString("ko-KR")}</span>건 분석
                   </div>
                   <div style={{ display: "flex", height: 14, borderRadius: 999, overflow: "hidden" }}>
                     <div style={{ width: `${sentiment.positive}%`, background: C.hot }} />
@@ -556,7 +557,18 @@ export default async function TelegramPage() {
                       )}
                     </div>
                     <div style={{ margin: "6px 0 5px", height: 8, background: C.track, borderRadius: 999, overflow: "hidden" }}>
-                      <div style={{ width: `${Math.min(100, t.sharePct * 2.6)}%`, height: "100%", background: C.blue, borderRadius: 999 }} />
+                      {/* 막대 길이 = 점유율 그대로. 예전엔 얇은 테마를 키우려 2.6배를 곱했는데
+                          38.5%만 넘으면 전부 100%로 꽉 차 1위 테마가 늘 만땅으로 보였다.
+                          0%가 아닌 테마는 최소 3px는 남겨 존재 자체는 보이게 한다. */}
+                      <div
+                        style={{
+                          width: `${Math.min(100, t.sharePct)}%`,
+                          minWidth: t.sharePct > 0 ? 3 : 0,
+                          height: "100%",
+                          background: C.blue,
+                          borderRadius: 999,
+                        }}
+                      />
                     </div>
                     <div style={{ fontSize: 11, color: C.sub, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       점유율 <b style={{ color: C.ink, fontFamily: MONO }}>{t.sharePct.toFixed(1)}%</b> · 종목 {t.stockCount}개 ·{" "}
@@ -658,7 +670,13 @@ export default async function TelegramPage() {
 
         {/* ① 뜨는 채널 (¼) */}
         <div style={cardStyle}>
-          <SectionHead icon="rocket_launch" title="뜨는 채널" note="7일" desc="최근 구독자가 많이 늘어난 채널" />
+          {/* 스냅샷은 백필이 안 돼 하루씩 쌓인다 — 7일치가 차기 전엔 실제로 잰 구간을 적는다 */}
+          <SectionHead
+            icon="rocket_launch"
+            title="뜨는 채널"
+            note={`${Math.min(7, rising[0]?.spanDays || 7)}일`}
+            desc="최근 구독자가 많이 늘어난 채널"
+          />
           {/* 간격을 이슈 키워드 카드의 행 높이(pitch 53px)에 맞춰 두 카드의 순위가 나란히 보이게 한다 */}
           <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 18 }}>
             {rising.map((r, i) => {
@@ -670,15 +688,25 @@ export default async function TelegramPage() {
                     <div style={{ fontWeight: 700, fontSize: 13, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.title}</div>
                     <div style={{ fontSize: 10, fontFamily: MONO, color: C.sub }}>구독자 수 {compact(r.subscriberCount)}</div>
                   </div>
-                  <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.hot, whiteSpace: "nowrap" }}>
-                    ▲{r.delta7d.toLocaleString("ko-KR")}명
+                  {/* 정원을 채우느라 증감이 없거나 줄어든 채널까지 들어올 수 있어 부호를 그대로 쓴다 */}
+                  <span
+                    style={{
+                      fontFamily: MONO,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: r.delta7d > 0 ? C.hot : r.delta7d < 0 ? C.cold : C.sub,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {r.delta7d > 0 ? "▲" : r.delta7d < 0 ? "▼" : ""}
+                    {Math.abs(r.delta7d).toLocaleString("ko-KR")}명
                   </span>
                 </>
               );
-              // 실제 채널일 때만 링크로 감싼다 — 데모 채널은 연결할 대상이 없다.
+              // 실제 채널일 때만 링크로 감싼다(복제해 채운 행은 링크를 걸지 않는다).
               return (
-                <li key={r.title}>
-                  {r.handle ? (
+                <li key={`${r.handle ?? r.title}-${i}`}>
+                  {r.handle && !r.isPlaceholder ? (
                     <a href={`https://t.me/${r.handle}`} target="_blank" rel="noopener noreferrer" className="hz-row-link">
                       {body}
                     </a>

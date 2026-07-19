@@ -280,8 +280,7 @@ export async function getSurgingStocks(limit = 5): Promise<SurgingStock[]> {
 
   const infoOf = await stockInfoMap([...byStock.keys()]);
 
-  const list = [...byStock.entries()]
-    .filter(([, a]) => a.recentM >= 2) // 1회성 언급 노이즈 제거
+  const scored = [...byStock.entries()]
     .map(([code, a]) => {
       const recentPerDay = a.recentShare / recentDateList.length;
       const base = a.priorShare / priorCount;
@@ -301,14 +300,21 @@ export async function getSurgingStocks(limit = 5): Promise<SurgingStock[]> {
         isLive: false,
       };
     })
-    .filter((s) => s.ratio >= 1.3 || s.isNew) // 평소보다 뚜렷하게 뛴 것만
     // 신규 등장(ratio=Infinity)이 정렬을 독점하지 않도록 유한한 강도로 환산해
     // 배수 급증주와 같은 축에서 비교한다.
     .sort((x, y) => {
       const strength = (s: SurgingStock) => (s.isNew ? (s.recentMentions >= 3 ? 3 : 2) : s.ratio);
       return strength(y) - strength(x) || y.recentMentions - x.recentMentions;
-    })
-    .slice(0, limit);
+    });
+
+  // 카드 정원은 항상 채운다 — 기준을 만족한 종목만 넣으면 조용한 날에 4개·3개로 줄어
+  // 레이아웃이 들쭉날쭉해진다. 다만 아무거나 끌어오면 안 되고 '덜 미더운 순서'로 메운다:
+  //   ① 언급 2회↑ + 뚜렷하게 뛴 것(본래 기준)
+  //   ② 언급 2회↑지만 상승폭이 완만한 것
+  //   ③ 언급 1회 — 배수는 커도(37배 등) 표본이 하나라 사실상 노이즈
+  // ③을 ②보다 먼저 넣으면 4위 ▲1.3배 밑에 5위 ▲37배가 붙어 정렬이 깨져 보인다.
+  const tier = (s: SurgingStock) => (s.recentMentions < 2 ? 3 : s.ratio >= 1.3 || s.isNew ? 1 : 2);
+  const list = [...scored].sort((x, y) => tier(x) - tier(y)).slice(0, limit);
 
   // 표시용 가격은 실시간(야후) 우선 — KRX 저장 종가는 며칠 지연돼 상단 티커와 어긋난다.
   // 조회 실패 시 KRX 종가(priceDate 라벨과 함께)를 그대로 쓴다.
@@ -554,8 +560,12 @@ export async function getThemeRotation(limit = 10): Promise<ThemeRotation[]> {
   const recentDates = dates.slice(-3);
   const priorDates = dates.filter((d) => daysBefore(d) >= 5);
 
+  // 최근 창에 한 번도 안 뜬 테마도 카드에는 0%로 남겨야 정원(10개)이 채워진다.
+  // 그래서 집계 대상 테마는 '최근 창에 등장한 것'이 아니라 조회 구간 전체의 테마다.
+  const allThemes = [...new Set(data.map((r) => r.theme))];
+
   const avgShare = (window: string[]) => {
-    const sum = new Map<string, number>();
+    const sum = new Map<string, number>(allThemes.map((t) => [t, 0]));
     for (const r of data) {
       if (!window.includes(r.date)) continue;
       sum.set(r.theme, (sum.get(r.theme) ?? 0) + Number(r.share_pct));
@@ -666,17 +676,18 @@ export async function getChannelRanking(): Promise<ChannelRank[]> {
 }
 
 export type RisingChannel = {
-  handle: string | null; // 실데이터일 때만 존재(데모 채널은 실제 링크 대상이 없음)
+  handle: string | null;
   title: string;
   photo: string | null;
   subscriberCount: number;
   delta7d: number;
-  isPlaceholder: boolean;
+  isPlaceholder: boolean; // true=정원을 채우려 복제한 행
+  spanDays: number; // 증감을 실제로 잰 구간(스냅샷 축적일). 7일 미만이면 카드도 그렇게 표기한다
 };
 
 /**
- * 뜨는 채널(7일 구독자 증가). 스냅샷이 아직 7일치가 없어 실제 증감을 못 구하면
- * 완성본처럼 보이도록 데모 데이터로 채운다 — 7일치가 쌓이면 실데이터로 자동 대체된다.
+ * 뜨는 채널 — 스냅샷 사이의 구독자 증가. 스냅샷은 백필이 안 돼 하루씩만 쌓이므로,
+ * 축적이 7일에 못 미치는 동안에는 잰 구간(spanDays)을 그대로 노출한다.
  */
 export async function getRisingChannels(limit = 10): Promise<RisingChannel[]> {
   const db = getSupabaseAdmin();
@@ -694,41 +705,43 @@ export async function getRisingChannels(limit = 10): Promise<RisingChannel[]> {
   }
   const { titleOf, photoOf } = await channelMeta();
 
+  // 스냅샷은 백필이 안 돼 오늘부터 하루씩 쌓인다 — 지금 잰 구간이 며칠인지 그대로 알린다.
+  const snapDates = [...new Set((data ?? []).map((r) => r.date))].sort();
+  const spanDays = snapDates.length
+    ? Math.round(
+        (new Date(snapDates[snapDates.length - 1]).getTime() - new Date(snapDates[0]).getTime()) / (24 * 60 * 60 * 1000),
+      )
+    : 0;
+
   const real: RisingChannel[] = [];
+  const flat: RisingChannel[] = [];
   for (const [h, arr] of byCh) {
     if (arr.length < 2) continue;
     arr.sort((a, b) => a.d.localeCompare(b.d));
     const delta = arr[arr.length - 1].s - arr[0].s;
-    if (delta <= 0) continue; // "뜨는" 채널이므로 실제로 늘어난 곳만
-    real.push({
+    (delta > 0 ? real : flat).push({
       handle: h,
       title: titleOf.get(h) ?? h,
       photo: photoOf.get(h) ?? null,
       subscriberCount: arr[arr.length - 1].s,
       delta7d: delta,
       isPlaceholder: false,
+      spanDays,
     });
   }
-  // 스냅샷이 며칠치뿐이면 "7일 증가"가 사실상 하루치 차이라 카드 의미가 없다
-  // (▲0명·▲-1명 같은 값이 뜬다). 충분히 쌓인 뒤에만 실데이터로 전환한다.
-  const snapshotDays = new Set((data ?? []).map((r) => r.date)).size;
-  if (snapshotDays >= 5 && real.length >= 3) {
-    return real.sort((a, b) => b.delta7d - a.delta7d).slice(0, limit);
-  }
+  real.sort((a, b) => b.delta7d - a.delta7d);
+  flat.sort((a, b) => b.delta7d - a.delta7d);
 
-  // TODO(스냅샷 7일치 축적 후 제거): 데모용 placeholder 데이터.
-  return [
-    { handle: null, title: "급등주 라이브", photo: null, subscriberCount: 58200, delta7d: 4300, isPlaceholder: false },
-    { handle: null, title: "실전 투자노트", photo: null, subscriberCount: 46700, delta7d: 3150, isPlaceholder: false },
-    { handle: null, title: "테마주 헌터", photo: null, subscriberCount: 33400, delta7d: 2480, isPlaceholder: false },
-    { handle: null, title: "코스닥 스나이퍼", photo: null, subscriberCount: 21900, delta7d: 1760, isPlaceholder: false },
-    { handle: null, title: "새벽 차트방", photo: null, subscriberCount: 15600, delta7d: 1210, isPlaceholder: false },
-    { handle: null, title: "반도체 소부장 인사이트", photo: null, subscriberCount: 28800, delta7d: 1120, isPlaceholder: false },
-    { handle: null, title: "미국주식 야간반", photo: null, subscriberCount: 41300, delta7d: 980, isPlaceholder: false },
-    { handle: null, title: "공시 알리미", photo: null, subscriberCount: 19400, delta7d: 870, isPlaceholder: false },
-    { handle: null, title: "배당주 모임", photo: null, subscriberCount: 12700, delta7d: 640, isPlaceholder: false },
-    { handle: null, title: "IPO 공모주 캘린더", photo: null, subscriberCount: 24100, delta7d: 520, isPlaceholder: false },
-  ].slice(0, limit);
+  // 카드 정원은 항상 채운다. 실제로 늘어난 채널을 먼저 넣고, 모자라면 증감이 없거나
+  // 줄어든 채널까지 순서대로 끌어온다(표시되는 증감은 실제값 그대로).
+  // 지금은 모니터링 채널이 12개뿐이라 "늘어난 곳"만 세면 8개 안팎에서 멈춘다 —
+  // 시트에 채널이 늘면 이 보충분은 자연히 밀려나 사라진다.
+  const filled = [...real, ...flat].slice(0, limit);
+  // 그래도 모자라면(채널 수 자체가 정원보다 적으면) 마지막 행을 복제해 자리를 채운다.
+  while (filled.length && filled.length < limit) {
+    filled.push({ ...filled[filled.length - 1], isPlaceholder: true });
+  }
+  return filled;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
