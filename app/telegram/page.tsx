@@ -6,6 +6,7 @@ import {
   getStockReport,
   getSurgingStocks,
   getTelegramSummary,
+  getThemeRotation,
   getTopStocksWithTrend,
   getTrendingMessages,
 } from "@/lib/telegram-data";
@@ -22,21 +23,8 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-// 테마 로테이션 / 생태계 센티먼트는 아직 실집계·LLM 분석이 없어 데모 데이터다.
-// TODO(구축 시 실데이터로 교체).
-const THEMES_DEMO = [
-  { name: "반도체", share: 34, delta: 32, up: true, mentions: 412, rank: 1, prevRank: 1, lead: "삼성전자·SK하이닉스", series: [21, 24, 29, 33, 35, 34, 34] },
-  { name: "방산", share: 17, delta: 24, up: true, mentions: 208, rank: 2, prevRank: 4, lead: "한화에어로·LIG넥스원", series: [8, 9, 11, 13, 15, 16, 17] },
-  { name: "2차전지", share: 13, delta: 13, up: true, mentions: 156, rank: 3, prevRank: 3, lead: "LG엔솔·에코프로비엠", series: [10, 11, 10, 12, 12, 13, 13] },
-  { name: "조선", share: 8, delta: 5, up: false, mentions: 94, rank: 4, prevRank: 2, lead: "한화오션·HD현대중공업", series: [15, 14, 12, 11, 9, 9, 8] },
-  { name: "원전", share: 5, delta: 11, up: false, mentions: 61, rank: 5, prevRank: 5, lead: "두산에너빌리티·한전기술", series: [9, 8, 8, 7, 6, 5, 5] },
-  { name: "바이오", share: 4, delta: 9, up: true, mentions: 52, rank: 6, prevRank: 8, lead: "삼성바이오·셀트리온", series: [2, 2, 3, 3, 4, 4, 4] },
-  { name: "지주·밸류업", share: 3, delta: 6, up: true, mentions: 41, rank: 7, prevRank: 9, lead: "SK·삼성물산", series: [1, 2, 2, 2, 3, 3, 3] },
-  { name: "엔터·미디어", share: 2, delta: 14, up: false, mentions: 28, rank: 8, prevRank: 6, lead: "하이브·JYP", series: [5, 4, 4, 3, 3, 2, 2] },
-  { name: "금융·은행", share: 2, delta: 4, up: true, mentions: 24, rank: 9, prevRank: 10, lead: "KB금융·신한지주", series: [1, 1, 2, 2, 2, 2, 2] },
-  { name: "게임", share: 1, delta: 8, up: false, mentions: 17, rank: 10, prevRank: 7, lead: "크래프톤·엔씨소프트", series: [4, 3, 3, 2, 2, 1, 1] },
-];
-
+// 생태계 센티먼트·이슈 키워드·종목 흐름 요약은 아직 LLM 분석이 없어 데모 데이터다.
+// TODO(LLM 파이프라인 구축 시 실데이터로 교체).
 // 이슈 키워드 — 종목명이 아닌 화제어. LLM 추출 예정(현재 데모).
 const KEYWORDS_DEMO = [
   { word: "HBM", count: 128, up: true },
@@ -213,12 +201,13 @@ const span = (n: number): React.CSSProperties => ({ gridColumn: `span ${n}` });
 
 export default async function TelegramPage() {
   const topStocks = await getTopStocksWithTrend(3);
-  const [summary, surging, trending, channels, rising, reports] = await Promise.all([
+  const [summary, surging, trending, channels, rising, themes, reports] = await Promise.all([
     getTelegramSummary(),
     getSurgingStocks(5),
     getTrendingMessages(7, 6),
     getChannelRanking(),
     getRisingChannels(10),
+    getThemeRotation(10),
     Promise.all(topStocks.map((s) => getStockReport(s.code))),
   ]);
   const stockReports = reports.filter((r): r is NonNullable<typeof r> => r !== null);
@@ -548,38 +537,42 @@ export default async function TelegramPage() {
             note="최근 7일 · 점유율/순위"
             desc="관심이 어느 테마로 옮겨가는지"
           />
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {THEMES_DEMO.map((t) => {
-              const move = t.prevRank - t.rank; // +면 순위 상승
-              return (
-                <div key={t.name} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {themes.length === 0 ? (
+            <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 집계된 테마가 없어요.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {themes.map((t) => (
+                <div key={t.theme} style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <span style={{ ...rankNum, color: C.sub }}>{t.rank}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 7, flexWrap: "wrap" }}>
-                      <span style={{ fontWeight: 800, fontSize: 14, color: C.ink }}>{t.name}</span>
-                      {move !== 0 && (
-                        <span style={{ fontSize: 10, fontWeight: 800, color: move > 0 ? C.hot : C.cold }}>
-                          {move > 0 ? "▲" : "▼"}
-                          {Math.abs(move)}계단
+                      <span style={{ fontWeight: 800, fontSize: 14, color: C.ink }}>{t.theme}</span>
+                      {t.rankChange !== null && t.rankChange !== 0 && (
+                        <span style={{ fontSize: 10, fontWeight: 800, color: t.rankChange > 0 ? C.hot : C.cold }}>
+                          {t.rankChange > 0 ? "▲" : "▼"}
+                          {Math.abs(t.rankChange)}계단
                         </span>
                       )}
-                      <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 12, fontWeight: 700, color: t.up ? C.hot : C.cold }}>
-                        {t.up ? "▲" : "▼"}
-                        {t.delta}%
-                      </span>
+                      {t.shareDelta !== null && Math.abs(t.shareDelta) >= 0.1 && (
+                        <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 12, fontWeight: 700, color: t.shareDelta >= 0 ? C.hot : C.cold }}>
+                          {t.shareDelta >= 0 ? "▲" : "▼"}
+                          {Math.abs(t.shareDelta).toFixed(1)}%p
+                        </span>
+                      )}
                     </div>
                     <div style={{ margin: "6px 0 5px", height: 8, background: C.track, borderRadius: 999, overflow: "hidden" }}>
-                      <div style={{ width: `${t.share * 2.6}%`, height: "100%", background: C.blue, borderRadius: 999 }} />
+                      <div style={{ width: `${Math.min(100, t.sharePct * 2.6)}%`, height: "100%", background: C.blue, borderRadius: 999 }} />
                     </div>
                     <div style={{ fontSize: 11, color: C.sub, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      점유율 <b style={{ color: C.ink, fontFamily: MONO }}>{t.share}%</b> · {t.lead} · <span style={{ fontFamily: MONO }}>{t.mentions}회</span>
+                      점유율 <b style={{ color: C.ink, fontFamily: MONO }}>{t.sharePct.toFixed(1)}%</b> · 종목 {t.stockCount}개 ·{" "}
+                      <span style={{ fontFamily: MONO }}>{t.mentions}회</span>
                     </div>
                   </div>
                   <Sparkline data={t.series} height={26} width={4} />
                 </div>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ⑤ 주요 종목 리포트 (½) — 3종목 상세 */}
@@ -673,19 +666,33 @@ export default async function TelegramPage() {
           <SectionHead icon="rocket_launch" title="뜨는 채널" note="7일" desc="최근 구독자가 많이 늘어난 채널" />
           {/* 간격을 이슈 키워드 카드의 행 높이(pitch 53px)에 맞춰 두 카드의 순위가 나란히 보이게 한다 */}
           <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 18 }}>
-            {rising.map((r, i) => (
-              <li key={r.title} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ ...rankNum, color: C.sub }}>{i + 1}</span>
-                <Avatar photo={r.photo} title={r.title} size={26} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.title}</div>
-                  <div style={{ fontSize: 10, fontFamily: MONO, color: C.sub }}>구독자 수 {compact(r.subscriberCount)}</div>
-                </div>
-                <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.hot, whiteSpace: "nowrap" }}>
-                  ▲{r.delta7d.toLocaleString("ko-KR")}명
-                </span>
-              </li>
-            ))}
+            {rising.map((r, i) => {
+              const body = (
+                <>
+                  <span style={{ ...rankNum, color: C.sub }}>{i + 1}</span>
+                  <Avatar photo={r.photo} title={r.title} size={26} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.title}</div>
+                    <div style={{ fontSize: 10, fontFamily: MONO, color: C.sub }}>구독자 수 {compact(r.subscriberCount)}</div>
+                  </div>
+                  <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.hot, whiteSpace: "nowrap" }}>
+                    ▲{r.delta7d.toLocaleString("ko-KR")}명
+                  </span>
+                </>
+              );
+              // 실제 채널일 때만 링크로 감싼다 — 데모 채널은 연결할 대상이 없다.
+              return (
+                <li key={r.title}>
+                  {r.handle ? (
+                    <a href={`https://t.me/${r.handle}`} target="_blank" rel="noopener noreferrer" className="hz-row-link">
+                      {body}
+                    </a>
+                  ) : (
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>{body}</div>
+                  )}
+                </li>
+              );
+            })}
           </ol>
         </div>
 
