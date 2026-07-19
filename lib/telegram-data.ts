@@ -495,6 +495,90 @@ export async function getStockReport(code: string): Promise<StockReport | null> 
   };
 }
 
+export type ThemeRotation = {
+  theme: string;
+  rank: number;
+  rankChange: number | null; // 주간 순위 변동(+면 상승). 비교할 과거가 없으면 null
+  sharePct: number;
+  shareDelta: number | null; // 점유율 증감(%p)
+  mentions: number;
+  stockCount: number;
+  series: number[]; // 일별 점유율 추이(오래된→최신)
+};
+
+/**
+ * 테마 로테이션 — 테마별 언급 점유율·순위와 그 변화.
+ * 절대 언급량은 주말에 급감해 비교가 안 되므로 '그날 전체 대비 점유율'로 본다.
+ * 순위 변동·점유율 증감은 5일 이상 이전 데이터가 있을 때만 계산한다(축적 초기 왜곡 방지).
+ */
+export async function getThemeRotation(limit = 10): Promise<ThemeRotation[]> {
+  const db = getSupabaseAdmin();
+  const { data } = await db
+    .from("telegram_theme_daily")
+    .select("date,theme,share_pct,mention_count,stock_count")
+    .gte("date", daysAgoISO(14).slice(0, 10));
+  if (!data?.length) return [];
+
+  const dates = [...new Set(data.map((r) => r.date))].sort();
+  const latestDate = dates[dates.length - 1];
+  const DAY = 24 * 60 * 60 * 1000;
+  const daysBefore = (d: string) => (new Date(latestDate).getTime() - new Date(d).getTime()) / DAY;
+
+  // 하루치끼리 비교하면 주말·수집 첫날처럼 표본이 얇은 날에 점유율이 요동친다.
+  // 그래서 '최근 3일 평균' vs '5일 이상 이전 평균'으로 창을 잡아 비교한다.
+  const recentDates = dates.slice(-3);
+  const priorDates = dates.filter((d) => daysBefore(d) >= 5);
+
+  const avgShare = (window: string[]) => {
+    const sum = new Map<string, number>();
+    for (const r of data) {
+      if (!window.includes(r.date)) continue;
+      sum.set(r.theme, (sum.get(r.theme) ?? 0) + Number(r.share_pct));
+    }
+    // 그날 등장하지 않은 테마는 0으로 치므로 창 전체 일수로 나눈다.
+    return new Map([...sum].map(([t, v]) => [t, v / Math.max(window.length, 1)]));
+  };
+  const rankMap = (shares: Map<string, number>) =>
+    new Map([...shares].sort((a, b) => b[1] - a[1]).map(([t], i) => [t, i + 1]));
+
+  const recentShare = avgShare(recentDates);
+  const priorShare = priorDates.length ? avgShare(priorDates) : null;
+  const currRank = rankMap(recentShare);
+  const prevRank = priorShare ? rankMap(priorShare) : null;
+
+  // 최근 창의 합계(언급수·종목수)는 표시용으로 최신일 값이 아니라 창 전체를 쓴다.
+  const agg = new Map<string, { mentions: number; stocks: number }>();
+  for (const r of data) {
+    if (!recentDates.includes(r.date)) continue;
+    const a = agg.get(r.theme) ?? { mentions: 0, stocks: 0 };
+    a.mentions += r.mention_count ?? 0;
+    a.stocks = Math.max(a.stocks, r.stock_count ?? 0);
+    agg.set(r.theme, a);
+  }
+
+  const seriesOf = (theme: string) =>
+    dates.map((d) => Number(data.find((r) => r.date === d && r.theme === theme)?.share_pct ?? 0));
+
+  return [...recentShare.entries()]
+    .map(([theme, share]) => {
+      const before = priorShare?.get(theme);
+      const pr = prevRank?.get(theme);
+      const cr = currRank.get(theme) ?? 0;
+      return {
+        theme,
+        rank: cr,
+        rankChange: pr != null ? pr - cr : null,
+        sharePct: share,
+        shareDelta: before != null ? share - before : null,
+        mentions: agg.get(theme)?.mentions ?? 0,
+        stockCount: agg.get(theme)?.stocks ?? 0,
+        series: seriesOf(theme),
+      };
+    })
+    .sort((a, b) => a.rank - b.rank)
+    .slice(0, limit);
+}
+
 export type ChannelRank = {
   handle: string;
   title: string;

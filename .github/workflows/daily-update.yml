@@ -216,6 +216,11 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/calculate_stock_daily.py
 
+      - name: (텔레그램) 테마 일별 집계
+        id: telegram_theme_daily
+        continue-on-error: true
+        run: python data-pipeline/scripts/calculate_theme_daily.py
+
       - name: Summarize results
         if: always()
         run: |
