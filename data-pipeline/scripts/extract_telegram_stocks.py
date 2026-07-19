@@ -1,10 +1,16 @@
 """텔레그램 메시지 본문에서 종목을 추출해 telegram_message_stocks 에 저장한다.
 
 하이브리드의 '결정적' 층: KRX 상장사명(stocks) + 별칭(config)로 사전을 만들고,
-본문을 긴 이름 우선으로 매칭한다. 오탐 위험 종목(일반 단어/영문 약자)은 경계
-규칙을 통과할 때만 인정한다:
-  - 매칭 앞 글자: 한글/영숫자가 아니어야 함(다른 단어의 꼬리 방지)
-  - 뒤 글자: (오탐 위험군 한정) 조사이거나 구두점/공백/문자열끝이어야 함
+본문을 긴 이름 우선으로 매칭한다. URL은 매칭 전에 마스킹한다(쿼리스트링의
+"&SK=" 같은 파라미터명이 종목으로 잡히던 걸 막는다).
+
+오탐 위험 종목(일반 단어/영문 약자)은 경계 규칙을 통과할 때만 인정한다:
+  - 매칭 앞 글자: 한글/영숫자/한자가 아니어야 함(다른 단어의 꼬리 방지)
+  - 붙어 있는 뒤 글자: 조사이거나 구두점/공백/문자열끝이어야 함
+  - 띄어쓴 뒤 단어까지 봤을 때 '더 긴 고유명사의 앞부분'이면 SK 단독으로 안 센다:
+      "SK 하이닉스"  → 붙이면 사전에 있는 더 긴 종목명 → 그 종목(SK하이닉스)으로 인정
+      "SK hynix"    → 뒤가 로마자(영문 병기·해외 자회사명: SK On, LS Electric) → 거부
+      "SK 그룹"      → 그룹 전체 지칭(config.GROUP_SUFFIXES) → 거부
 우선주(…우) 등 파생 종목은 사전에서 제외해 잡음을 줄인다.
 
 LLM 보강은 여기 붙일 자리만 두고(사전이 0개 잡은 메시지 대상), 실측 후 정한다.
@@ -29,12 +35,19 @@ from config.stock_extraction import (  # noqa: E402
     ALIASES,
     AMBIGUOUS_NAMES,
     EXCLUDE_NAMES,
+    GROUP_SUFFIXES,
     JOSA,
 )
 
 # 우선주/파생 종목 제외 패턴(…우, …우B, …N우, …우(전환) 등).
 PREFERRED_RE = re.compile(r"(우[A-Z]?|\d우|우\(전환\))$")
 HANGUL_OR_ALNUM = re.compile(r"[가-힣0-9A-Za-z]")
+HAN = re.compile(r"[一-鿿]")  # SK海力士(=SK하이닉스) 같은 중국어 기사 제목용
+LATIN = re.compile(r"[A-Za-z]")
+LATIN_ACRONYM = re.compile(r"^[A-Za-z][A-Za-z0-9&]*$")  # SK, LG, E1 … (한글 종목명 제외)
+URL_RE = re.compile(r"(?:https?://|www\.)\S+")
+# 마스킹 채움 문자 — 한글/영숫자/한자 어디에도 안 걸려 경계 판정이 공백과 같아진다.
+MASK_CHAR = "\x00"
 
 
 def load_dictionary(db) -> tuple[dict[str, str], dict[str, str], set[str]]:
@@ -69,28 +82,67 @@ def build_pattern(keys: list[str]) -> re.Pattern:
 
 
 def boundary_ok(text: str, start: int, end: int, is_ambiguous: bool) -> bool:
-    # 앞 경계: 한글/영숫자면 다른 단어의 일부 → 거부.
-    if start > 0 and HANGUL_OR_ALNUM.match(text[start - 1]):
+    """매칭에 '붙어 있는' 앞뒤 글자만 보는 경계 검사."""
+    # 앞 경계: 한글/영숫자/한자면 다른 단어의 일부 → 거부.
+    if start > 0 and (HANGUL_OR_ALNUM.match(text[start - 1]) or HAN.match(text[start - 1])):
         return False
     if not is_ambiguous:
         return True
-    # 오탐 위험군은 뒤 경계도 검사: 영숫자 거부, 한글은 조사만 허용.
+    # 오탐 위험군은 뒤 경계도 검사: 영숫자/한자 거부, 한글은 조사만 허용.
     if end < len(text):
         nxt = text[end]
-        if re.match(r"[0-9A-Za-z]", nxt):
+        if re.match(r"[0-9A-Za-z]", nxt) or HAN.match(nxt):
             return False
         if re.match(r"[가-힣]", nxt) and nxt not in JOSA:
+            return False
+        # 스킴 없는 URL("a.co/x?db=1&SK=") 대비 — 쿼리스트링 파라미터명 꼴은 거부.
+        if nxt in "=&" or (start > 0 and text[start - 1] in "&?"):
             return False
     return True
 
 
+def compound_key(text: str, end: int, key: str, match_to_code: dict[str, str]) -> str | None:
+    """오탐 위험군이 '한 칸 띄운 더 긴 고유명사'의 앞부분인지 본다.
+
+    반환: key(그대로 인정) / 더 긴 종목명(그 종목으로 인정) / None(거부).
+    줄바꿈은 건너뛰지 않는다 — 다음 줄 첫 단어는 한 고유명사가 아니라서.
+    """
+    m = re.match(r"[ \t]+(\S+)", text[end:])
+    if not m:
+        return key
+    nxt_word = m.group(1)
+
+    # "SK 그룹" — 개별 종목이 아니라 그룹 전체 지칭.
+    if nxt_word.startswith(GROUP_SUFFIXES):
+        return None
+    # "SK hynix" / "LS Electric" — 영문 병기·해외 자회사명. 한글 종목명엔 적용 안 함.
+    if LATIN_ACRONYM.match(key) and LATIN.match(nxt_word):
+        return None
+    # "SK 하이닉스" — 붙이면 더 긴 종목명이면 그 종목 언급으로 본다. 뒤 단어에
+    # 조사·구두점이 붙어 있을 수 있으니 뒤에서부터 잘라가며 확인한다.
+    joined = key + nxt_word
+    for i in range(len(joined), len(key), -1):
+        cand = joined[:i]
+        if cand in match_to_code and boundary_ok(joined, 0, i, cand in AMBIGUOUS_NAMES):
+            return cand
+    return key
+
+
 def extract(text: str, pattern, match_to_code, method, ambiguous) -> dict[str, tuple[str, str]]:
     """text에서 {code: (match_text, method)} (메시지 내 중복 제거)."""
+    # URL 안의 문자열은 본문 언급이 아니다. 길이를 유지해 경계 판정을 흐트러뜨리지 않는다.
+    text = URL_RE.sub(lambda m: MASK_CHAR * len(m.group(0)), text)
+
     found: dict[str, tuple[str, str]] = {}
     for m in pattern.finditer(text):
         key = m.group(0)
-        if not boundary_ok(text, m.start(), m.end(), key in ambiguous):
+        is_ambiguous = key in ambiguous
+        if not boundary_ok(text, m.start(), m.end(), is_ambiguous):
             continue
+        if is_ambiguous:
+            key = compound_key(text, m.end(), key, match_to_code)
+            if key is None:
+                continue
         code = match_to_code[key]
         if code not in found:
             found[code] = (key, method[key])
