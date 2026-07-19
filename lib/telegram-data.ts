@@ -19,6 +19,27 @@ function todayKstDate(): string {
   return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
+/**
+ * PostgREST는 한 번에 최대 1,000행만 준다 — 그 이상은 **에러 없이 잘린다**.
+ * 일별 집계 테이블은 날짜가 쌓일수록 커져서(화제어는 하루 200행꼴) 이 상한을 넘기면
+ * 최신 날짜가 통째로 빠지고, 그러면 "최근 3일 vs 이전" 같은 비교가 조용히 어긋난다.
+ * 실제로 화제어 증감(▲▼)이 전부 사라지는 버그가 이 때문에 났다.
+ * 행 수가 상한을 넘길 수 있는 조회는 전부 이 헬퍼로 페이지를 이어 받는다.
+ */
+async function fetchAllRows<T>(
+  build: (from: number, to: number) => PromiseLike<{ data: T[] | null }>,
+): Promise<T[]> {
+  const PAGE = 1000;
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data } = await build(from, from + PAGE - 1);
+    if (!data?.length) break;
+    out.push(...data);
+    if (data.length < PAGE) break;
+  }
+  return out;
+}
+
 export type TelegramSummary = {
   channelCount: number;
   totalSubscribers: number;
@@ -80,13 +101,17 @@ type DailyRow = { stock_code: string; date: string; weighted_score: number; ment
 
 async function loadStockDaily(days: number): Promise<{ rows: DailyRow[]; dates: string[] }> {
   const db = getSupabaseAdmin();
-  const { data } = await db
-    .from("telegram_stock_daily")
-    .select("stock_code,date,weighted_score,mention_count,channel_count")
-    .gte("date", daysAgoISO(days).slice(0, 10));
+  const data = await fetchAllRows<DailyRow>((from, to) =>
+    db
+      .from("telegram_stock_daily")
+      .select("stock_code,date,weighted_score,mention_count,channel_count")
+      .gte("date", daysAgoISO(days).slice(0, 10))
+      .order("date")
+      .range(from, to),
+  );
   // 오늘은 아직 하루가 덜 차서 일평균·추이를 왜곡한다 — 완료된 날만 쓴다.
   const today = todayKstDate();
-  const rows = ((data ?? []) as DailyRow[]).filter((r) => r.date < today);
+  const rows = data.filter((r) => r.date < today);
   const dates = [...new Set(rows.map((r) => r.date))].sort();
   return { rows, dates };
 }
@@ -704,4 +729,222 @@ export async function getRisingChannels(limit = 10): Promise<RisingChannel[]> {
     { handle: null, title: "배당주 모임", photo: null, subscriberCount: 12700, delta7d: 640, isPlaceholder: false },
     { handle: null, title: "IPO 공모주 캘린더", photo: null, subscriberCount: 24100, delta7d: 520, isPlaceholder: false },
   ].slice(0, limit);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LLM 분석 계층 — analyze_telegram_messages.py 가 메시지별로 분류하고,
+// calculate_telegram_sentiment.py 가 날짜·테마·화제어로 집계한 결과를 읽는다.
+// 화면에 뜨는 비율·횟수는 전부 그 집계값이다(LLM이 센 게 아니다).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 화제어가 카드에 오르기 위한 최소 언급 수(최근 7일). 한두 번 스친 말이 상위에
+ *  끼면 "지금 무엇이 화제인가"라는 카드의 목적이 흐려진다. 집계 테이블에는 전부
+ *  남아 있어서, 이 기준만 바꾸면 재계산 없이 반영된다. */
+const MIN_KEYWORD_MENTIONS = 3;
+
+export type EcosystemSentiment = {
+  /** 낙관도 = 낙관 / (낙관 + 비관), 중립 제외. 카드 헤드라인 숫자.
+   *  전체 대비 '긍정 비율'을 쓰면 안 된다 — 실측상 중립이 절반쯤이라 긍정 비율은
+   *  구조적으로 낮게 나오고, 긍정(30%)이 비관(22%)보다 많은데도 '비관 우세'로
+   *  읽히는 일이 생긴다. 바로 옆 테마별 막대도 같은 기준(중립 제외)이라 카드 안에서
+   *  기준이 하나로 통일된다. */
+  score: number;
+  label: string;
+  positive: number;
+  neutral: number;
+  negative: number; // 셋의 합은 항상 100(반올림 보정). 아래 3분할 막대가 이걸 그린다
+  messageCount: number;
+  summary: string | null; // LLM 총평. 아직 생성 전이면 null
+  /** 표본(positive/negative/total)을 같이 넘긴다 — 얇은 테마는 100:0 같은 극단값이
+   *  나오는데, 몇 건 기준인지 보여줘야 그 숫자를 제대로 읽을 수 있다. */
+  byTheme: { name: string; pos: number; positive: number; negative: number; total: number }[];
+};
+
+/** 낙관도 → 라벨. LLM에 맡기지 않고 결정적으로 정한다(같은 수치면 항상 같은 말). */
+function sentimentLabel(optimismPct: number): string {
+  if (optimismPct >= 60) return "낙관 우세";
+  if (optimismPct >= 45) return "중립";
+  return "비관 우세";
+}
+
+/** 합이 100이 되도록 반올림을 보정한다(단순 반올림은 99·101이 나와 막대가 어긋난다). */
+function toPercents(pos: number, neu: number, neg: number): [number, number, number] {
+  const total = pos + neu + neg;
+  if (!total) return [0, 0, 0];
+  const raw = [(pos / total) * 100, (neu / total) * 100, (neg / total) * 100];
+  const floors = raw.map(Math.floor);
+  let remainder = 100 - floors.reduce((s, v) => s + v, 0);
+  // 소수부가 큰 순서로 남은 1%p씩 나눠 준다.
+  const order = raw
+    .map((v, i) => ({ i, frac: v - Math.floor(v) }))
+    .sort((a, b) => b.frac - a.frac);
+  const out = [...floors];
+  for (const { i } of order) {
+    if (remainder <= 0) break;
+    out[i] += 1;
+    remainder -= 1;
+  }
+  return [out[0], out[1], out[2]];
+}
+
+/**
+ * 생태계 센티먼트 — 최근 7일 메시지 톤 구성 + 테마별 낙관 비중 + LLM 총평.
+ * 테마는 파이프라인이 config/stock_themes.py(테마 로테이션과 같은 사전)로 묶어 둔 것이다.
+ */
+export async function getEcosystemSentiment(): Promise<EcosystemSentiment | null> {
+  const db = getSupabaseAdmin();
+  const since = daysAgoISO(7).slice(0, 10);
+  const { data } = await db
+    .from("telegram_sentiment_daily")
+    .select("date,scope,positive_count,neutral_count,negative_count,message_count")
+    .gte("date", since);
+  if (!data?.length) return null;
+
+  const agg = new Map<string, { pos: number; neu: number; neg: number; total: number }>();
+  for (const r of data) {
+    const a = agg.get(r.scope) ?? { pos: 0, neu: 0, neg: 0, total: 0 };
+    a.pos += r.positive_count ?? 0;
+    a.neu += r.neutral_count ?? 0;
+    a.neg += r.negative_count ?? 0;
+    a.total += r.message_count ?? 0;
+    agg.set(r.scope, a);
+  }
+
+  const overall = agg.get("overall");
+  if (!overall?.total) return null;
+  const [positive, neutral, negative] = toPercents(overall.pos, overall.neu, overall.neg);
+
+  // 테마 막대는 낙관↔비관 양분 구조라 중립을 뺀 대립 비율로 그린다.
+  // 낙관/비관이 합쳐 8건은 돼야 비율에 의미가 있다(그 아래는 한두 건에 100:0이 되어
+  // 실제보다 단정적으로 보인다). 남은 극단값은 표본을 툴팁으로 같이 보여 해석을 돕는다.
+  const byTheme = [...agg.entries()]
+    .filter(([scope, a]) => scope !== "overall" && a.pos + a.neg >= 8)
+    .map(([scope, a]) => ({
+      name: scope,
+      pos: Math.round((a.pos / (a.pos + a.neg)) * 100),
+      positive: a.pos,
+      negative: a.neg,
+      total: a.total,
+    }))
+    .sort((x, y) => y.total - x.total)
+    .slice(0, 4);
+
+  const { data: brief } = await db
+    .from("telegram_daily_brief")
+    .select("sentiment_summary")
+    .order("date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  // 헤드라인은 중립을 뺀 낙관도 — 테마별 막대와 같은 기준으로 맞춘다(위 타입 주석 참고).
+  const decided = overall.pos + overall.neg;
+  const optimism = decided ? Math.round((overall.pos / decided) * 100) : 50;
+
+  return {
+    score: optimism,
+    label: sentimentLabel(optimism),
+    positive,
+    neutral,
+    negative,
+    messageCount: overall.total,
+    summary: (brief?.sentiment_summary as string | null) ?? null,
+    byTheme,
+  };
+}
+
+export type IssueKeyword = {
+  word: string;
+  count: number; // 최근 7일 언급 수(화면에 그대로 표시)
+  up: boolean | null; // 관심 점유율 증감. 비교할 과거가 없으면 null
+};
+
+/**
+ * 이슈 키워드 — 종목명이 아닌 화제어 순위.
+ *
+ * 증감(▲▼)은 **절대 언급 수가 아니라 그날 전체 화제어 중 점유율**로 본다.
+ * 주말이면 전체 메시지가 평일의 1/10로 떨어져서, 절대량으로 비교하면 모든 화제어가
+ * 일제히 ▼로 표시된다(실제로 그렇게 났다). 점유율로 보면 "관심이 이 화제어로
+ * 옮겨갔는가"라는 원래 묻고 싶은 것이 남는다 — 테마 로테이션·급부상 종목이 같은 이유로
+ * share 기반이다.
+ *
+ * 창은 테마 로테이션과 동일하게 최근 3일 평균 vs 5일 이상 이전 평균 — 하루치끼리
+ * 비교하면 표본이 얇은 날에 요동친다.
+ */
+export async function getIssueKeywords(limit = 10): Promise<IssueKeyword[]> {
+  const db = getSupabaseAdmin();
+  // 화제어는 하루 200행꼴이라 2주면 1,000행 상한을 훌쩍 넘는다 — 반드시 페이징.
+  const data = await fetchAllRows<{ date: string; keyword: string; mention_count: number }>(
+    (from, to) =>
+      db
+        .from("telegram_keyword_daily")
+        .select("date,keyword,mention_count")
+        .gte("date", daysAgoISO(14).slice(0, 10))
+        .order("date")
+        .range(from, to),
+  );
+  if (!data.length) return [];
+
+  const dates = [...new Set(data.map((r) => r.date))].sort();
+  const latestDate = dates[dates.length - 1];
+  const DAY = 24 * 60 * 60 * 1000;
+  const daysBefore = (d: string) => (new Date(latestDate).getTime() - new Date(d).getTime()) / DAY;
+
+  const recentDates = new Set(dates.slice(-3));
+  const priorDates = new Set(dates.filter((d) => daysBefore(d) >= 5));
+  const last7 = new Set(dates.filter((d) => daysBefore(d) < 7));
+
+  // 그날 전체 화제어 언급 합 — 점유율의 분모.
+  const dayTotal = new Map<string, number>();
+  for (const r of data) {
+    dayTotal.set(r.date, (dayTotal.get(r.date) ?? 0) + (r.mention_count ?? 0));
+  }
+
+  const total = new Map<string, number>();
+  const recentShare = new Map<string, number>();
+  const priorShare = new Map<string, number>();
+  for (const r of data) {
+    const n = r.mention_count ?? 0;
+    if (last7.has(r.date)) total.set(r.keyword, (total.get(r.keyword) ?? 0) + n);
+    const share = n / Math.max(dayTotal.get(r.date) ?? 1, 1);
+    if (recentDates.has(r.date)) {
+      recentShare.set(r.keyword, (recentShare.get(r.keyword) ?? 0) + share);
+    }
+    if (priorDates.has(r.date)) {
+      priorShare.set(r.keyword, (priorShare.get(r.keyword) ?? 0) + share);
+    }
+  }
+
+  const canCompare = priorDates.size > 0;
+  return [...total.entries()]
+    .filter(([, count]) => count >= MIN_KEYWORD_MENTIONS)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([word, count]) => {
+      // 창 길이가 다르므로 '하루 평균 점유율'로 맞춰 비교한다.
+      // 그날 등장하지 않은 화제어는 점유율 0으로 치므로 창 전체 일수로 나눈다.
+      const recentAvg = (recentShare.get(word) ?? 0) / Math.max(recentDates.size, 1);
+      const priorAvg = (priorShare.get(word) ?? 0) / Math.max(priorDates.size, 1);
+      return { word, count, up: canCompare ? recentAvg >= priorAvg : null };
+    });
+}
+
+/**
+ * 종목별 흐름 요약(LLM) — 가장 최근에 생성된 날짜분을 종목코드로 찾아 쓴다.
+ * 파이프라인이 상위 몇 종목만 만들므로, 없는 종목은 카드에서 문단이 빠진다.
+ */
+export async function getStockNarratives(): Promise<Record<string, string>> {
+  const db = getSupabaseAdmin();
+  const { data: latest } = await db
+    .from("telegram_stock_narrative")
+    .select("date")
+    .order("date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!latest?.date) return {};
+
+  const { data } = await db
+    .from("telegram_stock_narrative")
+    .select("stock_code,narrative")
+    .eq("date", latest.date);
+  return Object.fromEntries((data ?? []).map((r) => [r.stock_code as string, r.narrative as string]));
 }

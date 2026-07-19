@@ -221,6 +221,24 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/calculate_theme_daily.py
 
+      # LLM 계층 — 메시지별 분류(돈이 드는 단계, 증분) → 결정적 집계 → 문장 생성.
+      # 분류가 실패해도 집계는 직전까지 저장된 분류분으로 돌고, 집계가 실패하면
+      # 문장 생성이 조용히 건너뛴다. 위 스텝들과 마찬가지로 실패 알림과는 분리한다.
+      - name: (텔레그램) 메시지 LLM 분류
+        id: telegram_analyze
+        continue-on-error: true
+        run: python data-pipeline/scripts/analyze_telegram_messages.py
+
+      - name: (텔레그램) 센티먼트·화제어 집계
+        id: telegram_sentiment
+        continue-on-error: true
+        run: python data-pipeline/scripts/calculate_telegram_sentiment.py
+
+      - name: (텔레그램) 총평·종목 요약 생성
+        id: telegram_narratives
+        continue-on-error: true
+        run: python data-pipeline/scripts/generate_telegram_narratives.py
+
       - name: Summarize results
         if: always()
         run: |

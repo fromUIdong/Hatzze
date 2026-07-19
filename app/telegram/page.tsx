@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 
 import {
   getChannelRanking,
+  getEcosystemSentiment,
+  getIssueKeywords,
   getRisingChannels,
+  getStockNarratives,
   getStockReport,
   getSurgingStocks,
   getTelegramSummary,
@@ -22,53 +25,6 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = "force-dynamic";
-
-// 생태계 센티먼트·이슈 키워드·종목 흐름 요약은 아직 LLM 분석이 없어 데모 데이터다.
-// TODO(LLM 파이프라인 구축 시 실데이터로 교체).
-// 이슈 키워드 — 종목명이 아닌 화제어. LLM 추출 예정(현재 데모).
-const KEYWORDS_DEMO = [
-  { word: "HBM", count: 128, up: true },
-  { word: "관세", count: 96, up: true },
-  { word: "실적발표", count: 84, up: false },
-  { word: "금리인하", count: 72, up: true },
-  { word: "수주", count: 61, up: true },
-  { word: "공매도", count: 45, up: false },
-  { word: "환율", count: 38, up: true },
-  { word: "밸류업", count: 31, up: false },
-  { word: "外人수급", count: 27, up: true },
-  { word: "공모주", count: 22, up: false },
-];
-
-// 종목별 흐름 요약 — LLM(Claude Haiku)으로 최근 7일 언급을 요약할 자리.
-// 카드 높이가 종목마다 들쭉날쭉하지 않도록 길이를 75~80자로 맞춘다
-// (반칸 카드 폭에서 3줄로 떨어지는 구간. 83자를 넘기면 4줄이 돼 높이가 어긋난다).
-// 실제 LLM을 붙일 때도 프롬프트에 같은 글자수 제약을 넣을 것.
-// TODO(파이프라인 스텝 구축 시 DB에서 조회로 교체). 현재는 데모 문구.
-const STOCK_NARRATIVE_DEMO: Record<string, string> = {
-  "000660":
-    "HBM 수급과 실적 기대가 주중 내내 반복적으로 언급되며 최상위 화제를 지켰지만, 주말로 갈수록 언급이 눈에 띄게 식는 흐름이 나타났어요.",
-  "005930":
-    "미국 ADR 상장 검토 소식이 여러 채널로 확산되며 언급이 크게 튀었고, 파운드리 회복 기대가 뒤따라 붙으면서 관심이 주 후반까지 이어졌어요.",
-  "034730":
-    "지주사 밸류업과 자회사 지분 이슈가 반복해서 등장했지만, 언급량 자체는 대형주 대비 크지 않아 화제의 중심에서는 한 발 비켜서 있었어요.",
-};
-
-const SENTIMENT_DEMO = {
-  score: 62,
-  label: "낙관 우세",
-  // 시장 브리핑 히어로처럼 LLM이 쓰는 오늘의 총평(현재 데모).
-  summary:
-    "반도체·방산에 대한 기대가 이번 주 내내 대화를 주도하면서 전반적인 톤은 낙관 쪽에 기울어 있어요. 다만 조선·원전은 언급이 줄고 비관 비중이 늘어, 관심이 특정 테마로 쏠리는 모습이에요.",
-  positive: 62,
-  neutral: 23,
-  negative: 15,
-  byTheme: [
-    { name: "반도체", pos: 74 },
-    { name: "방산", pos: 66 },
-    { name: "조선", pos: 45 },
-    { name: "원전", pos: 31 },
-  ],
-};
 
 function compact(n: number): string {
   if (n >= 10000) return `${Math.round(n / 1000)}K`;
@@ -201,15 +157,19 @@ const span = (n: number): React.CSSProperties => ({ gridColumn: `span ${n}` });
 
 export default async function TelegramPage() {
   const topStocks = await getTopStocksWithTrend(3);
-  const [summary, surging, trending, channels, rising, themes, reports] = await Promise.all([
-    getTelegramSummary(),
-    getSurgingStocks(5),
-    getTrendingMessages(7, 6),
-    getChannelRanking(),
-    getRisingChannels(10),
-    getThemeRotation(10),
-    Promise.all(topStocks.map((s) => getStockReport(s.code))),
-  ]);
+  const [summary, surging, trending, channels, rising, themes, reports, sentiment, keywords, narratives] =
+    await Promise.all([
+      getTelegramSummary(),
+      getSurgingStocks(5),
+      getTrendingMessages(7, 6),
+      getChannelRanking(),
+      getRisingChannels(10),
+      getThemeRotation(10),
+      Promise.all(topStocks.map((s) => getStockReport(s.code))),
+      getEcosystemSentiment(),
+      getIssueKeywords(10),
+      getStockNarratives(),
+    ]);
   const stockReports = reports.filter((r): r is NonNullable<typeof r> => r !== null);
 
   const channelItems = channels.map((c, i) => (
@@ -294,73 +254,108 @@ export default async function TelegramPage() {
           </a>
         </div>
 
-        {/* 생태계 센티먼트 (3칸) — LLM 분석 (데모) */}
+        {/* 생태계 센티먼트 (3칸) — 메시지별 LLM 분류를 집계한 결과 */}
         <div style={{ ...cardStyle, ...span(3) }}>
           <SectionHead
             icon="psychology"
             title="텔레그램 생태계 센티먼트"
             note="최근 7일 · LLM 분석"
             desc="메시지 톤으로 본 시장 분위기"
+            noteHelp="수집한 메시지를 한 건씩 낙관/중립/비관으로 분류한 뒤 그 비율을 집계한 값이에요. 사실을 담담히 전하는 시황·공시 요약은 중립으로 봅니다. 큰 숫자는 중립을 뺀 낙관↔비관 비율(낙관도)이고, 아래 막대는 중립까지 포함한 실제 구성이에요. 테마별 막대도 같은 낙관도 기준이에요."
           />
           {summary.lastUpdated && (
             <p style={{ margin: "-8px 0 14px", fontSize: 11, color: C.sub, fontFamily: MONO }}>
               최종 업데이트 · {formatKstUpdate(summary.lastUpdated)}
             </p>
           )}
-          <p
-            style={{
-              margin: "0 0 18px",
-              fontSize: 13,
-              lineHeight: 1.7,
-              color: "var(--c-ink-soft)",
-              background: C.bg,
-              border: `1px solid ${C.line}`,
-              borderRadius: 12,
-              padding: "13px 15px",
-            }}
-          >
-            <Icon name="auto_awesome" style={{ fontSize: 15, color: C.blue, marginRight: 6, verticalAlign: "-3px" }} />
-            {SENTIMENT_DEMO.summary}
-          </p>
-          <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "center" }}>
-            {/* 메시지 톤 종합 — 점수와 그 근거 막대를 한 덩어리로 묶는다 */}
-            <div style={{ flex: "1 1 300px", minWidth: 280 }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-                <span style={{ fontSize: 40, fontWeight: 800, color: C.hot, lineHeight: 1 }}>{SENTIMENT_DEMO.score}%</span>
-                <span style={{ fontSize: 14, fontWeight: 800, color: C.ink }}>{SENTIMENT_DEMO.label}</span>
-              </div>
-              <div style={{ fontSize: 11, color: C.sub, margin: "6px 0 10px" }}>메시지 톤 종합</div>
-              <div style={{ display: "flex", height: 14, borderRadius: 999, overflow: "hidden" }}>
-                <div style={{ width: `${SENTIMENT_DEMO.positive}%`, background: C.hot }} />
-                <div style={{ width: `${SENTIMENT_DEMO.neutral}%`, background: C.track }} />
-                <div style={{ width: `${SENTIMENT_DEMO.negative}%`, background: C.cold }} />
-              </div>
-              <div style={{ display: "flex", gap: 14, marginTop: 9, fontSize: 11, color: C.sub, flexWrap: "wrap" }}>
-                <span><b style={{ color: C.hot }}>■</b> 긍정 {SENTIMENT_DEMO.positive}%</span>
-                <span><b style={{ color: C.sub }}>■</b> 중립 {SENTIMENT_DEMO.neutral}%</span>
-                <span><b style={{ color: C.cold }}>■</b> 비관 {SENTIMENT_DEMO.negative}%</span>
-              </div>
-            </div>
-
-            <div style={{ flex: "1 1 250px", minWidth: 235, display: "flex", flexDirection: "column", gap: 9 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: C.sub, display: "flex", justifyContent: "space-between" }}>
-                <span>인기 테마별 낙관 ↔ 비관</span>
-              </div>
-              {SENTIMENT_DEMO.byTheme.map((t) => (
-                <div key={t.name} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ width: 46, fontSize: 11, fontWeight: 700, color: C.ink, flexShrink: 0 }}>{t.name}</span>
-                  {/* 낙관(왼쪽)과 비관(오른쪽)을 한 바에 나눠 담아 비율이 바로 보이게 */}
-                  <div style={{ flex: 1, display: "flex", height: 8, borderRadius: 999, overflow: "hidden" }}>
-                    <div style={{ width: `${t.pos}%`, background: C.hot }} />
-                    <div style={{ width: `${100 - t.pos}%`, background: C.cold }} />
+          {!sentiment ? (
+            <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 분석된 메시지가 없어요.</p>
+          ) : (
+            <>
+              {sentiment.summary && (
+                <p
+                  style={{
+                    margin: "0 0 18px",
+                    fontSize: 13,
+                    lineHeight: 1.7,
+                    color: "var(--c-ink-soft)",
+                    background: C.bg,
+                    border: `1px solid ${C.line}`,
+                    borderRadius: 12,
+                    padding: "13px 15px",
+                  }}
+                >
+                  <Icon name="auto_awesome" style={{ fontSize: 15, color: C.blue, marginRight: 6, verticalAlign: "-3px" }} />
+                  {sentiment.summary}
+                </p>
+              )}
+              <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "center" }}>
+                {/* 메시지 톤 종합 — 점수와 그 근거 막대를 한 덩어리로 묶는다 */}
+                <div style={{ flex: "1 1 300px", minWidth: 280 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+                    <span style={{ fontSize: 40, fontWeight: 800, color: C.hot, lineHeight: 1 }}>{sentiment.score}%</span>
+                    <span style={{ fontSize: 14, fontWeight: 800, color: C.ink }}>{sentiment.label}</span>
                   </div>
-                  <span style={{ fontFamily: MONO, fontSize: 10, color: C.sub, width: 62, textAlign: "right", whiteSpace: "nowrap" }}>
-                    <b style={{ color: C.hot }}>{t.pos}</b>:<b style={{ color: C.cold }}>{100 - t.pos}</b>
-                  </span>
+                  {/* 헤드라인 숫자는 중립을 뺀 낙관↔비관 비율이라, 아래 3분할 막대와
+                      기준이 다르다는 걸 부제에서 분명히 해 둔다 */}
+                  <div style={{ fontSize: 11, color: C.sub, margin: "6px 0 10px" }}>
+                    낙관 ↔ 비관 (중립 제외) · <span style={{ fontFamily: MONO }}>{sentiment.messageCount.toLocaleString("ko-KR")}</span>건 분석
+                  </div>
+                  <div style={{ display: "flex", height: 14, borderRadius: 999, overflow: "hidden" }}>
+                    <div style={{ width: `${sentiment.positive}%`, background: C.hot }} />
+                    <div style={{ width: `${sentiment.neutral}%`, background: C.track }} />
+                    <div style={{ width: `${sentiment.negative}%`, background: C.cold }} />
+                  </div>
+                  <div style={{ display: "flex", gap: 14, marginTop: 9, fontSize: 11, color: C.sub, flexWrap: "wrap" }}>
+                    <span><b style={{ color: C.hot }}>■</b> 긍정 {sentiment.positive}%</span>
+                    <span><b style={{ color: C.sub }}>■</b> 중립 {sentiment.neutral}%</span>
+                    <span><b style={{ color: C.cold }}>■</b> 비관 {sentiment.negative}%</span>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
+
+                {sentiment.byTheme.length > 0 && (
+                  <div style={{ flex: "1 1 250px", minWidth: 235, display: "flex", flexDirection: "column", gap: 9 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: C.sub, display: "flex", justifyContent: "space-between" }}>
+                      <span>인기 테마별 낙관 ↔ 비관</span>
+                    </div>
+                    {sentiment.byTheme.map((t) => (
+                      <div
+                        key={t.name}
+                        className="hz-tip"
+                        data-tip={`${t.name} 언급 ${t.total}건 중 낙관 ${t.positive}건 · 비관 ${t.negative}건 (중립 제외 비율)`}
+                        style={{ display: "flex", alignItems: "center", gap: 8 }}
+                      >
+                        {/* 실제 테마명은 '지주·밸류업'·'인터넷·플랫폼'처럼 길어서
+                            데모용 폭(46px)으론 줄바꿈이 나 행 높이가 어긋난다 */}
+                        <span
+                          style={{
+                            width: 64,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: C.ink,
+                            flexShrink: 0,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {t.name}
+                        </span>
+                        {/* 낙관(왼쪽)과 비관(오른쪽)을 한 바에 나눠 담아 비율이 바로 보이게 */}
+                        <div style={{ flex: 1, display: "flex", height: 8, borderRadius: 999, overflow: "hidden" }}>
+                          <div style={{ width: `${t.pos}%`, background: C.hot }} />
+                          <div style={{ width: `${100 - t.pos}%`, background: C.cold }} />
+                        </div>
+                        <span style={{ fontFamily: MONO, fontSize: 10, color: C.sub, width: 62, textAlign: "right", whiteSpace: "nowrap" }}>
+                          <b style={{ color: C.hot }}>{t.pos}</b>:<b style={{ color: C.cold }}>{100 - t.pos}</b>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* ② 급부상 종목 (전체폭) */}
@@ -616,7 +611,7 @@ export default async function TelegramPage() {
                         </div>
                       ))}
                     </div>
-                    {STOCK_NARRATIVE_DEMO[r.code] && (
+                    {narratives[r.code] && (
                       <p
                         style={{
                           margin: "0 0 12px",
@@ -629,7 +624,7 @@ export default async function TelegramPage() {
                         }}
                       >
                         <Icon name="auto_awesome" style={{ fontSize: 13, color: C.blue, marginRight: 5, verticalAlign: "-2px" }} />
-                        {STOCK_NARRATIVE_DEMO[r.code]}
+                        {narratives[r.code]}
                       </p>
                     )}
                     <div style={{ display: "flex", gap: 12, fontSize: 11, fontFamily: MONO, color: C.sub, marginBottom: 12 }}>
@@ -700,25 +695,30 @@ export default async function TelegramPage() {
         <div style={cardStyle}>
           <SectionHead icon="tag" title="이슈 키워드" note="7일" desc="종목명이 아닌 화제어" />
           <div style={{ display: "flex", flexDirection: "column", gap: 23 }}>
-            {KEYWORDS_DEMO.map((k, i) => {
-              const max = KEYWORDS_DEMO[0].count;
-              return (
-                <div key={k.word} style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                  <span style={{ ...rankNum, color: C.sub }}>{i + 1}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
-                      <span style={{ fontWeight: 700, fontSize: 13, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{k.word}</span>
-                      <span style={{ fontFamily: MONO, fontSize: 11, color: k.up ? C.hot : C.cold, flexShrink: 0 }}>
-                        {k.up ? "▲" : "▼"} {k.count}회
-                      </span>
-                    </div>
-                    <div style={{ marginTop: 5, height: 5, background: C.track, borderRadius: 999, overflow: "hidden" }}>
-                      <div style={{ width: `${(k.count / max) * 100}%`, height: "100%", background: C.blue, borderRadius: 999, opacity: 0.8 }} />
+            {keywords.length === 0 ? (
+              <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 뽑을 화제어가 없어요.</p>
+            ) : (
+              keywords.map((k, i) => {
+                const max = keywords[0].count;
+                return (
+                  <div key={k.word} style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                    <span style={{ ...rankNum, color: C.sub }}>{i + 1}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
+                        <span style={{ fontWeight: 700, fontSize: 13, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{k.word}</span>
+                        {/* 비교할 과거가 아직 없으면 화살표를 숨긴다 — ▲▼ 아무거나 붙이면 거짓말이 된다 */}
+                        <span style={{ fontFamily: MONO, fontSize: 11, color: k.up == null ? C.sub : k.up ? C.hot : C.cold, flexShrink: 0 }}>
+                          {k.up == null ? "" : k.up ? "▲ " : "▼ "}{k.count}회
+                        </span>
+                      </div>
+                      <div style={{ marginTop: 5, height: 5, background: C.track, borderRadius: 999, overflow: "hidden" }}>
+                        <div style={{ width: `${(k.count / max) * 100}%`, height: "100%", background: C.blue, borderRadius: 999, opacity: 0.8 }} />
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
       </div>
