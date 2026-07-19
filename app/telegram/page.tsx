@@ -126,6 +126,9 @@ const cardStyle: React.CSSProperties = {
   borderRadius: 16,
   padding: 24,
   border: `1px solid ${C.line}`,
+  // 그리드 칸 안에서 카드가 내용에 밀려 넓어지지 않도록(칸 비율 고정). 긴 채널명 등은
+  // 카드 안에서 말줄임 처리되어야지, 카드를 늘려선 안 된다.
+  minWidth: 0,
 };
 
 const subCard: React.CSSProperties = {
@@ -152,8 +155,6 @@ const badge = (bg: string, color: string): React.CSSProperties => ({
   borderRadius: 999,
   whiteSpace: "nowrap",
 });
-
-const span = (n: number): React.CSSProperties => ({ gridColumn: `span ${n}` });
 
 export default async function TelegramPage() {
   const topStocks = await getTopStocksWithTrend(3);
@@ -255,7 +256,7 @@ export default async function TelegramPage() {
         </div>
 
         {/* 생태계 센티먼트 (3칸) — 메시지별 LLM 분류를 집계한 결과 */}
-        <div style={{ ...cardStyle, ...span(3) }}>
+        <div className="hz-c3" style={cardStyle}>
           <SectionHead
             icon="psychology"
             title="텔레그램 생태계 센티먼트"
@@ -360,7 +361,7 @@ export default async function TelegramPage() {
         </div>
 
         {/* ② 급부상 종목 (전체폭) */}
-        <div style={{ ...cardStyle, ...span(4) }}>
+        <div className="hz-c4" style={cardStyle}>
           <SectionHead
             icon="local_fire_department"
             title="급부상 종목"
@@ -419,7 +420,7 @@ export default async function TelegramPage() {
         </div>
 
         {/* ⑥ 트렌딩 메시지 (전체폭) — 종목/주제 태그 포함 */}
-        <div style={{ ...cardStyle, ...span(4) }}>
+        <div className="hz-c4" style={cardStyle}>
           <SectionHead
             icon="campaign"
             title="트렌딩 메시지"
@@ -526,7 +527,7 @@ export default async function TelegramPage() {
         </div>
 
         {/* ④ 테마 로테이션 (½) */}
-        <div style={{ ...cardStyle, ...span(2) }}>
+        <div className="hz-c2" style={cardStyle}>
           <SectionHead
             icon="donut_small"
             title="테마 로테이션"
@@ -583,7 +584,7 @@ export default async function TelegramPage() {
         </div>
 
         {/* ⑤ 주요 종목 리포트 (½) — 3종목 상세 */}
-        <div style={{ ...cardStyle, ...span(2) }}>
+        <div className="hz-c2" style={cardStyle}>
           <SectionHead
             icon="query_stats"
             title="주요 종목 리포트"
@@ -653,7 +654,7 @@ export default async function TelegramPage() {
         </div>
 
         {/* ③ 채널 파워 랭킹 (½) */}
-        <div style={{ ...cardStyle, ...span(2) }}>
+        <div className="hz-c2" style={cardStyle}>
           <SectionHead
             icon="military_tech"
             title="채널 파워 랭킹"

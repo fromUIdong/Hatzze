@@ -101,15 +101,25 @@ body {
 .hz-pulse-red { animation: hz-pulse-red 2s infinite; }
 
 /* 4열 → 2열 → 1열. span-2 카드는 최소 폭 아래에서 1열로 접힌다. */
+/* minmax(0, 1fr) — 1fr은 minmax(auto, 1fr)이라 그리드 항목의 기본 min-width:auto가
+   살아 있고, 줄바꿈 안 되는 긴 내용(예: 채널명 "주식 급등일보🚀…| Korean Stocks")이
+   트랙을 밀어 4등분이 깨진다. 실제로 122/0/466/166px까지 벌어졌다.
+   최소값을 0으로 눌러야 칸 비율이 내용과 무관하게 고정된다. */
 .hz-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 20px;
   grid-auto-flow: dense;
 }
 .hz-span2 { grid-column: span 2; }
+/* 카드 가로 점유 칸수. 인라인 style로 두면 아래 브레이크포인트에서 못 줄여, 2칸짜리
+   그리드에 span 3·4가 남아 암묵적 트랙이 생기고 칸 비율이 깨진다(50px 15px 237px …). */
+.hz-c2 { grid-column: span 2; }
+.hz-c3 { grid-column: span 3; }
+.hz-c4 { grid-column: span 4; }
 @media (max-width: 1024px) {
-  .hz-grid { grid-template-columns: repeat(2, 1fr); }
+  .hz-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hz-c2, .hz-c3, .hz-c4 { grid-column: span 2; }
 }
 /* 사이드바의 display는 여기서 관리한다 — 인라인 스타일로 두면 아래
    모바일 미디어쿼리의 display:none을 이겨버려 숨김이 안 먹는다. */
@@ -122,8 +132,9 @@ body {
 .hz-hero { padding: 24px 48px; gap: 56px; }
 
 @media (max-width: 560px) {
-  .hz-grid { grid-template-columns: 1fr; }
+  .hz-grid { grid-template-columns: minmax(0, 1fr); }
   .hz-span2 { grid-column: span 1; }
+  .hz-c2, .hz-c3, .hz-c4 { grid-column: span 1; }
   .hz-sidebar { display: none; }
   .hz-hero { padding: 28px 20px; gap: 32px; }
   .hz-topbar-date { display: none; }
