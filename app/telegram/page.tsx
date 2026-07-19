@@ -666,19 +666,33 @@ export default async function TelegramPage() {
           <SectionHead icon="rocket_launch" title="뜨는 채널" note="7일" desc="최근 구독자가 많이 늘어난 채널" />
           {/* 간격을 이슈 키워드 카드의 행 높이(pitch 53px)에 맞춰 두 카드의 순위가 나란히 보이게 한다 */}
           <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 18 }}>
-            {rising.map((r, i) => (
-              <li key={r.title} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ ...rankNum, color: C.sub }}>{i + 1}</span>
-                <Avatar photo={r.photo} title={r.title} size={26} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.title}</div>
-                  <div style={{ fontSize: 10, fontFamily: MONO, color: C.sub }}>구독자 수 {compact(r.subscriberCount)}</div>
-                </div>
-                <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.hot, whiteSpace: "nowrap" }}>
-                  ▲{r.delta7d.toLocaleString("ko-KR")}명
-                </span>
-              </li>
-            ))}
+            {rising.map((r, i) => {
+              const body = (
+                <>
+                  <span style={{ ...rankNum, color: C.sub }}>{i + 1}</span>
+                  <Avatar photo={r.photo} title={r.title} size={26} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.title}</div>
+                    <div style={{ fontSize: 10, fontFamily: MONO, color: C.sub }}>구독자 수 {compact(r.subscriberCount)}</div>
+                  </div>
+                  <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: C.hot, whiteSpace: "nowrap" }}>
+                    ▲{r.delta7d.toLocaleString("ko-KR")}명
+                  </span>
+                </>
+              );
+              // 실제 채널일 때만 링크로 감싼다 — 데모 채널은 연결할 대상이 없다.
+              return (
+                <li key={r.title}>
+                  {r.handle ? (
+                    <a href={`https://t.me/${r.handle}`} target="_blank" rel="noopener noreferrer" className="hz-row-link">
+                      {body}
+                    </a>
+                  ) : (
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>{body}</div>
+                  )}
+                </li>
+              );
+            })}
           </ol>
         </div>
 

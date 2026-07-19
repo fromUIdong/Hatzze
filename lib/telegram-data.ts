@@ -641,6 +641,7 @@ export async function getChannelRanking(): Promise<ChannelRank[]> {
 }
 
 export type RisingChannel = {
+  handle: string | null; // 실데이터일 때만 존재(데모 채널은 실제 링크 대상이 없음)
   title: string;
   photo: string | null;
   subscriberCount: number;
@@ -675,6 +676,7 @@ export async function getRisingChannels(limit = 10): Promise<RisingChannel[]> {
     const delta = arr[arr.length - 1].s - arr[0].s;
     if (delta <= 0) continue; // "뜨는" 채널이므로 실제로 늘어난 곳만
     real.push({
+      handle: h,
       title: titleOf.get(h) ?? h,
       photo: photoOf.get(h) ?? null,
       subscriberCount: arr[arr.length - 1].s,
@@ -691,15 +693,15 @@ export async function getRisingChannels(limit = 10): Promise<RisingChannel[]> {
 
   // TODO(스냅샷 7일치 축적 후 제거): 데모용 placeholder 데이터.
   return [
-    { title: "급등주 라이브", photo: null, subscriberCount: 58200, delta7d: 4300, isPlaceholder: false },
-    { title: "실전 투자노트", photo: null, subscriberCount: 46700, delta7d: 3150, isPlaceholder: false },
-    { title: "테마주 헌터", photo: null, subscriberCount: 33400, delta7d: 2480, isPlaceholder: false },
-    { title: "코스닥 스나이퍼", photo: null, subscriberCount: 21900, delta7d: 1760, isPlaceholder: false },
-    { title: "새벽 차트방", photo: null, subscriberCount: 15600, delta7d: 1210, isPlaceholder: false },
-    { title: "반도체 소부장 인사이트", photo: null, subscriberCount: 28800, delta7d: 1120, isPlaceholder: false },
-    { title: "미국주식 야간반", photo: null, subscriberCount: 41300, delta7d: 980, isPlaceholder: false },
-    { title: "공시 알리미", photo: null, subscriberCount: 19400, delta7d: 870, isPlaceholder: false },
-    { title: "배당주 모임", photo: null, subscriberCount: 12700, delta7d: 640, isPlaceholder: false },
-    { title: "IPO 공모주 캘린더", photo: null, subscriberCount: 24100, delta7d: 520, isPlaceholder: false },
+    { handle: null, title: "급등주 라이브", photo: null, subscriberCount: 58200, delta7d: 4300, isPlaceholder: false },
+    { handle: null, title: "실전 투자노트", photo: null, subscriberCount: 46700, delta7d: 3150, isPlaceholder: false },
+    { handle: null, title: "테마주 헌터", photo: null, subscriberCount: 33400, delta7d: 2480, isPlaceholder: false },
+    { handle: null, title: "코스닥 스나이퍼", photo: null, subscriberCount: 21900, delta7d: 1760, isPlaceholder: false },
+    { handle: null, title: "새벽 차트방", photo: null, subscriberCount: 15600, delta7d: 1210, isPlaceholder: false },
+    { handle: null, title: "반도체 소부장 인사이트", photo: null, subscriberCount: 28800, delta7d: 1120, isPlaceholder: false },
+    { handle: null, title: "미국주식 야간반", photo: null, subscriberCount: 41300, delta7d: 980, isPlaceholder: false },
+    { handle: null, title: "공시 알리미", photo: null, subscriberCount: 19400, delta7d: 870, isPlaceholder: false },
+    { handle: null, title: "배당주 모임", photo: null, subscriberCount: 12700, delta7d: 640, isPlaceholder: false },
+    { handle: null, title: "IPO 공모주 캘린더", photo: null, subscriberCount: 24100, delta7d: 520, isPlaceholder: false },
   ].slice(0, limit);
 }
