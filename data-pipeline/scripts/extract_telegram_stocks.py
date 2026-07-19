@@ -4,12 +4,15 @@
 본문을 긴 이름 우선으로 매칭한다. URL은 매칭 전에 마스킹한다(쿼리스트링의
 "&SK=" 같은 파라미터명이 종목으로 잡히던 걸 막는다).
 
+영문 종목명은 KRX 정식명이 전부 대문자라("LS ELECTRIC") 본문의 "LS Electric"을
+놓치므로, 한글이 없고 충분히 긴 이름만 대소문자를 무시한다(is_caseless 참고).
+
 오탐 위험 종목(일반 단어/영문 약자)은 경계 규칙을 통과할 때만 인정한다:
   - 매칭 앞 글자: 한글/영숫자/한자가 아니어야 함(다른 단어의 꼬리 방지)
   - 붙어 있는 뒤 글자: 조사이거나 구두점/공백/문자열끝이어야 함
   - 띄어쓴 뒤 단어까지 봤을 때 '더 긴 고유명사의 앞부분'이면 SK 단독으로 안 센다:
       "SK 하이닉스"  → 붙이면 사전에 있는 더 긴 종목명 → 그 종목(SK하이닉스)으로 인정
-      "SK hynix"    → 뒤가 로마자(영문 병기·해외 자회사명: SK On, LS Electric) → 거부
+      "SK hynix"    → 뒤가 로마자(영문 병기·해외 자회사명: SK On) → 거부
       "SK 그룹"      → 그룹 전체 지칭(config.GROUP_SUFFIXES) → 거부
 우선주(…우) 등 파생 종목은 사전에서 제외해 잡음을 줄인다.
 
@@ -42,6 +45,7 @@ from config.stock_extraction import (  # noqa: E402
 # 우선주/파생 종목 제외 패턴(…우, …우B, …N우, …우(전환) 등).
 PREFERRED_RE = re.compile(r"(우[A-Z]?|\d우|우\(전환\))$")
 HANGUL_OR_ALNUM = re.compile(r"[가-힣0-9A-Za-z]")
+HANGUL = re.compile(r"[가-힣]")
 HAN = re.compile(r"[一-鿿]")  # SK海力士(=SK하이닉스) 같은 중국어 기사 제목용
 LATIN = re.compile(r"[A-Za-z]")
 LATIN_ACRONYM = re.compile(r"^[A-Za-z][A-Za-z0-9&]*$")  # SK, LG, E1 … (한글 종목명 제외)
@@ -75,10 +79,32 @@ def load_dictionary(db) -> tuple[dict[str, str], dict[str, str], set[str]]:
     return match_to_code, method, ambiguous
 
 
-def build_pattern(keys: list[str]) -> re.Pattern:
+def is_caseless(key: str) -> bool:
+    """대소문자를 무시해도 안전한 이름인가.
+
+    KRX 정식명은 "LS ELECTRIC"처럼 전부 대문자인데 텔레그램에선 "LS Electric"으로
+    쓰는 일이 흔해 그대로면 놓친다. 다만 패턴 전체를 IGNORECASE로 두면 SK/LG/LS
+    같은 짧은 약자가 소문자 산문("sk", "ls")에 걸려 오탐이 폭발하므로, 한글이 없고
+    충분히 긴(3글자 이상이거나 공백 포함) 이름에만 적용한다.
+    """
+    return not HANGUL.search(key) and (len(key) > 2 or " " in key)
+
+
+def build_pattern(keys: list[str]) -> tuple[re.Pattern, dict[str, str]]:
+    """통합 패턴과, 대소문자 무시로 잡힌 표기를 사전 키로 되돌릴 역인덱스를 만든다."""
     # 긴 것 우선(겹칠 때 더 구체적인 종목명이 이기도록).
     ordered = sorted(keys, key=len, reverse=True)
-    return re.compile("|".join(re.escape(k) for k in ordered))
+    parts: list[str] = []
+    caseless: dict[str, str] = {}
+    for k in ordered:
+        escaped = re.escape(k)
+        if is_caseless(k):
+            # 통짜 IGNORECASE 대신 해당 항목만 지역 플래그로 감싸 길이 우선순위를 유지한다.
+            parts.append(f"(?i:{escaped})")
+            caseless.setdefault(k.lower(), k)
+        else:
+            parts.append(escaped)
+    return re.compile("|".join(parts)), caseless
 
 
 def boundary_ok(text: str, start: int, end: int, is_ambiguous: bool) -> bool:
@@ -115,7 +141,8 @@ def compound_key(text: str, end: int, key: str, match_to_code: dict[str, str]) -
     # "SK 그룹" — 개별 종목이 아니라 그룹 전체 지칭.
     if nxt_word.startswith(GROUP_SUFFIXES):
         return None
-    # "SK hynix" / "LS Electric" — 영문 병기·해외 자회사명. 한글 종목명엔 적용 안 함.
+    # "SK hynix" / "SK On" — 영문 병기·해외 자회사명. 한글 종목명엔 적용 안 함.
+    # (사전에 있는 영문 종목명은 대소문자 무시로 통째 매칭돼 여기까지 오지 않는다.)
     if LATIN_ACRONYM.match(key) and LATIN.match(nxt_word):
         return None
     # "SK 하이닉스" — 붙이면 더 긴 종목명이면 그 종목 언급으로 본다. 뒤 단어에
@@ -128,14 +155,25 @@ def compound_key(text: str, end: int, key: str, match_to_code: dict[str, str]) -
     return key
 
 
-def extract(text: str, pattern, match_to_code, method, ambiguous) -> dict[str, tuple[str, str]]:
+def extract(text: str, pattern, match_to_code, method, ambiguous, caseless) -> dict[str, tuple[str, str]]:
     """text에서 {code: (match_text, method)} (메시지 내 중복 제거)."""
     # URL 안의 문자열은 본문 언급이 아니다. 길이를 유지해 경계 판정을 흐트러뜨리지 않는다.
     text = URL_RE.sub(lambda m: MASK_CHAR * len(m.group(0)), text)
 
     found: dict[str, tuple[str, str]] = {}
     for m in pattern.finditer(text):
-        key = m.group(0)
+        matched = m.group(0)
+        # 대소문자를 무시해 잡힌 표기("LS Electric")는 사전 키("LS ELECTRIC")로 되돌린다.
+        key = matched if matched in match_to_code else caseless.get(matched.lower())
+        if key is None:
+            continue
+        # 표기가 사전과 다른데 전부 소문자면 종목명이 아니라 산문이나 URL이다.
+        # 위 마스킹이 스킴 있는 URL을 걷어내지만 "n.news.naver.com/…"처럼 스킴 없는
+        # 도메인은 남고, 앞 글자가 '.'이라 경계 검사도 통과한다. 본문에 종목을 쓸 땐
+        # 최소 한 글자는 대문자라는 점으로 한 겹 더 막는다. 현재 코퍼스에선 마스킹이
+        # 먼저 걸러 실측 변화는 0건이고, 대소문자를 푼 데 대한 예방적 방어다.
+        if matched != key and matched.islower():
+            continue
         is_ambiguous = key in ambiguous
         if not boundary_ok(text, m.start(), m.end(), is_ambiguous):
             continue
@@ -143,9 +181,11 @@ def extract(text: str, pattern, match_to_code, method, ambiguous) -> dict[str, t
             key = compound_key(text, m.end(), key, match_to_code)
             if key is None:
                 continue
+            # "SK 하이닉스"처럼 더 긴 종목명으로 승격됐으면 그 이름을 기록한다.
+            matched = key
         code = match_to_code[key]
         if code not in found:
-            found[code] = (key, method[key])
+            found[code] = (matched, method[key])
     return found
 
 
@@ -172,7 +212,7 @@ def main() -> None:
     db = get_client()
 
     match_to_code, method, ambiguous = load_dictionary(db)
-    pattern = build_pattern(list(match_to_code))
+    pattern, caseless = build_pattern(list(match_to_code))
     code_to_name = {c: n for n, c in [(s["name"], s["code"]) for s in db.table("stocks").select("code,name").execute().data]}
     print(f"사전: {len(match_to_code)}개 매칭문자열(별칭 {sum(1 for v in method.values() if v=='alias')}, 오탐위험 {len(ambiguous)})")
 
@@ -184,7 +224,7 @@ def main() -> None:
     samples = []
 
     for msg in messages:
-        found = extract(msg["text"], pattern, match_to_code, method, ambiguous)
+        found = extract(msg["text"], pattern, match_to_code, method, ambiguous, caseless)
         if found:
             msgs_with_hit += 1
         for code, (match_text, meth) in found.items():
