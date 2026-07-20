@@ -308,7 +308,10 @@ def main() -> None:
         sb["capped_progress"] = cap_progress(divergence)
         sb["hit"] = sb["capped_progress"] >= HIT_ZONE  # 괴리 초고온(≥75)일 때 Hit
         # 카드 인포그래픽용: 두 축(실물/증시) progress를 details에 남긴다.
+        # fetch 쪽(common/details.py)이 같은 컬럼에 vs_avg/avg_index를 쓰므로 병합한다 —
+        # 통째로 갈아끼우면 아래 update가 그 키들을 지운다(반대 방향의 같은 사고).
         sb["details"] = {
+            **(get_latest_details(client, sb["indicator_id"]) or {}),
             "real_stress": round(real_stress, 1),
             "market_strength": round(market_strength, 1),
             "divergence": round(cap_progress(divergence), 1),
