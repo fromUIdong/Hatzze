@@ -202,7 +202,7 @@ function TitleRow({
   icon,
   name,
   desc,
-  iconSize = 24,
+  iconSize = 22,
   badge,
   right,
 }: {
@@ -226,7 +226,7 @@ function TitleRow({
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Icon name={icon} style={{ fontSize: iconSize, color: C.blue }} />
-          <span style={{ fontSize: 15, fontWeight: 800, color: C.ink, lineHeight: 1.2, wordBreak: "keep-all" }}>
+          <span style={{ fontSize: 17, fontWeight: 800, color: C.ink, lineHeight: 1.2, wordBreak: "keep-all" }}>
             {name}
           </span>
           {badge && (
@@ -566,7 +566,7 @@ function Sparkline({
         {tips && tips.length === data.length && (
           <div style={{ position: "absolute", inset: 0, display: "flex" }}>
             {tips.map((tip, i) => (
-              <div key={i} className="hz-tip" data-tip={tip} style={{ flex: 1, cursor: "help" }} />
+              <div key={i} className="hz-tip hz-vline" data-tip={tip} style={{ flex: 1, position: "relative" }} />
             ))}
           </div>
         )}
@@ -709,7 +709,7 @@ function CardBuffett({ v }: { v: Pick }) {
   const jo = (won: number) => Math.round(won / 1e12).toLocaleString("ko-KR"); // 원 → 조원
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
-      <TitleRow desc={v.headline} icon="payments" iconSize={30} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge={sourceBadge(v, "당일 기준")} />
+      <TitleRow desc={v.headline} icon="payments" name={v.name} badge={sourceBadge(v, "당일 기준")} />
       <Big disp={v.disp} unit={v.unit} color={v.color} size={52} sub={ratio !== null ? `${ratio.toFixed(1)}배` : undefined} />
       <div style={{ background: C.bg, borderRadius: 10, padding: "18px 18px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
         <div>
@@ -769,7 +769,7 @@ function CardLeverage({ v }: { v: Pick }) {
     dt?.futures_oi != null ? `${Math.round(dt.futures_oi).toLocaleString("ko-KR")}계약` : null;
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
-      <TitleRow desc={v.headline} icon="rocket_launch" iconSize={30} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="당일 기준" />
+      <TitleRow desc={v.headline} icon="rocket_launch" name={v.name} badge="당일 기준" />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 12 }}>
         <span style={{ fontFamily: MONO, fontSize: 44, fontWeight: 800, color: heatC, lineHeight: 1, letterSpacing: "-0.03em" }}>{heat}</span>
         <span style={{ fontSize: 18, fontWeight: 800, color: "var(--c-faint)" }}>/ 100</span>
@@ -819,7 +819,7 @@ function CardMarketActions({ v }: { v: Pick }) {
         : { t: "균형", c: C.neutral };
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
-      <TitleRow desc={v.headline} icon="speed" iconSize={30} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="최근 한 달" />
+      <TitleRow desc={v.headline} icon="speed" name={v.name} badge="최근 한 달" />
       {verdict ? (
         <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginBottom: 12 }}>
           <span style={{ fontSize: 34, fontWeight: 800, color: verdict.c, lineHeight: 1 }}>{verdict.t}</span>
@@ -872,7 +872,7 @@ function CardTurnover({ v }: { v: Pick }) {
           <Donut pct={share} color={c} />
           {/* 툴팁은 도넛 바깥이 아니라 안쪽 라벨에 건다 — 116px 도넛 위에 걸면 툴팁이
               카드 제목·설명 자리까지 올라가 글자를 덮는다(실측 확인). */}
-          <div className="hz-tip" data-tip={donutTip} style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "help" }}>
+          <div className="hz-tip" data-tip={donutTip} style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
             <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 800, color: c, lineHeight: 1 }}>{Math.round(share)}%</span>
             <span style={{ fontSize: 8, fontWeight: 700, color: C.sub, marginTop: 2 }}>상위10 거래</span>
           </div>
@@ -1236,8 +1236,7 @@ function CardDivergence({ v }: { v: Pick }) {
     <Shell span={2} hit={v.isHit} minH={236}>
       <TitleRow desc={v.headline}
         icon="compare_arrows"
-        iconSize={30}
-        name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>}
+        name={v.name}
         right={
           <span style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
             <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: c, letterSpacing: "-0.02em" }}>{Math.round(div)}</span>
@@ -1262,7 +1261,7 @@ function CardTrend({ v, icon, span }: { v: Pick; icon: string; span?: 1 | 2 }) {
   const vsAvg = v.details?.vs_avg ?? null;
   return (
     <Shell span={span} hit={v.isHit} minH={210}>
-      <TitleRow desc={v.headline} icon={icon} name={v.name} iconSize={22} />
+      <TitleRow desc={v.headline} icon={icon} name={v.name} />
       {vsAvg !== null ? (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
           <VsAvg ratio={vsAvg} />
@@ -1298,7 +1297,7 @@ function CardSentiment({ v, icon, span = 1 }: { v: Pick; icon: string; span?: 1 
   const barColor = raw === 0 ? C.neutral : optimistic ? C.hot : C.cold;
   return (
     <Shell span={span} hit={v.isHit} minH={210}>
-      <TitleRow desc={v.headline} icon={icon} iconSize={22} name={v.name} />
+      <TitleRow desc={v.headline} icon={icon} name={v.name} />
       <div style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: barColor, letterSpacing: "-0.03em", margin: "8px 0 0" }}>
         {raw > 0 ? "+" : ""}
         {v.disp}
@@ -1336,7 +1335,7 @@ function CardYoutube({ v }: { v: Pick }) {
   const [baseH, todayH] = ratioBarHeights(v.threshold, v.raw);
   return (
     <Shell hit={v.isHit} minH={210}>
-      <TitleRow desc={v.headline} icon="play_circle" iconSize={22} name={v.name} />
+      <TitleRow desc={v.headline} icon="play_circle" name={v.name} />
       <div style={{ flex: 1, display: "flex", alignItems: "flex-end", gap: 14 }}>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 88 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, height: "100%" }}>
@@ -1401,7 +1400,7 @@ function CardUpbit({ v }: { v: Pick }) {
   const volLabel = (p: number) => (p >= 100 ? "HIGH" : p >= 60 ? "MID" : "LOW");
   return (
     <Shell hit={v.isHit} minH={210}>
-      <TitleRow desc={v.headline} icon="currency_bitcoin" iconSize={22} name={v.name} />
+      <TitleRow desc={v.headline} icon="currency_bitcoin" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
         <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}{v.unit}</span>
       </div>
@@ -1432,7 +1431,7 @@ function CardNetBuy({ v }: { v: Pick }) {
   const isBuy = cum >= 0;
   return (
     <Shell hit={v.isHit} minH={210}>
-      <TitleRow desc={v.headline} icon="person" iconSize={22} name={v.name} />
+      <TitleRow desc={v.headline} icon="person" name={v.name} />
       <div style={{ margin: "6px 0 2px" }}>
         <span style={{ fontSize: 10, fontWeight: 700, color: C.sub }}>최근 5거래일 누적</span>
         <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
@@ -1456,7 +1455,7 @@ function CardNetBuy({ v }: { v: Pick }) {
               key={i}
               className="hz-tip"
               data-tip={label}
-              style={{ flex: 1, position: "relative", height: 56, cursor: "help" }}
+              style={{ flex: 1, position: "relative", height: 56 }}
             >
               <div style={{ position: "absolute", left: 0, right: 0, top: "50%", height: 1, background: C.line }} />
               <div style={{ position: "absolute", left: "22%", right: "22%", height: px, background: buy ? C.hot : C.cold, borderRadius: 2, ...(buy ? { bottom: "50%" } : { top: "50%" }) }} />
@@ -1488,7 +1487,7 @@ function CardDeposit({ v }: { v: Pick }) {
   const change = recent.length >= 2 ? recent[recent.length - 1] - recent[0] : 0;
   return (
     <Shell hit={v.isHit} minH={210}>
-      <TitleRow desc={v.headline} icon="savings" iconSize={22} name={v.name} />
+      <TitleRow desc={v.headline} icon="savings" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "6px 0 4px" }}>
         <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: c, letterSpacing: "-0.03em" }}>{jo.toFixed(1)}</span>
         <span style={{ fontSize: 13, fontWeight: 700, color: C.sub }}>조원</span>
@@ -1531,7 +1530,7 @@ function CardPutCall({ v }: { v: Pick }) {
   const c = greedy ? C.hot : C.cold;
   return (
     <Shell hit={v.isHit} minH={210}>
-      <TitleRow desc={v.headline} icon="casino" iconSize={22} name={v.name} />
+      <TitleRow desc={v.headline} icon="casino" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "6px 0 14px" }}>
         <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 800, color: c, letterSpacing: "-0.03em" }}>{ratio.toFixed(2)}</span>
         <span style={{ fontSize: 11, fontWeight: 700, color: C.sub }}>풋/콜</span>
@@ -1539,10 +1538,10 @@ function CardPutCall({ v }: { v: Pick }) {
       </div>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 8 }}>
         <div style={{ display: "flex", height: 24, borderRadius: 8, overflow: "hidden" }}>
-          <div className="hz-tip" data-tip={tip("call")} style={{ width: `${callShare}%`, background: C.hot, display: "flex", alignItems: "center", paddingLeft: 8, cursor: "help" }}>
+          <div className="hz-tip" data-tip={tip("call")} style={{ width: `${callShare}%`, background: C.hot, display: "flex", alignItems: "center", paddingLeft: 8 }}>
             <span style={{ fontSize: 10, fontWeight: 800, color: "#fff" }}>콜 {Math.round(callShare)}%</span>
           </div>
-          <div className="hz-tip" data-tip={tip("put")} style={{ width: `${100 - callShare}%`, background: C.cold, display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 8, cursor: "help" }}>
+          <div className="hz-tip" data-tip={tip("put")} style={{ width: `${100 - callShare}%`, background: C.cold, display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 8 }}>
             <span style={{ fontSize: 10, fontWeight: 800, color: "#fff" }}>풋 {Math.round(100 - callShare)}%</span>
           </div>
         </div>
@@ -1567,7 +1566,7 @@ function CardBrokerage({ v }: { v: Pick }) {
   const shortName = (n: string) => (n.split(/[-(,]/)[0].trim().slice(0, 18) || n);
   return (
     <Shell hit={v.isHit} minH={210}>
-      <TitleRow desc={v.headline} icon="leaderboard" iconSize={22} name={v.name} />
+      <TitleRow desc={v.headline} icon="leaderboard" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "6px 0 10px" }}>
         <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: c, letterSpacing: "-0.03em" }}>{count}</span>
         <span style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>개 앱 인기차트 진입</span>
@@ -1619,7 +1618,7 @@ const FALLBACK_ICONS: Record<string, string> = {
 function GenericCard({ v, icon }: { v: Pick; icon: string }) {
   return (
     <Shell hit={v.isHit} minH={210}>
-      <TitleRow desc={v.headline} icon={icon} iconSize={22} name={v.name} />
+      <TitleRow desc={v.headline} icon={icon} name={v.name} />
       <Big disp={v.disp} unit={v.unit} color={v.color} size={30} />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
         <HeatBar v={v} />

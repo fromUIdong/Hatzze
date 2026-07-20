@@ -194,6 +194,25 @@ body {
 .hz-tip:hover::after {
   opacity: 1;
 }
+/* 스파크라인 지점 띠 — 마우스를 올리면 그 지점에 세로 기준선을 긋는다.
+   차트 어디를 가리키고 있는지 툴팁만으론 알기 어려워서(선 위 어디쯤인지 안 보임)
+   차트류 UI가 흔히 쓰는 crosshair 를 CSS만으로 흉내낸다. */
+.hz-vline::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--c-sub);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+.hz-vline:hover::before {
+  opacity: 0.6;
+}
+
 /* 긴 설명용 — 줄바꿈 허용 + 너비 제한 */
 .hz-tip-wide::after {
   white-space: normal;
