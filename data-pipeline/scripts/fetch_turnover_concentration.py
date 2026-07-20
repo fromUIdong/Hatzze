@@ -9,8 +9,10 @@ raw_value = 상위 10종목 거래대금 / 전체 KOSPI 거래대금 × 100 (%).
 수준 threshold는 낡는다. 그래서 youtube·예탁금처럼 '최근 평균 대비 급증(surge_map)'으로
 쏠림 '심화'를 과열로 본다 — 평균이면 상온, 평균보다 쏠림이 커지면 초고온.
 
-한계: KOSDAQ 종목 엔드포인트(ksq_bydd_trd)는 아직 미승인(401)이라 KOSPI만 본다. 테마·잡주
-쏠림은 KOSDAQ에서 더 잘 드러나므로, 승인되면 KOSDAQ 포함으로 확장할 여지가 있다.
+범위: KOSPI만 본다. KOSDAQ 엔드포인트(ksq_bydd_trd)는 2026-07-20 승인돼 호출은 가능해졌지만,
+과거값이 전부 KOSPI 기준이라 지표 시계열의 연속성을 깨지 않으려고 확장은 보류했다. 테마·잡주
+쏠림은 KOSDAQ에서 더 잘 드러나므로, 확장한다면 기존 slug를 덮지 말고 별도 지표로 두거나
+과거분을 재계산해야 한다.
 """
 
 from __future__ import annotations

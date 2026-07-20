@@ -54,9 +54,25 @@ URL_RE = re.compile(r"(?:https?://|www\.)\S+")
 MASK_CHAR = "\x00"
 
 
+def load_all(db, table: str, columns: str) -> list[dict]:
+    """Supabase 기본 페이지 크기(1000)를 넘겨 전량을 읽는다.
+
+    stocks는 KOSPI만일 땐 944행이라 캡에 안 걸렸지만, 코스닥 승인(2026-07-20)으로
+    2,765행이 되며 조용히 잘려나갔다. 1000행을 넘길 수 있는 표는 반드시 이걸 쓴다.
+    """
+    rows, start = [], 0
+    while True:
+        page = db.table(table).select(columns).range(start, start + 999).execute().data
+        if not page:
+            break
+        rows += page
+        start += 1000
+    return rows
+
+
 def load_dictionary(db) -> tuple[dict[str, str], dict[str, str], set[str]]:
     """매칭문자열→코드, 매칭문자열→method, 오탐위험 매칭문자열 집합을 만든다."""
-    stocks = db.table("stocks").select("code,name").execute().data
+    stocks = load_all(db, "stocks", "code,name")
     name_to_code = {}
     for s in stocks:
         name = s["name"].strip()
@@ -213,7 +229,7 @@ def main() -> None:
 
     match_to_code, method, ambiguous = load_dictionary(db)
     pattern, caseless = build_pattern(list(match_to_code))
-    code_to_name = {c: n for n, c in [(s["name"], s["code"]) for s in db.table("stocks").select("code,name").execute().data]}
+    code_to_name = {s["code"]: s["name"] for s in load_all(db, "stocks", "code,name")}
     print(f"사전: {len(match_to_code)}개 매칭문자열(별칭 {sum(1 for v in method.values() if v=='alias')}, 오탐위험 {len(ambiguous)})")
 
     messages = load_messages(db)

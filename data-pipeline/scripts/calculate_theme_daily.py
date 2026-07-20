@@ -43,8 +43,9 @@ def main() -> None:
     dry_run = "--dry-run" in sys.argv[1:]
     db = get_client()
 
-    # 테마 사전의 종목명을 코드로 해석한다. stocks 에 없는 이름(코스닥 미적재 등)은
-    # 건너뛰되 무엇이 빠졌는지 알린다 — 코스닥이 들어오면 자동으로 살아난다.
+    # 테마 사전의 종목명을 코드로 해석한다. stocks 에 없는 이름은 건너뛰되 무엇이
+    # 빠졌는지 알린다. 코스닥 적재(2026-07-20) 이후 남는 미해결은 사전 오타이거나
+    # KRX 정식명 불일치(예: 엔씨소프트 → "NC")이니 사전을 고쳐야 한다.
     stocks = load_all(db, "stocks", "code,name")
     code_of = {s["name"]: s["code"] for s in stocks}
     theme_of: dict[str, list[str]] = defaultdict(list)  # code -> [theme]
@@ -61,7 +62,7 @@ def main() -> None:
             missing[theme] = unresolved
     if missing:
         total = sum(len(v) for v in missing.values())
-        print(f"[안내] 아직 stocks 에 없어 건너뛴 종목 {total}개(코스닥 적재 시 자동 반영):")
+        print(f"[경고] stocks 에 없어 건너뛴 종목 {total}개 — 사전의 이름을 KRX 정식명과 맞추세요:")
         for t, v in missing.items():
             print(f"  {t}: {', '.join(v)}")
 
