@@ -97,6 +97,14 @@ export async function getTelegramSummary(): Promise<TelegramSummary> {
 
 // ─── 종목 일별 집계 공통 로더 ────────────────────────────────────────────────
 
+/**
+ * 점유율 비교용 평활 상수 — '언급 1회가 그날 대화에서 차지하는 몫'.
+ * telegram_stock_daily 949건 실측: 언급 1회 종목의 점유율 중앙값 0.0018.
+ * 배수를 낼 때 분자·분모에 함께 더해, 표본이 1회치뿐인 종목이 거대한 배수를
+ * 받는 걸 막는다(자세한 이유는 getSurgingStocks 안 주석).
+ */
+const SHARE_SMOOTHING = 0.002;
+
 type DailyRow = { stock_code: string; date: string; weighted_score: number; mention_count: number; channel_count: number };
 
 async function loadStockDaily(days: number): Promise<{ rows: DailyRow[]; dates: string[] }> {
@@ -290,7 +298,12 @@ export async function getSurgingStocks(limit = 5): Promise<SurgingStock[]> {
         name: info?.name ?? code,
         recentMentions: a.recentM,
         channelCount: a.channels,
-        ratio: base > 0 ? recentPerDay / base : Infinity,
+        // 평활(+SHARE_SMOOTHING)한 뒤 나눈다. 그냥 나누면 분모가 거의 0인 종목이
+        // "▲162.8배"처럼 터무니없는 배수를 받는데, 실제론 3일간 2회 언급·1개 채널이라
+        // 표본이 사실상 없는 경우다. 상수는 '언급 1회가 만드는 몫'(실측 중앙값 0.0018)
+        // 이라, 최근 몫이 1회치밖에 안 되면 배수가 2배 근처로 눌리고, 진짜 두꺼운
+        // 급증(몫이 1회치의 수십 배)은 거의 그대로 남는다.
+        ratio: (recentPerDay + SHARE_SMOOTHING) / (base + SHARE_SMOOTHING),
         isNew: base === 0,
         series: dates.map((d) => a.byDate.get(d) ?? 0),
         market: info?.market ?? null,
@@ -300,20 +313,20 @@ export async function getSurgingStocks(limit = 5): Promise<SurgingStock[]> {
         isLive: false,
       };
     })
-    // 신규 등장(ratio=Infinity)이 정렬을 독점하지 않도록 유한한 강도로 환산해
-    // 배수 급증주와 같은 축에서 비교한다.
-    .sort((x, y) => {
-      const strength = (s: SurgingStock) => (s.isNew ? (s.recentMentions >= 3 ? 3 : 2) : s.ratio);
-      return strength(y) - strength(x) || y.recentMentions - x.recentMentions;
-    });
+    // 평활 덕에 신규 등장(base=0)도 유한한 배수를 받아 급증주와 같은 축에서 비교된다.
+    // 예전엔 ratio=Infinity라 정렬을 독점해서 isNew를 3/2로 환산하는 보정이 필요했는데,
+    // 그 보정은 "크게 등장한 신규"와 "1회 언급 신규"를 구분 못 했다. 이제 몫의 크기가
+    // 그대로 반영돼 보정 없이 옳게 줄 선다.
+    .sort((x, y) => y.ratio - x.ratio || y.recentMentions - x.recentMentions);
 
   // 카드 정원은 항상 채운다 — 기준을 만족한 종목만 넣으면 조용한 날에 4개·3개로 줄어
   // 레이아웃이 들쭉날쭉해진다. 다만 아무거나 끌어오면 안 되고 '덜 미더운 순서'로 메운다:
   //   ① 언급 2회↑ + 뚜렷하게 뛴 것(본래 기준)
   //   ② 언급 2회↑지만 상승폭이 완만한 것
-  //   ③ 언급 1회 — 배수는 커도(37배 등) 표본이 하나라 사실상 노이즈
+  //   ③ 언급 1회 — 표본이 하나라 사실상 노이즈
   // ③을 ②보다 먼저 넣으면 4위 ▲1.3배 밑에 5위 ▲37배가 붙어 정렬이 깨져 보인다.
-  const tier = (s: SurgingStock) => (s.recentMentions < 2 ? 3 : s.ratio >= 1.3 || s.isNew ? 1 : 2);
+  // (평활 후에는 배수 자체가 눌리지만, '2회 이상'이라는 표본 하한은 그대로 둔다.)
+  const tier = (s: SurgingStock) => (s.recentMentions < 2 ? 3 : s.ratio >= 1.3 ? 1 : 2);
   const list = [...scored].sort((x, y) => tier(x) - tier(y)).slice(0, limit);
 
   // 표시용 가격은 실시간(야후) 우선 — KRX 저장 종가는 며칠 지연돼 상단 티커와 어긋난다.

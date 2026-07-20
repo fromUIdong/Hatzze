@@ -167,7 +167,16 @@ def main() -> None:
     today = date.today().isoformat()
     rounded_gap = round(gap_pct, 2)
     client.table("indicator_values").upsert(
-        {"indicator_id": gap_id, "date": today, "raw_value": rounded_gap},
+        {
+            "indicator_id": gap_id,
+            "date": today,
+            "raw_value": rounded_gap,
+            # 행의 date 는 '계산한 날'이지 '자료의 날'이 아니다. KRX가 최근 영업일치를
+            # 아직 안 냈으면 며칠 전 종가로 오늘 행을 써서 화면상 최신값처럼 보인다.
+            # 실제 종가 기준일을 남겨 카드가 "기준 07-16"을 표시할 수 있게 한다
+            # (details 는 숫자 맵이라 YYYYMMDD 정수로 넣는다).
+            "details": {"source_date": int(latest_date.replace("-", ""))},
+        },
         on_conflict="indicator_id,date",
     ).execute()
     print(f"[Supabase] indicator_values upsert 완료: date={today}, raw_value={rounded_gap}")

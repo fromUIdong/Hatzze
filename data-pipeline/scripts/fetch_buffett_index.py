@@ -221,6 +221,11 @@ def main() -> None:
                 "market_cap": round(market_cap_krw, 0),
                 "gdp_year": gdp_year,
                 "gdp_q": gdp_q,
+                # 행의 date 는 '계산한 날'이지 '자료의 날'이 아니다. KRX가 최근
+                # 영업일치를 아직 안 냈으면 며칠 전 시가총액으로 오늘 행을 쓰게 되고,
+                # 그러면 화면상 최신값처럼 보인다. 실제 기준일을 함께 남겨 카드가
+                # "기준 07-16"을 표시할 수 있게 한다(숫자 맵이라 YYYYMMDD 정수).
+                "source_date": int(mktcap_date.replace("-", "")),
             },
         },
         on_conflict="indicator_id,date",
