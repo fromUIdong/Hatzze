@@ -1081,10 +1081,16 @@ function CardRiskAssets({ gold, kosdaq }: { gold: Pick; kosdaq: Pick }) {
         <div style={{ width: 1, background: C.line }} />
         <SubRatio v={kosdaq} icon="celebration" label="코스닥 강도 (vs 코스피)" />
       </div>
-      <div style={{ display: "flex", gap: 32, marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--c-divider)" }}>
-        <SubNote text={gold.desc} />
-        <div style={{ width: 1 }} />
-        <SubNote text={kosdaq.desc} />
+      {/* 지표가 둘인 카드의 설명 줄. Foot 과 박스 모델을 똑같이 맞춰야 같은 행에 놓인
+          카드끼리 divider 가 같은 높이에 온다 — marginTop:auto 로 바닥에 붙이고,
+          바깥 paddingTop 20 + 안쪽 minHeight 53/paddingTop 16 까지 Foot 과 동일하게 둔다.
+          (예전엔 marginTop:16 에 minHeight 가 없어 안전장치 카드와 3px 어긋났다.) */}
+      <div style={{ marginTop: "auto", paddingTop: 20 }}>
+        <div style={{ display: "flex", gap: 32, boxSizing: "border-box", minHeight: 53, paddingTop: 16, borderTop: "1px solid var(--c-divider)" }}>
+          <SubNote text={gold.desc} />
+          <div style={{ width: 1 }} />
+          <SubNote text={kosdaq.desc} />
+        </div>
       </div>
     </Shell>
   );
@@ -1385,10 +1391,16 @@ function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick }) {
         <div style={{ width: 1, background: C.line }} />
         <SubSpend v={dining} icon="restaurant" />
       </div>
-      <div style={{ display: "flex", gap: 32, marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--c-divider)" }}>
-        <SubNote text={luxury.desc} />
-        <div style={{ width: 1 }} />
-        <SubNote text={dining.desc} />
+      {/* 지표가 둘인 카드의 설명 줄. Foot 과 박스 모델을 똑같이 맞춰야 같은 행에 놓인
+          카드끼리 divider 가 같은 높이에 온다 — marginTop:auto 로 바닥에 붙이고,
+          바깥 paddingTop 20 + 안쪽 minHeight 53/paddingTop 16 까지 Foot 과 동일하게 둔다.
+          (예전엔 marginTop:16 에 minHeight 가 없어 안전장치 카드와 3px 어긋났다.) */}
+      <div style={{ marginTop: "auto", paddingTop: 20 }}>
+        <div style={{ display: "flex", gap: 32, boxSizing: "border-box", minHeight: 53, paddingTop: 16, borderTop: "1px solid var(--c-divider)" }}>
+          <SubNote text={luxury.desc} />
+          <div style={{ width: 1 }} />
+          <SubNote text={dining.desc} />
+        </div>
       </div>
     </Shell>
   );
