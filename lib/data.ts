@@ -46,6 +46,8 @@ export type IndicatorWithLatestValue = {
   } | null;
   // 최근 ~30일 raw_value(시간순, 오래된→최신). 카드가 추세 스파크라인을 그릴 때 쓴다.
   history: number[];
+  /** 스파크라인 툴팁용 — 값에 날짜를 붙인 것. 거래일은 주말·휴장을 건너뛰어 역산할 수 없다. */
+  historyPoints: { date: string; value: number }[];
 };
 
 export async function getLatestDailyScore(): Promise<DailyScore | null> {
@@ -169,6 +171,9 @@ export async function getPublicIndicators(): Promise<IndicatorWithLatestValue[]>
         : null,
       // 조회는 최신순이므로 뒤집어 시간순(오래된→최신)으로 둔다.
       history: [...row.indicator_values].reverse().map((v) => v.raw_value),
+      historyPoints: [...row.indicator_values]
+        .reverse()
+        .map((v) => ({ date: v.date, value: v.raw_value })),
     };
   });
 }

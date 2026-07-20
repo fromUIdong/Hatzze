@@ -90,9 +90,13 @@ def main() -> None:
         window = daily[i : i + WINDOW]  # 최신순 (D, D-1, ... D-4)
         cum = sum(v for _, v in window)
         # 카드용: 5일 일별 순매수를 과거→현재 순으로. today = 그날 순매수.
+        # dates5 는 각 막대의 날짜(카드 툴팁용). 거래일은 주말·휴장을 건너뛰므로
+        # 화면에서 날짜를 역산할 수 없어 함께 저장한다. details 는 숫자 맵이라
+        # YYYYMMDD 정수로 넣는다(buffett 의 source_date 와 같은 방식).
         details = {
             "today": round(window[0][1], 0),
             "daily5": [round(v, 0) for _, v in reversed(window)],
+            "dates5": [int(dt.replace("-", "")) for dt, _ in reversed(window)],
         }
         rows.append((d, cum, details))
     for d, cum, details in rows:

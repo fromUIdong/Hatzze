@@ -1,6 +1,6 @@
 import { getLatestDailyScore, getPublicIndicators, getTopStockHighGaps } from "@/lib/data";
 import type { DailyScore, IndicatorCategory, IndicatorWithLatestValue, StockHighGap } from "@/lib/data";
-import { formatIndicatorValue, formatKstUpdate } from "@/lib/format";
+import { formatEokMixed, formatIndicatorValue, formatKstUpdate } from "@/lib/format";
 import { C, Icon, MONO, stageForScore } from "./ui";
 
 // 지표는 하루 단위(GitHub Actions 배치)로 갱신되므로, 빌드 시점에 정적으로
@@ -47,6 +47,7 @@ type Pick = {
   dirLabel: string;
   details: Record<string, number> | null;
   history: number[];
+  historyPoints: { date: string; value: number }[];
   /** 자료의 실제 기준일이 몇 영업일 뒤처졌나(0~1이면 정상). details.source_date 가 있을 때만. */
   staleDays: number;
 };
@@ -115,6 +116,7 @@ function pick(ind: Ind | undefined): Pick {
     dirLabel: ind?.direction === "low" ? "이하" : "이상",
     details: ind?.latest?.details ?? null,
     history: ind?.history ?? [],
+    historyPoints: ind?.historyPoints ?? [],
     staleDays: staleBusinessDays(ind?.latest?.details ?? null),
   };
 }
@@ -200,7 +202,7 @@ function TitleRow({
   icon,
   name,
   desc,
-  iconSize = 24,
+  iconSize = 22,
   badge,
   right,
 }: {
@@ -224,7 +226,7 @@ function TitleRow({
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Icon name={icon} style={{ fontSize: iconSize, color: C.blue }} />
-          <span style={{ fontSize: 15, fontWeight: 800, color: C.ink, lineHeight: 1.2, wordBreak: "keep-all" }}>
+          <span style={{ fontSize: 17, fontWeight: 800, color: C.ink, lineHeight: 1.2, wordBreak: "keep-all" }}>
             {name}
           </span>
           {badge && (
@@ -520,7 +522,18 @@ function HalfGauge({ score, color }: { score: number; color: string }) {
 // 최근 값들의 실제 추세 스파크라인. data는 시간순(오래된→최신). 차트는 위 영역을
 // 꽉 채우고(선 두께는 non-scaling-stroke로 일정), 라벨은 차트에 겹치지 않게 아래
 // 오른쪽에 둔다.
-function Sparkline({ data, color, label = "최근 30일" }: { data: number[]; color: string; label?: string }) {
+function Sparkline({
+  data,
+  color,
+  label = "최근 30일",
+  tips,
+}: {
+  data: number[];
+  color: string;
+  label?: string;
+  /** 지점별 툴팁 문구. data 와 길이가 같을 때만 적용한다. */
+  tips?: string[];
+}) {
   if (data.length < 2) {
     return (
       <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: C.sub }}>
@@ -548,6 +561,15 @@ function Sparkline({ data, color, label = "최근 30일" }: { data: number[]; co
           <path d={area} fill={color} opacity={0.12} />
           <path d={line} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
         </svg>
+        {/* 선 위에 보이지 않는 세로 띠를 깔아 지점별 툴팁을 준다. SVG path 자체에는
+            hover 영역이 거의 없어서(선 두께 2px) 띠로 받아야 실제로 잡힌다. */}
+        {tips && tips.length === data.length && (
+          <div style={{ position: "absolute", inset: 0, display: "flex" }}>
+            {tips.map((tip, i) => (
+              <div key={i} className="hz-tip hz-vline" data-tip={tip} style={{ flex: 1, position: "relative" }} />
+            ))}
+          </div>
+        )}
       </div>
       <span style={{ alignSelf: "flex-end", fontSize: 9, fontWeight: 700, color: C.sub, marginTop: 4 }}>{label}</span>
     </div>
@@ -687,7 +709,7 @@ function CardBuffett({ v }: { v: Pick }) {
   const jo = (won: number) => Math.round(won / 1e12).toLocaleString("ko-KR"); // 원 → 조원
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
-      <TitleRow desc={v.headline} icon="payments" iconSize={30} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge={sourceBadge(v, "당일 기준")} />
+      <TitleRow desc={v.headline} icon="payments" name={v.name} badge={sourceBadge(v, "당일 기준")} />
       <Big disp={v.disp} unit={v.unit} color={v.color} size={52} sub={ratio !== null ? `${ratio.toFixed(1)}배` : undefined} />
       <div style={{ background: C.bg, borderRadius: 10, padding: "18px 18px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
         <div>
@@ -747,7 +769,7 @@ function CardLeverage({ v }: { v: Pick }) {
     dt?.futures_oi != null ? `${Math.round(dt.futures_oi).toLocaleString("ko-KR")}계약` : null;
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
-      <TitleRow desc={v.headline} icon="rocket_launch" iconSize={30} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="당일 기준" />
+      <TitleRow desc={v.headline} icon="rocket_launch" name={v.name} badge="당일 기준" />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 12 }}>
         <span style={{ fontFamily: MONO, fontSize: 44, fontWeight: 800, color: heatC, lineHeight: 1, letterSpacing: "-0.03em" }}>{heat}</span>
         <span style={{ fontSize: 18, fontWeight: 800, color: "var(--c-faint)" }}>/ 100</span>
@@ -797,7 +819,7 @@ function CardMarketActions({ v }: { v: Pick }) {
         : { t: "균형", c: C.neutral };
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
-      <TitleRow desc={v.headline} icon="speed" iconSize={30} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="최근 한 달" />
+      <TitleRow desc={v.headline} icon="speed" name={v.name} badge="최근 한 달" />
       {verdict ? (
         <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginBottom: 12 }}>
           <span style={{ fontSize: 34, fontWeight: 800, color: verdict.c, lineHeight: 1 }}>{verdict.t}</span>
@@ -834,14 +856,23 @@ function CardMarketActions({ v }: { v: Pick }) {
 function CardTurnover({ v }: { v: Pick }) {
   const c = overheatColor(v.capped);
   const share = v.raw ?? 0; // 상위10 거래대금 비중 %
-  const top5 = (v.details as unknown as { top5?: { name: string; share: number }[] })?.top5 ?? [];
+  const dt = v.details as unknown as { top5?: { name: string; share: number }[]; total_jo?: number } | null;
+  const top5 = dt?.top5 ?? [];
+  // 비중만으론 "얼마"인지 안 보인다 — 전체 거래대금(total_jo)에 비중을 곱해 금액으로 준다.
+  const totalJo = dt?.total_jo ?? null;
+  const donutTip =
+    totalJo != null
+      ? `전체 ${totalJo.toLocaleString("ko-KR")}조원 중 상위 10종목이 ${((totalJo * share) / 100).toFixed(1)}조원`
+      : `상위 10종목이 전체 거래대금의 ${share.toFixed(1)}%`;
   return (
     <Shell hit={v.isHit} minH={230}>
       <TitleRow desc={v.headline} icon="pie_chart" name={v.name} />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
         <div style={{ position: "relative", width: 116, height: 116 }}>
           <Donut pct={share} color={c} />
-          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+          {/* 툴팁은 도넛 바깥이 아니라 안쪽 라벨에 건다 — 116px 도넛 위에 걸면 툴팁이
+              카드 제목·설명 자리까지 올라가 글자를 덮는다(실측 확인). */}
+          <div className="hz-tip" data-tip={donutTip} style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
             <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 800, color: c, lineHeight: 1 }}>{Math.round(share)}%</span>
             <span style={{ fontSize: 8, fontWeight: 700, color: C.sub, marginTop: 2 }}>상위10 거래</span>
           </div>
@@ -1109,7 +1140,11 @@ function CardFx({ v }: { v: Pick }) {
         <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>±{v.disp}{v.unit}</span>
       </div>
       <div style={{ flex: 1, position: "relative", minHeight: 50 }}>
-        <Sparkline data={v.history} color={v.color} />
+        <Sparkline
+          data={v.history}
+          color={v.color}
+          tips={v.historyPoints.map((pt) => `${pt.date.slice(5)} · ±${pt.value.toFixed(2)}%`)}
+        />
       </div>
       <Foot text={v.desc} />
     </Shell>
@@ -1201,8 +1236,7 @@ function CardDivergence({ v }: { v: Pick }) {
     <Shell span={2} hit={v.isHit} minH={236}>
       <TitleRow desc={v.headline}
         icon="compare_arrows"
-        iconSize={30}
-        name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>}
+        name={v.name}
         right={
           <span style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
             <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: c, letterSpacing: "-0.02em" }}>{Math.round(div)}</span>
@@ -1227,7 +1261,7 @@ function CardTrend({ v, icon, span }: { v: Pick; icon: string; span?: 1 | 2 }) {
   const vsAvg = v.details?.vs_avg ?? null;
   return (
     <Shell span={span} hit={v.isHit} minH={210}>
-      <TitleRow desc={v.headline} icon={icon} name={v.name} iconSize={22} />
+      <TitleRow desc={v.headline} icon={icon} name={v.name} />
       {vsAvg !== null ? (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
           <VsAvg ratio={vsAvg} />
@@ -1263,7 +1297,7 @@ function CardSentiment({ v, icon, span = 1 }: { v: Pick; icon: string; span?: 1 
   const barColor = raw === 0 ? C.neutral : optimistic ? C.hot : C.cold;
   return (
     <Shell span={span} hit={v.isHit} minH={210}>
-      <TitleRow desc={v.headline} icon={icon} iconSize={22} name={v.name} />
+      <TitleRow desc={v.headline} icon={icon} name={v.name} />
       <div style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: barColor, letterSpacing: "-0.03em", margin: "8px 0 0" }}>
         {raw > 0 ? "+" : ""}
         {v.disp}
@@ -1301,7 +1335,7 @@ function CardYoutube({ v }: { v: Pick }) {
   const [baseH, todayH] = ratioBarHeights(v.threshold, v.raw);
   return (
     <Shell hit={v.isHit} minH={210}>
-      <TitleRow desc={v.headline} icon="play_circle" iconSize={22} name={v.name} />
+      <TitleRow desc={v.headline} icon="play_circle" name={v.name} />
       <div style={{ flex: 1, display: "flex", alignItems: "flex-end", gap: 14 }}>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 88 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, height: "100%" }}>
@@ -1366,7 +1400,7 @@ function CardUpbit({ v }: { v: Pick }) {
   const volLabel = (p: number) => (p >= 100 ? "HIGH" : p >= 60 ? "MID" : "LOW");
   return (
     <Shell hit={v.isHit} minH={210}>
-      <TitleRow desc={v.headline} icon="currency_bitcoin" iconSize={22} name={v.name} />
+      <TitleRow desc={v.headline} icon="currency_bitcoin" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
         <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}{v.unit}</span>
       </div>
@@ -1387,38 +1421,53 @@ function CardUpbit({ v }: { v: Pick }) {
 
 // 개인 순매수 강도 — 최근 5거래일 누적 + 일별 순매수/순매도 다이버징 바
 function CardNetBuy({ v }: { v: Pick }) {
-  const c = overheatColor(v.capped);
   const cum = v.raw ?? 0;
-  const daily = (v.details as unknown as { daily5?: number[] })?.daily5 ?? [];
+  const dt = v.details as unknown as { daily5?: number[]; dates5?: number[] } | null;
+  const daily = dt?.daily5 ?? [];
+  // 거래일은 주말·휴장을 건너뛰어 화면에서 역산할 수 없다 — 파이프라인이 넣어준
+  // YYYYMMDD 정수를 그대로 쓴다. 옛 행에는 없을 수 있어 빈 배열로 폴백한다.
+  const dates = dt?.dates5 ?? [];
   const maxAbs = Math.max(1, ...daily.map((d) => Math.abs(d)));
   const isBuy = cum >= 0;
   return (
     <Shell hit={v.isHit} minH={210}>
-      <TitleRow desc={v.headline} icon="person" iconSize={22} name={v.name} />
+      <TitleRow desc={v.headline} icon="person" name={v.name} />
       <div style={{ margin: "6px 0 2px" }}>
         <span style={{ fontSize: 10, fontWeight: 700, color: C.sub }}>최근 5거래일 누적</span>
         <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-          <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 800, color: isBuy ? C.hot : C.cold, letterSpacing: "-0.03em" }}>
-            {cum >= 0 ? "+" : ""}{Math.round(cum).toLocaleString()}
+          {/* "12,929억"은 한눈에 안 읽히고 "1.3조원"은 끝자리가 날아간다 — 둘을 함께 쓴다. */}
+          <span style={{ fontFamily: MONO, fontSize: 24, fontWeight: 800, color: isBuy ? C.hot : C.cold, letterSpacing: "-0.03em" }}>
+            {cum >= 0 ? "+" : ""}{formatEokMixed(cum)}
           </span>
-          <span style={{ fontSize: 12, fontWeight: 800, color: isBuy ? C.hot : C.cold }}>억 {isBuy ? "순매수" : "순매도"}</span>
+          <span style={{ fontSize: 12, fontWeight: 800, color: isBuy ? C.hot : C.cold }}>{isBuy ? "순매수" : "순매도"}</span>
         </div>
       </div>
       <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, minHeight: 60 }}>
         {daily.map((d, i) => {
           const px = Math.round((Math.abs(d) / maxAbs) * 24);
           const buy = d >= 0;
+          const ymd = dates[i];
+          const label = ymd
+            ? `${String(ymd).slice(4, 6)}-${String(ymd).slice(6, 8)} · ${d >= 0 ? "+" : ""}${formatEokMixed(d)} ${d >= 0 ? "순매수" : "순매도"}`
+            : `${d >= 0 ? "+" : ""}${formatEokMixed(d)}`;
           return (
-            <div key={i} style={{ flex: 1, position: "relative", height: 56 }}>
+            <div
+              key={i}
+              className="hz-tip"
+              data-tip={label}
+              style={{ flex: 1, position: "relative", height: 56 }}
+            >
               <div style={{ position: "absolute", left: 0, right: 0, top: "50%", height: 1, background: C.line }} />
               <div style={{ position: "absolute", left: "22%", right: "22%", height: px, background: buy ? C.hot : C.cold, borderRadius: 2, ...(buy ? { bottom: "50%" } : { top: "50%" }) }} />
             </div>
           );
         })}
       </div>
+      {/* 예전엔 "5일 전 / 어제" 였는데 마지막 막대는 보통 '오늘'이라 틀린 표기였다.
+          이제 dates5 가 있으니 실제 거래일을 적는다(거래일이라 달력상 5일 전이 아닐 수도 있다). */}
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, fontWeight: 700, color: "var(--c-faint)", marginTop: -4, marginBottom: 2 }}>
-        <span>5일 전</span>
-        <span>어제</span>
+        <span>{dates.length ? `${String(dates[0]).slice(4, 6)}-${String(dates[0]).slice(6, 8)}` : "5일 전"}</span>
+        <span>{dates.length ? `${String(dates[dates.length - 1]).slice(4, 6)}-${String(dates[dates.length - 1]).slice(6, 8)}` : "최근"}</span>
       </div>
       <Foot text={v.desc} />
     </Shell>
@@ -1429,11 +1478,16 @@ function CardNetBuy({ v }: { v: Pick }) {
 function CardDeposit({ v }: { v: Pick }) {
   const c = overheatColor(v.capped);
   const jo = (v.details as unknown as { jo?: number })?.jo ?? (v.raw ?? 0) / 10000;
-  const recent = (v.details as unknown as { recent_jo?: number[] })?.recent_jo ?? [];
+  // 예전엔 details.recent_jo(조원 배열)를 썼지만 날짜가 없어 툴팁을 못 만들었다.
+  // historyPoints 는 날짜를 갖고 있고 값은 억원이라 1e4 로 나눠 조원으로 맞춘다.
+  const points = v.historyPoints.map((pt) => ({ date: pt.date, jo: pt.value / 10000 }));
+  const recent = points.length
+    ? points.map((pt) => pt.jo)
+    : ((v.details as unknown as { recent_jo?: number[] })?.recent_jo ?? []);
   const change = recent.length >= 2 ? recent[recent.length - 1] - recent[0] : 0;
   return (
     <Shell hit={v.isHit} minH={210}>
-      <TitleRow desc={v.headline} icon="savings" iconSize={22} name={v.name} />
+      <TitleRow desc={v.headline} icon="savings" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "6px 0 4px" }}>
         <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: c, letterSpacing: "-0.03em" }}>{jo.toFixed(1)}</span>
         <span style={{ fontSize: 13, fontWeight: 700, color: C.sub }}>조원</span>
@@ -1442,7 +1496,11 @@ function CardDeposit({ v }: { v: Pick }) {
         </span>
       </div>
       <div style={{ flex: 1, position: "relative", minHeight: 52 }}>
-        <Sparkline data={recent} color={c} />
+        <Sparkline
+          data={recent}
+          color={c}
+          tips={points.length === recent.length ? points.map((pt) => `${pt.date.slice(5)} · ${pt.jo.toFixed(1)}조원`) : undefined}
+        />
       </div>
       <Foot text={v.desc} />
     </Shell>
@@ -1451,9 +1509,20 @@ function CardDeposit({ v }: { v: Pick }) {
 
 // 옵션 풋/콜 비율 — 콜(탐욕) vs 풋(공포) 거래량 비중. (KRX 옵션 API 승인 전까지 임시 데이터)
 function CardPutCall({ v }: { v: Pick }) {
-  const dt = v.details as unknown as { put_vol?: number; call_vol?: number } | null;
+  const dt = v.details as unknown as {
+    put_vol?: number; call_vol?: number; put_eok?: number; call_eok?: number;
+  } | null;
   const put = dt?.put_vol ?? 0;
   const call = dt?.call_vol ?? 0;
+  // 계약 수는 행사가마다 단가가 달라 규모 감각을 못 준다 — 툴팁엔 거래대금을 쓴다.
+  const tip = (kind: "call" | "put") => {
+    const vol = kind === "call" ? call : put;
+    const eok = kind === "call" ? dt?.call_eok : dt?.put_eok;
+    const head = kind === "call" ? "콜(상승 베팅)" : "풋(하락 대비)";
+    return eok != null
+      ? `${head} · ${formatEokMixed(eok)} · ${vol.toLocaleString("ko-KR")}계약`
+      : `${head} · ${vol.toLocaleString("ko-KR")}계약`;
+  };
   const total = put + call || 1;
   const callShare = (call / total) * 100;
   const ratio = call > 0 ? put / call : 0; // 풋/콜
@@ -1461,7 +1530,7 @@ function CardPutCall({ v }: { v: Pick }) {
   const c = greedy ? C.hot : C.cold;
   return (
     <Shell hit={v.isHit} minH={210}>
-      <TitleRow desc={v.headline} icon="casino" iconSize={22} name={v.name} />
+      <TitleRow desc={v.headline} icon="casino" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "6px 0 14px" }}>
         <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 800, color: c, letterSpacing: "-0.03em" }}>{ratio.toFixed(2)}</span>
         <span style={{ fontSize: 11, fontWeight: 700, color: C.sub }}>풋/콜</span>
@@ -1469,10 +1538,10 @@ function CardPutCall({ v }: { v: Pick }) {
       </div>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 8 }}>
         <div style={{ display: "flex", height: 24, borderRadius: 8, overflow: "hidden" }}>
-          <div style={{ width: `${callShare}%`, background: C.hot, display: "flex", alignItems: "center", paddingLeft: 8 }}>
+          <div className="hz-tip" data-tip={tip("call")} style={{ width: `${callShare}%`, background: C.hot, display: "flex", alignItems: "center", paddingLeft: 8 }}>
             <span style={{ fontSize: 10, fontWeight: 800, color: "#fff" }}>콜 {Math.round(callShare)}%</span>
           </div>
-          <div style={{ width: `${100 - callShare}%`, background: C.cold, display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 8 }}>
+          <div className="hz-tip" data-tip={tip("put")} style={{ width: `${100 - callShare}%`, background: C.cold, display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 8 }}>
             <span style={{ fontSize: 10, fontWeight: 800, color: "#fff" }}>풋 {Math.round(100 - callShare)}%</span>
           </div>
         </div>
@@ -1497,7 +1566,7 @@ function CardBrokerage({ v }: { v: Pick }) {
   const shortName = (n: string) => (n.split(/[-(,]/)[0].trim().slice(0, 18) || n);
   return (
     <Shell hit={v.isHit} minH={210}>
-      <TitleRow desc={v.headline} icon="leaderboard" iconSize={22} name={v.name} />
+      <TitleRow desc={v.headline} icon="leaderboard" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "6px 0 10px" }}>
         <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: c, letterSpacing: "-0.03em" }}>{count}</span>
         <span style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>개 앱 인기차트 진입</span>
@@ -1549,7 +1618,7 @@ const FALLBACK_ICONS: Record<string, string> = {
 function GenericCard({ v, icon }: { v: Pick; icon: string }) {
   return (
     <Shell hit={v.isHit} minH={210}>
-      <TitleRow desc={v.headline} icon={icon} iconSize={22} name={v.name} />
+      <TitleRow desc={v.headline} icon={icon} name={v.name} />
       <Big disp={v.disp} unit={v.unit} color={v.color} size={30} />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
         <HeatBar v={v} />

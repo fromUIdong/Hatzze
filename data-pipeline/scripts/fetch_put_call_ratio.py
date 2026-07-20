@@ -70,8 +70,13 @@ def to_int(value) -> int:
         return 0
 
 
-def fetch_volumes(bas_dd: str) -> tuple[int, int] | None:
-    """(put_vol, call_vol). 휴장일 등 데이터가 없으면 None."""
+def fetch_volumes(bas_dd: str) -> tuple[int, int, int, int] | None:
+    """(put_vol, call_vol, put_val, call_val). 휴장일 등 데이터가 없으면 None.
+
+    비율은 거래량(계약 수)으로 내지만, 카드 툴팁이 "얼마가 걸려 있나"를 보여줄 수
+    있도록 거래대금(ACC_TRDVAL, 원)도 함께 모은다 — 계약 수는 행사가마다 단가가
+    달라 규모 감각을 주지 못한다.
+    """
     resp = krx_get(KRX_URL, bas_dd)
     if resp is None:
         return None  # 네트워크 재시도 소진 — 이 날짜만 건너뜀
@@ -84,21 +89,24 @@ def fetch_volumes(bas_dd: str) -> tuple[int, int] | None:
     resp.raise_for_status()
 
     records = resp.json().get("OutBlock_1", [])
-    put_vol = call_vol = 0
+    put_vol = call_vol = put_val = call_val = 0
     for r in records:
         if not str(r.get("PROD_NM", "")).startswith(KOSPI200_PROD_PREFIXES):
             continue
         vol = to_int(r.get("ACC_TRDVOL"))
+        val = to_int(r.get("ACC_TRDVAL"))
         kind = r.get("RGHT_TP_NM")
         if kind == "PUT":
             put_vol += vol
+            put_val += val
         elif kind == "CALL":
             call_vol += vol
+            call_val += val
 
     # 콜 거래량이 0이면 비율이 무한대라 저장하지 않는다(휴장일·데이터 결손).
     if call_vol == 0:
         return None
-    return put_vol, call_vol
+    return put_vol, call_vol, put_val, call_val
 
 
 def backfill(client, indicator_id: str) -> None:
@@ -126,13 +134,19 @@ def backfill(client, indicator_id: str) -> None:
     for d in missing_days:
         result = fetch_volumes(d.strftime("%Y%m%d"))
         if result is not None:
-            put_vol, call_vol = result
+            put_vol, call_vol, put_val, call_val = result
             new_rows.append(
                 {
                     "indicator_id": indicator_id,
                     "date": d.isoformat(),
                     "raw_value": round(put_vol / call_vol, 4),
-                    "details": {"put_vol": put_vol, "call_vol": call_vol},
+                    # *_eok = 거래대금(억원). 카드 툴팁이 "얼마가 걸려 있나"를 보여준다.
+                    "details": {
+                        "put_vol": put_vol,
+                        "call_vol": call_vol,
+                        "put_eok": round(put_val / 1e8),
+                        "call_eok": round(call_val / 1e8),
+                    },
                 }
             )
         time.sleep(REQUEST_DELAY_SEC)
