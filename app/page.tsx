@@ -1,5 +1,5 @@
-import { getLatestDailyScore, getPublicIndicators } from "@/lib/data";
-import type { DailyScore, IndicatorCategory, IndicatorWithLatestValue } from "@/lib/data";
+import { getLatestDailyScore, getPublicIndicators, getTopStockHighGaps } from "@/lib/data";
+import type { DailyScore, IndicatorCategory, IndicatorWithLatestValue, StockHighGap } from "@/lib/data";
 import { formatIndicatorValue, formatKstUpdate } from "@/lib/format";
 import { C, Icon, MONO, stageForScore } from "./ui";
 
@@ -187,72 +187,67 @@ function HitBadge({ label = "🎯 HIT", small = false }: { label?: string; small
   );
 }
 
-function Tag({ text, color }: { text: string | null; color: string }) {
-  if (!text) return null;
-  return (
-    <p
-      style={{
-        margin: "0 0 12px",
-        fontSize: 11,
-        fontWeight: 800,
-        fontStyle: "italic",
-        textTransform: "uppercase",
-        letterSpacing: "0.04em",
-        color,
-      }}
-    >
-      &ldquo;{text}&rdquo;
-    </p>
-  );
-}
 
+/**
+ * 카드 머리 — 카더라 리포트(app/telegram의 SectionHead)와 같은 구조를 쓴다:
+ * [아이콘 + 제목] 을 먼저 두고 그 아래 한 줄 설명을 붙인다.
+ *
+ * 예전엔 따옴표 친 기울임 헤드라인("꼭대기까지 남은 발걸음")이 제목 위에 먼저 왔고
+ * 아이콘 색이 과열도에 따라 카드마다 달라 두 페이지가 다른 서비스처럼 보였다.
+ * 아이콘은 파랑으로 고정한다 — 과열도는 카드 안의 수치·게이지가 이미 색으로 말한다.
+ */
 function TitleRow({
   icon,
   name,
-  color = C.sub,
+  desc,
   iconSize = 24,
   badge,
   right,
 }: {
   icon: string;
   name: React.ReactNode;
-  color?: string;
+  /** 제목 아래 한 줄 설명. 카드 하단에 자세한 설명이 따로 있으므로 짧게 둔다. */
+  desc?: string | null;
   iconSize?: number;
   badge?: string;
   right?: React.ReactNode;
 }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        marginBottom: 14,
-        justifyContent: right ? "space-between" : undefined,
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <Icon name={icon} style={{ fontSize: iconSize, color }} />
-        <span style={{ fontSize: 15, fontWeight: 800, color: C.ink, lineHeight: 1.2, wordBreak: "keep-all" }}>
-          {name}
-        </span>
-        {badge && (
-          <span
-            style={{
-              fontSize: 9,
-              fontWeight: 700,
-              color: C.sub,
-              background: C.bg,
-              padding: "3px 8px",
-              borderRadius: 999,
-              whiteSpace: "nowrap",
-            }}
-          >
-            {badge}
+    <div style={{ marginBottom: 14 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          justifyContent: right ? "space-between" : undefined,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Icon name={icon} style={{ fontSize: iconSize, color: C.blue }} />
+          <span style={{ fontSize: 15, fontWeight: 800, color: C.ink, lineHeight: 1.2, wordBreak: "keep-all" }}>
+            {name}
           </span>
-        )}
+          {badge && (
+            <span
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                color: C.sub,
+                background: C.bg,
+                padding: "3px 8px",
+                borderRadius: 999,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {badge}
+            </span>
+          )}
+        </div>
+        {right}
       </div>
-      {right}
+      {desc && (
+        <p style={{ margin: "7px 0 0", fontSize: 12, lineHeight: 1.5, color: C.sub, wordBreak: "keep-all" }}>{desc}</p>
+      )}
     </div>
   );
 }
@@ -692,19 +687,19 @@ function CardBuffett({ v }: { v: Pick }) {
   const jo = (won: number) => Math.round(won / 1e12).toLocaleString("ko-KR"); // 원 → 조원
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
-      <Tag text={v.headline} color={v.color} />
-      <TitleRow icon="payments" iconSize={30} color={v.color} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge={sourceBadge(v, "당일 기준")} />
+      <TitleRow desc={v.headline} icon="payments" iconSize={30} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge={sourceBadge(v, "당일 기준")} />
       <Big disp={v.disp} unit={v.unit} color={v.color} size={52} sub={ratio !== null ? `${ratio.toFixed(1)}배` : undefined} />
       <div style={{ background: C.bg, borderRadius: 10, padding: "18px 18px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 6 }}>
-            <span>
+            {/* 1칸 카드라 폭이 좁다 — 분기 표기는 "~26년 1분기"로 줄여 한 줄에 들어가게 한다. */}
+            <span style={{ whiteSpace: "nowrap" }}>
               나라 경제 (GDP)
               {dt && dt.gdp_year ? (
-                <span style={{ color: "var(--c-faint)", fontWeight: 600 }}> · 최근 4개 분기(~{dt.gdp_year} {dt.gdp_q}분기)</span>
+                <span style={{ color: "var(--c-faint)", fontWeight: 600 }}> · ~{String(dt.gdp_year).slice(2)}년 {dt.gdp_q}분기</span>
               ) : null}
             </span>
-            <span style={{ fontFamily: MONO }}>{dt && dt.gdp ? `약 ${jo(dt.gdp)}조원` : "기준 100"}</span>
+            <span style={{ fontFamily: MONO, whiteSpace: "nowrap" }}>{dt && dt.gdp ? `약 ${jo(dt.gdp)}조원` : "기준 100"}</span>
           </div>
           <div style={{ height: 18, background: "var(--c-line)", borderRadius: 6, overflow: "hidden" }}>
             <div style={{ height: "100%", width: `${gdpWidth}%`, background: "var(--c-hint)", borderRadius: 6 }} />
@@ -752,8 +747,7 @@ function CardLeverage({ v }: { v: Pick }) {
     dt?.futures_oi != null ? `${Math.round(dt.futures_oi).toLocaleString("ko-KR")}계약` : null;
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
-      <Tag text={v.headline} color={heatC} />
-      <TitleRow icon="rocket_launch" iconSize={30} color={heatC} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="당일 기준" />
+      <TitleRow desc={v.headline} icon="rocket_launch" iconSize={30} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="당일 기준" />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 12 }}>
         <span style={{ fontFamily: MONO, fontSize: 44, fontWeight: 800, color: heatC, lineHeight: 1, letterSpacing: "-0.03em" }}>{heat}</span>
         <span style={{ fontSize: 18, fontWeight: 800, color: "var(--c-faint)" }}>/ 100</span>
@@ -803,8 +797,7 @@ function CardMarketActions({ v }: { v: Pick }) {
         : { t: "균형", c: C.neutral };
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
-      <Tag text={v.headline} color={v.color} />
-      <TitleRow icon="speed" iconSize={30} color={v.color} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="최근 한 달" />
+      <TitleRow desc={v.headline} icon="speed" iconSize={30} name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>} badge="최근 한 달" />
       {verdict ? (
         <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginBottom: 12 }}>
           <span style={{ fontSize: 34, fontWeight: 800, color: verdict.c, lineHeight: 1 }}>{verdict.t}</span>
@@ -844,8 +837,7 @@ function CardTurnover({ v }: { v: Pick }) {
   const top5 = (v.details as unknown as { top5?: { name: string; share: number }[] })?.top5 ?? [];
   return (
     <Shell hit={v.isHit} minH={230}>
-      <Tag text={v.headline} color={c} />
-      <TitleRow icon="pie_chart" name={v.name} color={c} />
+      <TitleRow desc={v.headline} icon="pie_chart" name={v.name} />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14 }}>
         <div style={{ position: "relative", width: 116, height: 116 }}>
           <Donut pct={share} color={c} />
@@ -868,23 +860,106 @@ function CardTurnover({ v }: { v: Pick }) {
   );
 }
 
-// 5. 코스피 신고가 괴리율 — 세로 게이지 (실제 값으로 복원)
-function CardHighGap({ v }: { v: Pick }) {
+/**
+ * 코스피 신고가 괴리율 — 지수 괴리율(왼쪽) + 거래대금 상위 3종목의 괴리율(오른쪽).
+ *
+ * 지수만 보면 "-25%"라는 한 덩어리 숫자뿐이라 그 안에서 주도주들이 어떤 상태인지 안
+ * 보인다. 지금 돈이 몰리는 종목들이 각자 고점에서 얼마나 떨어져 있는지를 나란히 두면
+ * 지수 숫자가 어디서 온 건지 읽힌다(종목 선정·산출은 lib/data.ts getTopStockHighGaps).
+ */
+function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
   const gap = v.raw ?? 0;
   const fillH = Math.max(0, Math.min(100, 100 - Math.abs(gap)));
   return (
-    <Shell hit={v.isHit} minH={230}>
-      <Tag text={v.headline} color={v.color} />
-      <TitleRow icon="vertical_align_top" name={v.name} color={v.color} badge={sourceBadge(v, "")} />
-      <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1 }}>
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <span style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{gap > 0 ? "+" : ""}{v.disp}{v.unit}</span>
-          <span style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginTop: 4 }}>{gap > 0 ? "이전 전고점 돌파" : "전고점으로부터"}</span>
+    <Shell span={2} hit={v.isHit} minH={230}>
+      <TitleRow desc={v.headline} icon="vertical_align_top" name={v.name} badge={sourceBadge(v, "")} />
+      <div style={{ display: "flex", gap: 24, flex: 1 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <span style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{gap > 0 ? "+" : ""}{v.disp}{v.unit}</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginTop: 4 }}>{gap > 0 ? "이전 전고점 돌파" : "전고점으로부터"}</span>
+          </div>
+          <div style={{ alignSelf: "stretch", display: "flex", justifyContent: "center", padding: "6px 0" }}>
+            <div style={{ width: 74, position: "relative", background: C.bg, borderRadius: 10, overflow: "hidden" }}>
+              <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: `${fillH}%`, background: `linear-gradient(180deg,#7cbde6,${C.cold})` }} />
+              <span style={{ position: "absolute", top: 6, right: 8, fontSize: 9, fontWeight: 800, color: C.ink }}>전고점</span>
+            </div>
+          </div>
         </div>
-        <div style={{ flex: 1, alignSelf: "stretch", display: "flex", justifyContent: "center", padding: "6px 0" }}>
-          <div style={{ width: 74, position: "relative", background: C.bg, borderRadius: 10, overflow: "hidden" }}>
-            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: `${fillH}%`, background: `linear-gradient(180deg,#7cbde6,${C.cold})` }} />
-            <span style={{ position: "absolute", top: 6, right: 8, fontSize: 9, fontWeight: 800, color: C.ink }}>전고점</span>
+        {tops.length > 0 && (
+          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center", gap: 10, borderLeft: `1px solid ${C.line}`, paddingLeft: 24 }}>
+            <span style={{ fontSize: 10, fontWeight: 800, color: C.sub }}>거래대금 상위 종목의 52주 고점 대비</span>
+            {tops.map((s) => {
+              // 고점 대비 낙폭이 클수록 막대가 짧다 — 지수 게이지와 같은 읽기 방향.
+              const pct = Math.max(0, Math.min(100, 100 + s.gapPct));
+              return (
+                <div key={s.code} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: C.ink, width: 68, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</span>
+                  <div style={{ flex: 1, height: 6, borderRadius: 999, background: C.bg, overflow: "hidden", minWidth: 0 }}>
+                    <div style={{ width: `${pct}%`, height: "100%", background: C.cold, borderRadius: 999 }} />
+                  </div>
+                  <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, color: C.cold, width: 46, textAlign: "right" }}>
+                    {s.gapPct >= 0 ? "+" : ""}{s.gapPct.toFixed(1)}%
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
+// 6. VKOSPI — 반원 게이지 (과열도 + 실제 값)
+/**
+ * VKOSPI — 숫자를 하나만 쓴다.
+ *
+ * 예전엔 "과열도 23/100"과 "실제 VKOSPI 87"을 같이 보여줬는데, 초보에겐 둘 중 뭘 봐야
+ * 하는지도, 왜 하나는 낮고 하나는 높은지도(과열도는 낮을수록 과열이라 역방향) 알 수
+ * 없었다. 지수 값 하나만 크게 두고, 그 값이 높은지 낮은지는 최근 30일 범위 안의
+ * 위치로 보여준다 — "87"만 봐선 모르지만 "73~97 중 여기"면 바로 읽힌다.
+ */
+function CardVkospi({ v }: { v: Pick }) {
+  const hist = v.history.filter((x) => typeof x === "number");
+  const lo = hist.length ? Math.min(...hist) : null;
+  const hi = hist.length ? Math.max(...hist) : null;
+  const cur = v.raw;
+  // 범위 안 위치(0=최저, 1=최고). 최근 30일이 평평하면 가운데로 둔다.
+  const pos = cur !== null && lo !== null && hi !== null && hi > lo ? (cur - lo) / (hi - lo) : 0.5;
+  // 색은 '불안의 크기' 기준 — 변동성이 높을수록 시장이 불안하다(과열도와 방향이 반대).
+  const c = pos >= 0.66 ? C.cold : pos <= 0.33 ? C.hot : C.sub;
+  const verdict = pos >= 0.66 ? "최근 30일 중 높은 편" : pos <= 0.33 ? "최근 30일 중 낮은 편" : "최근 30일 평균 수준";
+  return (
+    <Shell hit={v.isHit} minH={230}>
+      <TitleRow desc={v.headline} icon="monitor_heart" name={v.name} />
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 14 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
+          <span style={{ fontFamily: MONO, fontSize: 40, fontWeight: 800, color: c, letterSpacing: "-0.03em", lineHeight: 1 }}>{v.disp}</span>
+          <span style={{ fontSize: 12, fontWeight: 800, color: C.sub }}>변동성지수</span>
+          <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 800, color: c }}>{verdict}</span>
+        </div>
+        <div>
+          <div style={{ position: "relative", height: 8, borderRadius: 999, background: `linear-gradient(90deg, ${C.hot}, var(--c-track), ${C.cold})` }}>
+            <span
+              style={{
+                position: "absolute",
+                left: `${pos * 100}%`,
+                top: -3,
+                transform: "translateX(-50%)",
+                width: 14,
+                height: 14,
+                borderRadius: "50%",
+                background: C.ink,
+                border: `2px solid ${C.card}`,
+              }}
+            />
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 7, fontSize: 9, fontWeight: 800 }}>
+            <span style={{ color: C.hot }}>방심 {lo !== null ? Math.round(lo) : "-"}</span>
+            <span style={{ color: C.sub }}>최근 30일 범위</span>
+            <span style={{ color: C.cold }}>불안 {hi !== null ? Math.round(hi) : "-"}</span>
           </div>
         </div>
       </div>
@@ -893,71 +968,6 @@ function CardHighGap({ v }: { v: Pick }) {
   );
 }
 
-// 6. VKOSPI — 반원 게이지 (과열도 + 실제 값)
-function CardVkospi({ v }: { v: Pick }) {
-  const c = overheatColor(v.capped); // 과열도 게이지는 stage 구간(50=과열) 색
-  return (
-    <Shell hit={v.isHit} minH={230}>
-      <Tag text={v.headline} color={c} />
-      <TitleRow icon="monitor_heart" name={v.name} color={c} />
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
-        <HalfGauge score={v.capped ?? 0} color={c} />
-        <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-          <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: c, lineHeight: 1 }}>{v.capped !== null ? Math.round(v.capped) : "-"}</span>
-          <span style={{ fontSize: 13, fontWeight: 800, color: "var(--c-faint)" }}>/100</span>
-          <span style={{ fontSize: 11, fontWeight: 800, color: c, marginLeft: 2 }}>과열도</span>
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", width: 182, fontSize: 9, fontWeight: 800, marginTop: 2 }}>
-          <span style={{ color: C.cold }}>안심</span>
-          <span style={{ color: C.hot }}>과열</span>
-        </div>
-        <div style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginTop: 2 }}>실제 VKOSPI <b style={{ color: C.ink }}>{v.disp}</b> · 낮을수록 과열</div>
-      </div>
-      <Foot text={v.desc} />
-    </Shell>
-  );
-}
-
-// 7. VIX 대비 VKOSPI — 각자 1년 분포 내 백분위로 정규화해 비교(스케일 무관).
-// raw = VIX 백분위 - VKOSPI 백분위, 양수로 클수록 "한국만 유독 잠잠" = 방심.
-function CardVixSpread({ v }: { v: Pick }) {
-  const dt = v.details;
-  const hasPct = !!dt && "vix_pct" in dt && "vkospi_pct" in dt;
-  // 부호에 따라 방향 문구를 바꾼다 — 음수면 한국이 오히려 더 출렁이는 것이므로
-  // "한국이 더 잠잠"이라고 하면 안 된다. 크기는 절댓값으로 보여준다.
-  const rawv = v.raw ?? 0;
-  const spread =
-    rawv > 0
-      ? { label: "한국이 더 잠잠", color: C.hot }
-      : rawv < 0
-        ? { label: "한국이 더 출렁", color: C.cold }
-        : { label: "미·한 비슷", color: C.sub };
-  return (
-    <Shell hit={v.isHit} minH={230}>
-      <Tag text={v.headline} color={v.color} />
-      <TitleRow icon="compare_arrows" name={v.name} color={v.color} />
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 10 }}>
-        {hasPct ? (
-          <>
-            <div style={{ fontSize: 9, color: "var(--c-muted)", fontWeight: 700 }}>각자 최근 1년 변동성 대비 현재 위치 (0=최저 ~ 100=최고)</div>
-            <VixPctRow flag="🇺🇸" label="VIX" pct={dt!.vix_pct} color={C.mania} />
-            <VixPctRow flag="🇰🇷" label="VKOSPI" pct={dt!.vkospi_pct} color={C.cold} />
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.bg, borderRadius: 10, padding: 9 }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: C.sub }}>{spread.label}</span>
-              <span style={{ fontFamily: MONO, fontSize: 20, fontWeight: 800, color: spread.color }}>
-                {Math.abs(Math.round(rawv))}
-                {v.unit}
-              </span>
-            </div>
-          </>
-        ) : (
-          <HeatBar v={v} />
-        )}
-      </div>
-      <Foot text={v.desc} />
-    </Shell>
-  );
-}
 
 // 8. 코스피 vs 아시아 — 4개국 상대 막대 (details 있으면 목업 원본, 없으면 과열도)
 function CardAsia({ v }: { v: Pick }) {
@@ -965,8 +975,7 @@ function CardAsia({ v }: { v: Pick }) {
   if (!dt) {
     return (
       <Shell span={2} hit={v.isHit} minH={230}>
-        <Tag text={v.headline} color={v.color} />
-        <TitleRow icon="public" name={v.name} color={v.color} badge="최근 한 달" />
+        <TitleRow desc={v.headline} icon="public" name={v.name} badge="최근 한 달" />
         <Big disp={v.raw !== null && v.raw > 0 ? `+${v.disp}` : v.disp} unit={v.unit} color={v.color} size={40} sub="아시아 3국 평균 대비" />
         <HeatBar v={v} />
         <Foot text={v.desc} />
@@ -985,8 +994,7 @@ function CardAsia({ v }: { v: Pick }) {
   const heights = emphasizedHeights(bars.map((b) => b.index), 55);
   return (
     <Shell span={2} hit={v.isHit} minH={230}>
-      <Tag text={v.headline} color={v.color} />
-      <TitleRow icon="public" name={v.name} color={v.color} badge="최근 한 달" />
+      <TitleRow desc={v.headline} icon="public" name={v.name} badge="최근 한 달" />
       <div style={{ fontSize: 9, color: "var(--c-muted)", fontWeight: 700, marginBottom: 4 }}>
         KOSPI를 100으로 둔 상대 지수 · 코스피 초과수익률 {v.raw !== null && v.raw > 0 ? "+" : ""}
         {v.disp}
@@ -1036,7 +1044,7 @@ function SubNote({ text }: { text: string }) {
 function CardRiskAssets({ gold, kosdaq }: { gold: Pick; kosdaq: Pick }) {
   return (
     <Shell span={2} hit={gold.isHit || kosdaq.isHit} minH={230}>
-      <Tag text="위험자산 vs 안전자산" color={C.sub} />
+      <TitleRow icon="balance" name="위험자산 VS 안전자산" desc="금·코스피를 기준으로 본 위험 선호도" />
       <div style={{ display: "flex", gap: 32, flex: 1 }}>
         <SubRatio v={gold} icon="balance" label="코스피 강도 (vs 금)" />
         <div style={{ width: 1, background: C.line }} />
@@ -1061,11 +1069,9 @@ function CardVolume({ v }: { v: Pick }) {
   const surge = dt?.surge_pct ?? null;
   return (
     <Shell hit={v.isHit} minH={230}>
-      <Tag text={v.headline} color={v.color} />
-      <TitleRow
+      <TitleRow desc={v.headline}
         icon="groups"
         name={v.name}
-        color={v.color}
         right={
           surge !== null ? (
             <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: surge >= 0 ? C.hot : C.cold }}>
@@ -1098,8 +1104,7 @@ function CardVolume({ v }: { v: Pick }) {
 function CardFx({ v }: { v: Pick }) {
   return (
     <Shell hit={v.isHit} minH={230}>
-      <Tag text={v.headline} color={v.color} />
-      <TitleRow icon="waves" name={v.name} color={v.color} />
+      <TitleRow desc={v.headline} icon="waves" name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
         <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>±{v.disp}{v.unit}</span>
       </div>
@@ -1116,11 +1121,14 @@ function CardComingSoon() {
   return (
     <Shell minH={230}>
       <div style={{ opacity: 0.85, display: "flex", flexDirection: "column", flex: 1 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-          <p style={{ margin: 0, fontSize: 10, fontWeight: 800, fontStyle: "italic", textTransform: "uppercase", letterSpacing: "0.04em", color: C.sub }}>&ldquo;빚내서 사는 돈의 크기&rdquo;</p>
-          <span style={{ background: "var(--c-blue-tint)", color: C.blue, fontWeight: 800, padding: "4px 9px", borderRadius: 6, fontSize: 9 }}>준비 중</span>
-        </div>
-        <TitleRow icon="credit_score" name={<span style={{ color: "var(--c-muted)" }}>신용융자 잔고</span>} color="var(--c-faint)" />
+        <TitleRow
+          icon="credit_score"
+          name={<span style={{ color: "var(--c-muted)" }}>신용융자 잔고</span>}
+          desc="빚내서 주식을 산 금액"
+          right={
+            <span style={{ background: "var(--c-blue-tint)", color: C.blue, fontWeight: 800, padding: "4px 9px", borderRadius: 6, fontSize: 9 }}>준비 중</span>
+          }
+        />
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <svg width="100%" height="70" viewBox="0 0 100 40" preserveAspectRatio="none">
             <path d="M0 34 L20 32 L40 28 L60 22 L80 15 L100 8" fill="none" stroke={C.line} strokeDasharray="4,3" strokeWidth="2.5" strokeLinecap="round" />
@@ -1191,11 +1199,9 @@ function CardDivergence({ v }: { v: Pick }) {
   const c = overheatColor(div);
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
-      <Tag text={v.headline} color={c} />
-      <TitleRow
+      <TitleRow desc={v.headline}
         icon="compare_arrows"
         iconSize={30}
-        color={c}
         name={<h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{v.name}</h3>}
         right={
           <span style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
@@ -1217,12 +1223,11 @@ function CardDivergence({ v }: { v: Pick }) {
 // 라인+마커형 (초보검색/재테크도서/GitHub)
 // 네이버 검색지수(초보검색)는 details.vs_avg가 있어 '평소 대비 N배'로,
 // 그 외(재테크도서·GitHub)는 기존 값+과열기준 라인으로 보여준다.
-function CardTrend({ v, icon }: { v: Pick; icon: string }) {
+function CardTrend({ v, icon, span }: { v: Pick; icon: string; span?: 1 | 2 }) {
   const vsAvg = v.details?.vs_avg ?? null;
   return (
-    <Shell hit={v.isHit} minH={210}>
-      <Tag text={v.headline} color={v.color} />
-      <TitleRow icon={icon} name={v.name} iconSize={22} color={v.color} />
+    <Shell span={span} hit={v.isHit} minH={210}>
+      <TitleRow desc={v.headline} icon={icon} name={v.name} iconSize={22} />
       {vsAvg !== null ? (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
           <VsAvg ratio={vsAvg} />
@@ -1258,8 +1263,7 @@ function CardSentiment({ v, icon, span = 1 }: { v: Pick; icon: string; span?: 1 
   const barColor = raw === 0 ? C.neutral : optimistic ? C.hot : C.cold;
   return (
     <Shell span={span} hit={v.isHit} minH={210}>
-      <Tag text={v.headline} color={barColor} />
-      <TitleRow icon={icon} iconSize={22} color={barColor} name={v.name} />
+      <TitleRow desc={v.headline} icon={icon} iconSize={22} name={v.name} />
       <div style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: barColor, letterSpacing: "-0.03em", margin: "8px 0 0" }}>
         {raw > 0 ? "+" : ""}
         {v.disp}
@@ -1297,8 +1301,7 @@ function CardYoutube({ v }: { v: Pick }) {
   const [baseH, todayH] = ratioBarHeights(v.threshold, v.raw);
   return (
     <Shell hit={v.isHit} minH={210}>
-      <Tag text={v.headline} color={v.color} />
-      <TitleRow icon="play_circle" iconSize={22} name={v.name} color={v.color} />
+      <TitleRow desc={v.headline} icon="play_circle" iconSize={22} name={v.name} />
       <div style={{ flex: 1, display: "flex", alignItems: "flex-end", gap: 14 }}>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 88 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, height: "100%" }}>
@@ -1324,7 +1327,6 @@ function CardYoutube({ v }: { v: Pick }) {
 function SubSpend({ v, icon }: { v: Pick; icon: string }) {
   return (
     <div style={{ flex: 1 }}>
-      <Tag text={v.headline} color={v.color} />
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <Icon name={icon} style={{ fontSize: 18, color: C.sub }} />
         <span style={{ fontSize: 12, fontWeight: 700, wordBreak: "keep-all" }}>{v.name}</span>
@@ -1343,7 +1345,7 @@ function SubSpend({ v, icon }: { v: Pick; icon: string }) {
 function CardSpending({ luxury, dining }: { luxury: Pick; dining: Pick }) {
   return (
     <Shell span={2} hit={luxury.isHit || dining.isHit} minH={210}>
-      <h3 style={{ margin: "0 0 18px", fontSize: 15, fontWeight: 800 }}>여윳돈이 향하는 곳</h3>
+      <TitleRow icon="local_mall" name="여윳돈이 향하는 곳" desc="명품·외식 검색량으로 본 소비 심리" />
       <div style={{ display: "flex", gap: 32, flex: 1 }}>
         <SubSpend v={luxury} icon="shopping_bag" />
         <div style={{ width: 1, background: C.line }} />
@@ -1364,8 +1366,7 @@ function CardUpbit({ v }: { v: Pick }) {
   const volLabel = (p: number) => (p >= 100 ? "HIGH" : p >= 60 ? "MID" : "LOW");
   return (
     <Shell hit={v.isHit} minH={210}>
-      <Tag text={v.headline} color={v.color} />
-      <TitleRow icon="currency_bitcoin" iconSize={22} color={v.color} name={v.name} />
+      <TitleRow desc={v.headline} icon="currency_bitcoin" iconSize={22} name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
         <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}{v.unit}</span>
       </div>
@@ -1393,8 +1394,7 @@ function CardNetBuy({ v }: { v: Pick }) {
   const isBuy = cum >= 0;
   return (
     <Shell hit={v.isHit} minH={210}>
-      <Tag text={v.headline} color={c} />
-      <TitleRow icon="person" iconSize={22} name={v.name} color={c} />
+      <TitleRow desc={v.headline} icon="person" iconSize={22} name={v.name} />
       <div style={{ margin: "6px 0 2px" }}>
         <span style={{ fontSize: 10, fontWeight: 700, color: C.sub }}>최근 5거래일 누적</span>
         <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
@@ -1433,8 +1433,7 @@ function CardDeposit({ v }: { v: Pick }) {
   const change = recent.length >= 2 ? recent[recent.length - 1] - recent[0] : 0;
   return (
     <Shell hit={v.isHit} minH={210}>
-      <Tag text={v.headline} color={c} />
-      <TitleRow icon="savings" iconSize={22} name={v.name} color={c} />
+      <TitleRow desc={v.headline} icon="savings" iconSize={22} name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "6px 0 4px" }}>
         <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: c, letterSpacing: "-0.03em" }}>{jo.toFixed(1)}</span>
         <span style={{ fontSize: 13, fontWeight: 700, color: C.sub }}>조원</span>
@@ -1462,8 +1461,7 @@ function CardPutCall({ v }: { v: Pick }) {
   const c = greedy ? C.hot : C.cold;
   return (
     <Shell hit={v.isHit} minH={210}>
-      <Tag text={v.headline} color={c} />
-      <TitleRow icon="casino" iconSize={22} name={v.name} color={c} />
+      <TitleRow desc={v.headline} icon="casino" iconSize={22} name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "6px 0 14px" }}>
         <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 800, color: c, letterSpacing: "-0.03em" }}>{ratio.toFixed(2)}</span>
         <span style={{ fontSize: 11, fontWeight: 700, color: C.sub }}>풋/콜</span>
@@ -1499,8 +1497,7 @@ function CardBrokerage({ v }: { v: Pick }) {
   const shortName = (n: string) => (n.split(/[-(,]/)[0].trim().slice(0, 18) || n);
   return (
     <Shell hit={v.isHit} minH={210}>
-      <Tag text={v.headline} color={c} />
-      <TitleRow icon="leaderboard" iconSize={22} name={v.name} color={c} />
+      <TitleRow desc={v.headline} icon="leaderboard" iconSize={22} name={v.name} />
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "6px 0 10px" }}>
         <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: c, letterSpacing: "-0.03em" }}>{count}</span>
         <span style={{ fontSize: 12, fontWeight: 700, color: C.sub }}>개 앱 인기차트 진입</span>
@@ -1535,7 +1532,7 @@ function SectionHeading({ title }: { title: string }) {
 // 공개 지표는 각 섹션 끝에 일반 카드로 덧붙여 자동 노출을 유지한다.
 const LAID_OUT = new Set([
   "buffett_index", "leverage_etf_volume", "market_actions_30d", "turnover_concentration",
-  "kospi_high_gap", "vkospi", "vix_vkospi_spread", "kospi_asia_relative_strength",
+  "kospi_high_gap", "vkospi", "kospi_asia_relative_strength",
   "kospi_gold_ratio", "kosdaq_kospi_ratio", "kospi_volume_surge", "usdkrw_volatility",
   "individual_net_buy", "put_call_ratio", "investor_deposit",
   "naver_search_trend", "dcinside_post_count", "news_sentiment", "bestseller_finance_ratio",
@@ -1552,8 +1549,7 @@ const FALLBACK_ICONS: Record<string, string> = {
 function GenericCard({ v, icon }: { v: Pick; icon: string }) {
   return (
     <Shell hit={v.isHit} minH={210}>
-      <Tag text={v.headline} color={v.color} />
-      <TitleRow icon={icon} iconSize={22} name={v.name} color={v.color} />
+      <TitleRow desc={v.headline} icon={icon} iconSize={22} name={v.name} />
       <Big disp={v.disp} unit={v.unit} color={v.color} size={30} />
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
         <HeatBar v={v} />
@@ -1564,7 +1560,11 @@ function GenericCard({ v, icon }: { v: Pick; icon: string }) {
 }
 
 export default async function Home() {
-  const [dailyScore, indicators] = await Promise.all([getLatestDailyScore(), getPublicIndicators()]);
+  const [dailyScore, indicators, topGaps] = await Promise.all([
+    getLatestDailyScore(),
+    getPublicIndicators(),
+    getTopStockHighGaps(3),
+  ]);
 
   const bySlug = new Map(indicators.map((i) => [i.slug, i]));
   const p = (slug: string) => pick(bySlug.get(slug));
@@ -1589,21 +1589,33 @@ export default async function Home() {
             <section>
               <SectionHeading title="시장 지표" />
               <div className="hz-grid">
+                {/* 순서 = 가중치(config/indicator_weights.py) × 직관성 × 변동성.
+                    ① 가중치 1·2위(4.5/4.0)를 2칸으로 맨 앞에 — 둘 다 설명이 필요 없는 지표다.
+                    ② 그 다음 핵심 수급·심리를 1칸으로 묶고,
+                    ③ 콘텐츠가 풍부한 2칸 카드들, ④ 해석이 한 단계 필요한 지표 순.
+                    버핏지수는 예전에 맨 앞이었지만 분기 GDP 기반이라 30일 변동계수가
+                    0.04로 거의 안 움직여(가중치 주석의 "느림·비타이밍"과 같은 이유) 뒤로 뺐다. */}
+                <CardHighGap v={p("kospi_high_gap")} tops={topGaps} />
+                <CardVolume v={p("kospi_volume_surge")} />
+                <CardDeposit v={p("investor_deposit")} />
+                <CardVkospi v={p("vkospi")} />
+                <CardNetBuy v={p("individual_net_buy")} />
+                <CardPutCall v={p("put_call_ratio")} />
+                <CardTurnover v={p("turnover_concentration")} />
+                <CardMarketActions v={p("market_actions_30d")} />
+                <CardRiskAssets gold={p("kospi_gold_ratio")} kosdaq={p("kosdaq_kospi_ratio")} />
                 <CardBuffett v={p("buffett_index")} />
                 <CardLeverage v={p("leverage_etf_volume")} />
-                <CardMarketActions v={p("market_actions_30d")} />
-                <CardTurnover v={p("turnover_concentration")} />
-                <CardHighGap v={p("kospi_high_gap")} />
-                <CardVkospi v={p("vkospi")} />
-                <CardVixSpread v={p("vix_vkospi_spread")} />
-                <CardAsia v={p("kospi_asia_relative_strength")} />
-                <CardRiskAssets gold={p("kospi_gold_ratio")} kosdaq={p("kosdaq_kospi_ratio")} />
-                <CardVolume v={p("kospi_volume_surge")} />
-                <CardNetBuy v={p("individual_net_buy")} />
-                <CardDeposit v={p("investor_deposit")} />
-                <CardPutCall v={p("put_call_ratio")} />
                 <CardFx v={p("usdkrw_volatility")} />
+                <CardAsia v={p("kospi_asia_relative_strength")} />
                 <CardComingSoon />
+                {/* 순서 = 가중치 × 직관성 × 변동성. 칸 합계 20으로 5행이 정확히 채워진다.
+                    VIX 대비 VKOSPI 스프레드는 내렸다 — 1년의 76%가 과열도 0이라 종합점수에
+                    기여하지 못했고, VKOSPI 에서 파생된 지표라 VKOSPI 카드와 겹쳤다.
+                    그 한 칸을 버핏지수(1→2칸)로 돌려 총량은 그대로다.
+                    행 구성: [신고가2·거래대금·예탁금] [VKOSPI·순매수·풋콜·쏠림]
+                             [안전장치2·위험자산2] [버핏2·레버리지2]
+                             [환율·아시아2·준비중] */}
                 {extra("시장").map((i) => (
                   <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["시장"]} />
                 ))}
@@ -1614,16 +1626,22 @@ export default async function Home() {
             <section>
               <SectionHeading title="감성 지표" />
               <div className="hz-grid">
+                {/* 시장 지표와 같은 원칙으로 순서만 바꿨다 — 칸 수는 기존과 동일(12칸).
+                    검색량(가중치 3.0)과 코인 투기를 앞세우고, 명품·오마카세는 재미는 크지만
+                    가중치 0.5+0.5에 후행 지표라 뒤로, 베스트셀러는 30일간 값이 2종류뿐일
+                    만큼 안 움직여 맨 뒤로 뺐다.
+                    행 구성: [검색량·코인·디씨·뉴스] [증권앱·유튜브·실물괴리2]
+                             [명품2·베스트셀러·봇레포] — 3행이 정확히 채워진다. */}
                 <CardTrend v={p("naver_search_trend")} icon="search" />
-                <CardDivergence v={p("small_business_crisis_index")} />
-                <CardSentiment v={p("news_sentiment")} icon="newspaper" />
-                <CardSentiment v={p("dcinside_post_count")} icon="forum" />
-                <CardYoutube v={p("youtube_finance_search_views")} />
-                <CardSpending luxury={p("luxury_consumption_index")} dining={p("fine_dining_search_index")} />
                 <CardUpbit v={p("upbit_speculation_index")} />
+                <CardSentiment v={p("dcinside_post_count")} icon="forum" />
+                <CardSentiment v={p("news_sentiment")} icon="newspaper" />
                 <CardBrokerage v={p("brokerage_app_rank")} />
-                <CardTrend v={p("github_trading_bot_repos")} icon="terminal" />
+                <CardYoutube v={p("youtube_finance_search_views")} />
+                <CardDivergence v={p("small_business_crisis_index")} />
+                <CardSpending luxury={p("luxury_consumption_index")} dining={p("fine_dining_search_index")} />
                 <CardTrend v={p("bestseller_finance_ratio")} icon="menu_book" />
+                <CardTrend v={p("github_trading_bot_repos")} icon="terminal" />
                 {extra("감성").map((i) => (
                   <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["감성"]} />
                 ))}

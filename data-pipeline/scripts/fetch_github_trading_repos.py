@@ -39,7 +39,7 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "깃헙 트레이딩봇 저장소 생성 수",
     "category": "감성",
-    "headline": "개발자들도 뛰어드는 순간",
+    "headline": "새로 만들어진 트레이딩봇 저장소",
     "description_beginner": "개발자까지 트레이딩 봇을 만들 만큼 관심이 높아졌어요",
     "unit": "건",
     # weight 미지정 -> 기본값 1(검증 전 새 지표 안전장치)

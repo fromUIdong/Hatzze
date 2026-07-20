@@ -45,9 +45,13 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "VIX 대비 VKOSPI 스프레드",
     "category": "시장",
-    "headline": "태평양 건너 공포와 비교하면",
+    "headline": "미국과 한국의 변동성 지수 격차",
     "description_beginner": "미국은 불안한데 한국 증시만 잠잠할수록, 방심 신호로 봐요",
     "unit": "pt",
+    # 2026-07-20 대시보드에서 내림: 1년의 76%가 과열도 0이라 종합점수에 기여하지
+    #   못했고(같은 이유로 market_actions 공식을 갈아엎었다), VKOSPI 에서 파생된
+    #   지표라 VKOSPI 카드와 겹쳤다. 데이터는 계속 쌓아 두되 화면·점수에서는 뺀다.
+    "is_public": False,
     # raw = VIX 백분위 - VKOSPI 백분위. 양수로 클수록 "한국만 유독 방심" = 과열이므로
     # direction은 high(기본). VIX·VKOSPI는 산출식/스케일이 달라 절대값 뺄셈이 무의미했는데,
     # 각자 자기 1년 분포 내 백분위로 바꾸면 스케일과 무관하게 비교할 수 있다.

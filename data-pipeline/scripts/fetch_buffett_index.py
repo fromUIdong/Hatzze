@@ -68,6 +68,7 @@ BUFFETT_SLUG = "buffett_index"
 BUFFETT_META = {
     "slug": BUFFETT_SLUG,
     "name": "버핏지수",
+    "headline": "나라 경제 규모와 견준 증시 몸집",
     "category": "시장",
     "description_beginner": "나라 경제 규모(GDP)에 비해 주식시장 전체 몸집이 얼마나 커졌는지 보는 지표예요. 이 비율이 지나치게 높으면 실물 경제가 감당하기 어려운 거품일 수 있다는 대표적인 경고 신호예요",
     "unit": "%",

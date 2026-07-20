@@ -1,4 +1,4 @@
-"""26개 지표의 Hit/progress 기준값(threshold) 설정.
+"""지표별 Hit/progress 기준값(threshold) 설정.
 
 percentile 기반(과거 데이터의 상위/하위 N% 지점)은 데이터가 1년 가까이 쌓일
 때까지 기준선이 계속 흔들려서, 리서치·논리 기반으로 정한 고정 기준값으로
@@ -40,6 +40,15 @@ INDICATOR_THRESHOLDS = {
     "kospi_gold_ratio": {"kind": "fixed", "threshold": 2.2},
     "kosdaq_kospi_ratio": {"kind": "fixed", "threshold": 0.14},
     "usdkrw_volatility": {"kind": "fixed", "threshold": 0.25, "direction": "low"},
+    # put_call_ratio: 풋 거래량 / 콜 거래량. 콜(상승 베팅)이 많을수록 값이 작아지므로
+    # direction="low" — 낮을수록 탐욕(과열)이다. ※ direction 은 여기와 fetch 스크립트의
+    # INDICATOR_META 양쪽에 있어야 한다(점수 계산은 여기를, 카드의 "이하/이상" 표기는
+    # DB 컬럼을 본다).
+    # 실측 242영업일: 최소 0.459 / p25 0.861 / 중앙 0.947 / p75 1.062 / 최대 3.226.
+    # threshold=0.50 이면 중앙값이 progress 53%(상온)에 놓이고, Hit(≥75 → 0.667 이하)
+    # 도달이 10일(4.1%)로 market_actions_30d(4.3%)와 같은 엄격도가 된다.
+    # 0.55 로 올리면 Hit 이 6.6%로 헐거워지고, 0.45 면 2.1%로 사실상 안 켜진다.
+    "put_call_ratio": {"kind": "fixed", "threshold": 0.50, "direction": "low"},
     # leverage_etf_volume: raw_value가 fetch_leverage_etf_volume.py 안에서 이미
     # ETF거래대금_progress와 선물 미결제약정_progress의 가중 산술평균으로 계산된
     # 진행률 값이라(upbit_speculation_index와 동일한 설계), threshold=100은
@@ -106,17 +115,6 @@ INDICATOR_THRESHOLDS = {
     # 4.4%)를 그대로 재현**한다 — 공식을 바꾸되 지표가 종합점수에 기여하는 강도는
     # 유지하려는 의도다. 참고 분위수: p75=0.31, p90=0.43, p95=0.46, 최대=0.56.
     "market_actions_30d": {"kind": "fixed", "threshold": 0.50},
-    # vix_vkospi_spread: raw = VIX 백분위 - VKOSPI 백분위(각자 최근 1년 분포 기준).
-    # VIX와 VKOSPI는 산출식·스케일이 달라(VIX~15, KRX "코스피200 변동성지수"~78) 절대값
-    # 뺄셈이 무의미해서, 각자 자기 분포 내 백분위로 바꿔 비교한다. 양수로 클수록
-    # "미국은 불안한데 한국만 유독 잠잠" = 방심(과열)이라 direction=high(기본).
-    # 실측 분포(2025-07~2026-07, 237거래일, 저장된 VKOSPI와 기존 스프레드로 VIX를 역산해
-    # 계산)로 보니 min -82.9, 중앙값 -13.4, p90 14.3, p95 31.6, max 77.1 — 양수(한국이 더
-    # 잠잠)인 날이 22%뿐이라 과열은 원래 드문 신호다. threshold=30은 상위 5.5%(13/237일)로,
-    # 기존 지표가 잡던 상위 3.8% 및 다른 지표들의 상위 5~12% 관례와 비슷한 "뚜렷한 방심"
-    # 구간이다. 음수(한국이 오히려 더 출렁)면 progress=0으로 바닥 처리한다
-    # (NEGATIVE_CURRENT_CLAMP_SLUGS).
-    "vix_vkospi_spread": {"kind": "fixed", "threshold": 30.0},
 }
 
 # 현재값이 음수로 나올 수 있는 지표(감성 점수류)는 음수를 "역방향 과열"로 해석하지
@@ -127,6 +125,4 @@ NEGATIVE_CURRENT_CLAMP_SLUGS = {
     "news_sentiment",
     # 개인 순매도(음수 누적)는 froth의 반대(개미 이탈)라 progress=0으로 바닥 처리.
     "individual_net_buy",
-    # 한국이 미국보다 오히려 더 출렁이면(백분위 스프레드 음수) 방심과 반대라 progress=0.
-    "vix_vkospi_spread",
 }

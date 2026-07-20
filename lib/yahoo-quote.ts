@@ -12,6 +12,8 @@ export type YahooQuote = {
   price: number;
   /** 전일 종가. 판정 불가면 null — 등락률을 못 낸다는 뜻. */
   prevClose: number | null;
+  /** 최근 52주 최고가. 응답에 없으면 null. */
+  fiftyTwoWeekHigh: number | null;
 };
 
 /** Next 의 fetch 확장(next.revalidate)까지 받는 init 타입. */
@@ -49,7 +51,12 @@ export async function fetchYahooQuote(symbol: string, init: FetchInit): Promise<
     const closes: number[] = (result?.indicators?.quote?.[0]?.close ?? []).filter(
       (x: unknown): x is number => typeof x === "number",
     );
-    return { price, prevClose: resolvePrevClose(closes, price, result?.meta?.chartPreviousClose) };
+    const high52 = result?.meta?.fiftyTwoWeekHigh;
+    return {
+      price,
+      prevClose: resolvePrevClose(closes, price, result?.meta?.chartPreviousClose),
+      fiftyTwoWeekHigh: typeof high52 === "number" ? high52 : null,
+    };
   } catch {
     return null;
   }

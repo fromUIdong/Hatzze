@@ -62,6 +62,7 @@ INDICATOR_SLUG = "upbit_speculation_index"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "업비트 투기 과열 지수",
+    "headline": "김치 프리미엄과 코인 거래량",
     "category": "감성",
     "description_beginner": "김프·거래대금이 같이 뛰면, 코인 돈이 코스피에 왔다는 신호",
     "unit": "pt",

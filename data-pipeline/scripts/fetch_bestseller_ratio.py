@@ -37,6 +37,7 @@ INDICATOR_SLUG = "bestseller_finance_ratio"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "경제·재테크 도서 베스트셀러 비중",
+    "headline": "베스트셀러 중 경제·재테크 책 비중",
     "category": "감성",
     "description_beginner": "베스트셀러에 재테크 책이 많으면, 관심이 쏠렸다는 신호",
     "unit": "%",

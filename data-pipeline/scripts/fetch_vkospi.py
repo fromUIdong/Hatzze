@@ -35,6 +35,7 @@ INDICATOR_SLUG = "vkospi"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "VKOSPI (변동성지수)",
+    "headline": "옵션 가격에서 뽑아낸 시장의 불안",
     "category": "시장",
     "description_beginner": "코스피 '공포지수'예요. 너무 낮으면 다들 위험을 잊고 방심했다는 신호예요",
     "unit": "pt",

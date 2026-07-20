@@ -44,6 +44,7 @@ INDICATOR_SLUG = "kospi_asia_relative_strength"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "아시아 3국(일본·홍콩·대만) 대비 코스피 상대강도",
+    "headline": "일본·홍콩·대만 증시와 견준 코스피",
     "category": "시장",
     "description_beginner": "최근 한 달간 코스피가 일본·홍콩·대만 증시보다 얼마나 더 올랐는지 비교해요. 이웃 증시와 달리 한국만 유독 앞서가고 있다면 그만큼 쏠림이 심하다는 뜻일 수 있어요",
     "unit": "%p",

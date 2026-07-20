@@ -50,11 +50,15 @@ INDICATOR_SLUG = "put_call_ratio"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "옵션 풋/콜 비율",
+    "headline": "콜과 풋 중 어디에 더 베팅했나",
     "category": "시장",
     "description_beginner": (
         "콜(상승 베팅)이 풋(하락 대비)보다 많을수록, 다들 오를 거라 탐욕에 차 있다는 신호예요"
     ),
     "unit": "배",
+    # 낮을수록 콜 우세 = 탐욕이라 direction="low". 카드의 "0.50 이하" 표기가 이 DB
+    # 컬럼을 보고, 점수 계산은 config/indicator_thresholds.py 를 본다 — 양쪽에 있어야 한다.
+    "direction": "low",
 }
 
 

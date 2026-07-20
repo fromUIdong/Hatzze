@@ -2,6 +2,7 @@ import "server-only";
 
 import { getDevOverrides } from "@/lib/dev-overrides";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { fetchYahooQuote } from "@/lib/yahoo-quote";
 
 export type DailyScore = {
   date: string;
@@ -170,4 +171,60 @@ export async function getPublicIndicators(): Promise<IndicatorWithLatestValue[]>
       history: [...row.indicator_values].reverse().map((v) => v.raw_value),
     };
   });
+}
+
+/** 거래대금 상위 종목의 52주 신고가 대비 괴리율 (코스피 신고가 카드의 오른쪽 칸). */
+export type StockHighGap = {
+  name: string;
+  code: string;
+  price: number;
+  high52: number;
+  gapPct: number; // 음수 = 고점 아래
+};
+
+/**
+ * 거래대금 상위 3종목이 각자 52주 신고가에서 얼마나 떨어져 있는지.
+ *
+ * 지수 괴리율만 보면 "코스피가 고점 대비 -25%"라는 한 덩어리 숫자뿐이라, 그 안에서
+ * 주도주들이 어떤 상태인지는 안 보인다. 거래대금 상위 종목(= 지금 돈이 몰리는 곳)의
+ * 개별 괴리율을 같이 두면 지수 숫자가 어디서 온 건지 읽힌다.
+ *
+ * 종목 선정은 turnover_concentration 지표가 이미 저장해 둔 details.top5(거래대금 순)를
+ * 재사용한다 — 같은 자료를 두 번 긁지 않기 위해서다. 다만 거기엔 종목명만 있어
+ * stocks 에서 코드를 찾아 야후 심볼로 바꾼다.
+ */
+export async function getTopStockHighGaps(limit = 3): Promise<StockHighGap[]> {
+  const { data: rows } = await getSupabaseServer()
+    .from("indicators")
+    .select("id,indicator_values(date,details)")
+    .eq("slug", "turnover_concentration")
+    .order("date", { referencedTable: "indicator_values", ascending: false })
+    .limit(1, { referencedTable: "indicator_values" })
+    .maybeSingle();
+
+  const details = rows?.indicator_values?.[0]?.details as { top5?: { name: string }[] } | null;
+  const names = (details?.top5 ?? []).map((s) => s.name).slice(0, limit);
+  if (!names.length) return [];
+
+  const { data: stocks } = await getSupabaseServer().from("stocks").select("code,name,market").in("name", names);
+  const infoOf = new Map((stocks ?? []).map((s) => [s.name as string, s]));
+
+  const results = await Promise.all(
+    names.map(async (name) => {
+      const info = infoOf.get(name);
+      if (!info) return null;
+      const q = await fetchYahooQuote(`${info.code}.${info.market === "KOSDAQ" ? "KQ" : "KS"}`, {
+        next: { revalidate: 600 },
+      });
+      if (!q || q.fiftyTwoWeekHigh === null || q.fiftyTwoWeekHigh <= 0) return null;
+      return {
+        name,
+        code: info.code as string,
+        price: Math.round(q.price),
+        high52: Math.round(q.fiftyTwoWeekHigh),
+        gapPct: (q.price / q.fiftyTwoWeekHigh - 1) * 100,
+      };
+    }),
+  );
+  return results.filter((r): r is StockHighGap => r !== null);
 }

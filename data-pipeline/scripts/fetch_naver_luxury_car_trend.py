@@ -44,6 +44,7 @@ INDICATOR_SLUG = "luxury_consumption_index"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "명품·수입차 소비 검색 지수",
+    "headline": "명품·수입차 검색량",
     "category": "감성",
     "description_beginner": "명품·수입차 검색이 늘면, 사람들이 여윳돈으로 과시성 소비에 지갑을 열고 있다는 신호예요",
     "unit": "pt",

@@ -29,6 +29,7 @@ INDICATOR_SLUG = "usdkrw_volatility"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "원/달러 환율 변동성",
+    "headline": "최근 30일 원/달러 환율 출렁임",
     "category": "시장",
     "description_beginner": "환율 출렁임이 너무 잔잔하면, 위험을 잊고 방심했다는 신호예요",
     "unit": "%",

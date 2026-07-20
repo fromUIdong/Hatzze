@@ -40,6 +40,7 @@ GAP_SLUG = "kospi_high_gap"
 GAP_META = {
     "slug": GAP_SLUG,
     "name": "코스피 신고가 대비 괴리율",
+    "headline": "현재 지수와 52주 신고가 사이의 거리",
     "category": "시장",
     "description_beginner": "전고점에 바짝 다가설수록, 더 오를 자리가 남았나 싶은 부담 구간이에요",
     "unit": "%",

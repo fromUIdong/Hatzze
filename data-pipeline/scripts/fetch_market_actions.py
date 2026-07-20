@@ -86,7 +86,7 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "최근 한 달 매매 안전장치 동향",
     "category": "시장",
-    "headline": "한 달간 어느 쪽이 우세했나",
+    "headline": "사이드카·서킷브레이커 발동 내역",
     "description_beginner": "주가가 급등하면 매수 사이드카, 급락하면 매도 사이드카·서킷브레이커(CB)가 발동돼요. 최근 한 달 어느 쪽 안전장치가 더 자주 걸렸는지로 시장이 달아올랐는지 식었는지를 읽어요",
     "unit": "건",
     "weight": 2,

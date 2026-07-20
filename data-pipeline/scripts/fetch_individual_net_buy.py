@@ -36,7 +36,7 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "개인 순매수 강도",
     "category": "시장",
-    "headline": "개미가 사들일 때",
+    "headline": "개인 투자자의 최근 순매수 흐름",
     "description_beginner": "개인 투자자가 순매수로 몰릴수록, 개미가 시장을 떠받치는 과열 신호일 수 있어요",
     "unit": "억원",
 }

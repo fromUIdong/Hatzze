@@ -35,7 +35,7 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "투자자예탁금",
     "category": "시장",
-    "headline": "살 돈이 쌓일 때",
+    "headline": "증권계좌에 대기 중인 매수 자금",
     "description_beginner": "증권계좌에 대기 중인 매수 자금(예탁금)이 늘수록, 사려는 돈이 몰린다는 신호예요",
     "unit": "억원",
 }

@@ -43,6 +43,7 @@ GROUP_CONFIGS = [
             "slug": "fine_dining_search_index",
             "name": "오마카세·파인다이닝 웨이팅 검색 지수",
             "category": "감성",
+            "headline": "오마카세·파인다이닝 검색량",
             "description_beginner": "오마카세·파인다이닝 검색이 늘면, 여윳돈으로 값비싼 경험 소비에 지갑을 열고 있다는 뜻이에요",
             "unit": "pt",
         },
@@ -57,7 +58,7 @@ GROUP_CONFIGS = [
             # '실물–증시 괴리' 지표라 이름·설명도 그에 맞춘다(calculate_score의 괴리 override 참고).
             "name": "실물–증시 괴리 지수",
             "category": "감성",
-            "headline": "실물은 추운데 증시만 뜨겁다",
+            "headline": "자영업 위기와 증시 강세의 간극",
             "description_beginner": "자영업 폐업·가게 정리 검색이 늘수록 실물경제가 얼어붙었다는 뜻이에요. 그런데도 증시는 전고점 근처로 뜨겁다면, 실물과 시장이 따로 노는 '실물 없는 랠리'라는 신호라 거품을 의심해볼 만해요.",
             "unit": "pt",
         },

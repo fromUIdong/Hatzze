@@ -38,7 +38,7 @@ INDICATOR_META = {
     "slug": INDICATOR_SLUG,
     "name": "거래대금 쏠림도",
     "category": "시장",
-    "headline": "소수 종목에 다 몰릴 때",
+    "headline": "상위 10종목이 가져간 거래대금 비중",
     "description_beginner": "거래가 소수 인기 종목에 쏠릴수록, 다들 같은 핫한 종목만 쫓는다는 과열 신호일 수 있어요",
     "unit": "%",
 }
