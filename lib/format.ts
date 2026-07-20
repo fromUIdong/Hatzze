@@ -67,3 +67,20 @@ export function formatKstUpdate(isoString: string): string {
 
   return `${get("year")}-${get("month")}-${get("day")}(${weekday}) ${slot} 기준`;
 }
+
+/**
+ * 억 단위 금액을 "1조 2,929억"처럼 조와 억을 함께 읽는 형태로 만든다.
+ *
+ * formatIndicatorValue 는 1조를 넘으면 "1.3조원"으로 반올림하는데, 순매수처럼
+ * 끝자리까지 의미가 있는 금액은 그렇게 뭉개면 규모 감각이 오히려 흐려진다.
+ * "12,929억"은 한눈에 안 읽히고 "1.3조원"은 정보가 날아가므로 둘을 함께 쓴다.
+ */
+export function formatEokMixed(eok: number): string {
+  const abs = Math.abs(Math.round(eok));
+  const sign = eok < 0 ? "-" : "";
+  if (abs < 10000) return `${sign}${abs.toLocaleString("ko-KR")}억`;
+  const jo = Math.floor(abs / 10000);
+  const rest = abs % 10000;
+  if (rest === 0) return `${sign}${jo.toLocaleString("ko-KR")}조`;
+  return `${sign}${jo.toLocaleString("ko-KR")}조 ${rest.toLocaleString("ko-KR")}억`;
+}

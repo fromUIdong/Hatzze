@@ -1,6 +1,6 @@
 import { getLatestDailyScore, getPublicIndicators, getTopStockHighGaps } from "@/lib/data";
 import type { DailyScore, IndicatorCategory, IndicatorWithLatestValue, StockHighGap } from "@/lib/data";
-import { formatIndicatorValue, formatKstUpdate } from "@/lib/format";
+import { formatEokMixed, formatIndicatorValue, formatKstUpdate } from "@/lib/format";
 import { C, Icon, MONO, stageForScore } from "./ui";
 
 // 지표는 하루 단위(GitHub Actions 배치)로 갱신되므로, 빌드 시점에 정적으로
@@ -1387,9 +1387,12 @@ function CardUpbit({ v }: { v: Pick }) {
 
 // 개인 순매수 강도 — 최근 5거래일 누적 + 일별 순매수/순매도 다이버징 바
 function CardNetBuy({ v }: { v: Pick }) {
-  const c = overheatColor(v.capped);
   const cum = v.raw ?? 0;
-  const daily = (v.details as unknown as { daily5?: number[] })?.daily5 ?? [];
+  const dt = v.details as unknown as { daily5?: number[]; dates5?: number[] } | null;
+  const daily = dt?.daily5 ?? [];
+  // 거래일은 주말·휴장을 건너뛰어 화면에서 역산할 수 없다 — 파이프라인이 넣어준
+  // YYYYMMDD 정수를 그대로 쓴다. 옛 행에는 없을 수 있어 빈 배열로 폴백한다.
+  const dates = dt?.dates5 ?? [];
   const maxAbs = Math.max(1, ...daily.map((d) => Math.abs(d)));
   const isBuy = cum >= 0;
   return (
@@ -1398,27 +1401,39 @@ function CardNetBuy({ v }: { v: Pick }) {
       <div style={{ margin: "6px 0 2px" }}>
         <span style={{ fontSize: 10, fontWeight: 700, color: C.sub }}>최근 5거래일 누적</span>
         <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-          <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 800, color: isBuy ? C.hot : C.cold, letterSpacing: "-0.03em" }}>
-            {cum >= 0 ? "+" : ""}{Math.round(cum).toLocaleString()}
+          {/* "12,929억"은 한눈에 안 읽히고 "1.3조원"은 끝자리가 날아간다 — 둘을 함께 쓴다. */}
+          <span style={{ fontFamily: MONO, fontSize: 24, fontWeight: 800, color: isBuy ? C.hot : C.cold, letterSpacing: "-0.03em" }}>
+            {cum >= 0 ? "+" : ""}{formatEokMixed(cum)}
           </span>
-          <span style={{ fontSize: 12, fontWeight: 800, color: isBuy ? C.hot : C.cold }}>억 {isBuy ? "순매수" : "순매도"}</span>
+          <span style={{ fontSize: 12, fontWeight: 800, color: isBuy ? C.hot : C.cold }}>{isBuy ? "순매수" : "순매도"}</span>
         </div>
       </div>
       <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, minHeight: 60 }}>
         {daily.map((d, i) => {
           const px = Math.round((Math.abs(d) / maxAbs) * 24);
           const buy = d >= 0;
+          const ymd = dates[i];
+          const label = ymd
+            ? `${String(ymd).slice(4, 6)}-${String(ymd).slice(6, 8)} · ${d >= 0 ? "+" : ""}${formatEokMixed(d)} ${d >= 0 ? "순매수" : "순매도"}`
+            : `${d >= 0 ? "+" : ""}${formatEokMixed(d)}`;
           return (
-            <div key={i} style={{ flex: 1, position: "relative", height: 56 }}>
+            <div
+              key={i}
+              className="hz-tip"
+              data-tip={label}
+              style={{ flex: 1, position: "relative", height: 56, cursor: "help" }}
+            >
               <div style={{ position: "absolute", left: 0, right: 0, top: "50%", height: 1, background: C.line }} />
               <div style={{ position: "absolute", left: "22%", right: "22%", height: px, background: buy ? C.hot : C.cold, borderRadius: 2, ...(buy ? { bottom: "50%" } : { top: "50%" }) }} />
             </div>
           );
         })}
       </div>
+      {/* 예전엔 "5일 전 / 어제" 였는데 마지막 막대는 보통 '오늘'이라 틀린 표기였다.
+          이제 dates5 가 있으니 실제 거래일을 적는다(거래일이라 달력상 5일 전이 아닐 수도 있다). */}
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, fontWeight: 700, color: "var(--c-faint)", marginTop: -4, marginBottom: 2 }}>
-        <span>5일 전</span>
-        <span>어제</span>
+        <span>{dates.length ? `${String(dates[0]).slice(4, 6)}-${String(dates[0]).slice(6, 8)}` : "5일 전"}</span>
+        <span>{dates.length ? `${String(dates[dates.length - 1]).slice(4, 6)}-${String(dates[dates.length - 1]).slice(6, 8)}` : "최근"}</span>
       </div>
       <Foot text={v.desc} />
     </Shell>
