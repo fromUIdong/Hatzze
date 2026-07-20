@@ -681,6 +681,11 @@ export default async function TelegramPage() {
           {/* 간격을 이슈 키워드 카드의 행 높이(pitch 53px)에 맞춰 두 카드의 순위가 나란히 보이게 한다 */}
           <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 18 }}>
             {rising.map((r, i) => {
+              // 채널 수가 정원보다 적을 때 채워 넣은 빈 행 — 높이만 지키고 아무것도 안 그린다.
+              // (아바타 26px + 행 패딩에 맞춘 높이라 아래 실제 행과 pitch가 같다.)
+              if (r.isPlaceholder) {
+                return <li key={`empty-${i}`} style={{ height: 26 }} aria-hidden />;
+              }
               const body = (
                 <>
                   <span style={{ ...rankNum, color: C.sub }}>{i + 1}</span>
@@ -704,10 +709,10 @@ export default async function TelegramPage() {
                   </span>
                 </>
               );
-              // 실제 채널일 때만 링크로 감싼다(복제해 채운 행은 링크를 걸지 않는다).
+              // 핸들이 있는 채널만 링크로 감싼다.
               return (
                 <li key={`${r.handle ?? r.title}-${i}`}>
-                  {r.handle && !r.isPlaceholder ? (
+                  {r.handle ? (
                     <a href={`https://t.me/${r.handle}`} target="_blank" rel="noopener noreferrer" className="hz-row-link">
                       {body}
                     </a>
@@ -720,7 +725,8 @@ export default async function TelegramPage() {
           </ol>
         </div>
 
-        {/* 이슈 키워드 (¼) — 종목이 아닌 화제어 (LLM 추출 예정, 현재 데모) */}
+        {/* 이슈 키워드 (¼) — 종목이 아닌 화제어. analyze_telegram_messages.py 가 메시지별로
+            뽑고 calculate_telegram_sentiment.py 가 telegram_keyword_daily 로 집계한 실데이터. */}
         <div style={cardStyle}>
           <SectionHead icon="tag" title="이슈 키워드" note="7일" desc="종목명이 아닌 화제어" />
           <div style={{ display: "flex", flexDirection: "column", gap: 23 }}>

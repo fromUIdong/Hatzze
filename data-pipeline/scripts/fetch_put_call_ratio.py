@@ -57,9 +57,20 @@ INDICATOR_META = {
 
 
 def ensure_indicator(client) -> str:
+    """지표 행을 보장하고, 이미 있으면 메타데이터를 코드 기준으로 맞춘다.
+
+    이 지표는 옵션 API 승인 전 손으로 넣은 행이 먼저 있었다. 삽입만 하고 말면
+    그 옛 행이 남아 코드의 INDICATOR_META(unit="배" 등)가 영영 반영되지 않는다
+    — 실제로 unit 이 빈 값으로 남아 있었다. slug 를 뺀 나머지를 매번 덮어써
+    코드를 소스 오브 트루스로 둔다(is_public·weight 는 META 에 없어 안 건드린다).
+    """
     existing = client.table("indicators").select("id").eq("slug", INDICATOR_SLUG).execute()
     if existing.data:
-        return existing.data[0]["id"]
+        indicator_id = existing.data[0]["id"]
+        client.table("indicators").update(
+            {k: v for k, v in INDICATOR_META.items() if k != "slug"}
+        ).eq("id", indicator_id).execute()
+        return indicator_id
     inserted = client.table("indicators").insert(INDICATOR_META).execute()
     return inserted.data[0]["id"]
 

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { changeRateOf, fetchYahooQuote } from "@/lib/yahoo-quote";
+
 // 탑바 시세 티커용 라이브 시세. 야후 파이낸스 차트 JSON(지수·종목·환율·나스닥 선물)과
 // 업비트 API(비트코인, KRW)에서 모아 반환한다. 별도 크론/DB 없이 이 라우트가
 // 호출될 때 소스에서 직접 가져오되, CDN에 10분 캐시(s-maxage)를 걸어 소스를
@@ -22,35 +24,11 @@ const fmt = (n: number, digits: number) =>
 
 async function fetchYahoo(item: (typeof YAHOO)[number]): Promise<Quote> {
   const fallback: Quote = { key: item.key, label: item.label, value: "—", change: null };
-  try {
-    const res = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(item.symbol)}?interval=1d&range=5d`,
-      { headers: { "User-Agent": "Mozilla/5.0" }, cache: "no-store" },
-    );
-    if (!res.ok) return fallback;
-    const result = (await res.json())?.chart?.result?.[0];
-    const meta = result?.meta;
-    const price = meta?.regularMarketPrice;
-    if (typeof price !== "number") return fallback;
-    // 전일 종가: 일봉 배열이 심볼마다 오늘 바를 다르게 반영한다 — 선물은 마지막 바가
-    // 진행 중인 현재 세션(close == 현재가)이고, KR 지수는 오늘 바가 늦게 붙어 마지막
-    // 바가 어제인 경우도 있다. 그래서 "마지막 종가가 현재가와 (거의) 같으면 그건 현재
-    // 세션이므로 그 직전 종가를, 다르면 마지막 종가를" 전일로 삼는다.
-    const closes: number[] = (result?.indicators?.quote?.[0]?.close ?? []).filter(
-      (x: unknown): x is number => typeof x === "number",
-    );
-    let prev: number | null = null;
-    if (closes.length >= 1) {
-      const last = closes[closes.length - 1];
-      const lastIsCurrent = Math.abs(last - price) / price < 0.0005;
-      prev = lastIsCurrent ? (closes.length >= 2 ? closes[closes.length - 2] : null) : last;
-    }
-    if (prev === null && typeof meta?.chartPreviousClose === "number") prev = meta.chartPreviousClose;
-    const change = typeof prev === "number" && prev !== 0 ? (price / prev - 1) * 100 : null;
-    return { key: item.key, label: item.label, value: fmt(price, item.digits), change };
-  } catch {
-    return fallback;
-  }
+  // 조회·전일종가 판정은 lib/yahoo-quote 한 곳에 있다 — 카더라 리포트의 종목 카드가
+  // 같은 규칙을 써야 같은 종목이 두 화면에서 다른 등락률로 보이지 않는다.
+  const q = await fetchYahooQuote(item.symbol, { cache: "no-store" });
+  if (!q) return fallback;
+  return { key: item.key, label: item.label, value: fmt(q.price, item.digits), change: changeRateOf(q) };
 }
 
 async function fetchBtc(): Promise<Quote> {

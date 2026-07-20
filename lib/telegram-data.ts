@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdmin } from "@/lib/supabase-server";
+import { changeRateOf, fetchYahooQuote } from "@/lib/yahoo-quote";
 
 // 카더라 리포트 데이터 접근 계층. telegram_* 테이블은 비공개(공개 read 없음)라
 // service_role 클라이언트(getSupabaseAdmin)로만 읽는다 — 서버에서만 호출된다.
@@ -151,39 +152,16 @@ async function nameMap(codes: string[]): Promise<Map<string, string>> {
 type StockInfo = { name: string; market: string | null; closePrice: number | null; changeRate: number | null; priceDate: string | null };
 
 /**
- * 야후 파이낸스 실시간 시세(상단 티커와 같은 소스). KRX Open API는 며칠 지연돼
- * 티커의 실시간 값과 크게 어긋나므로, 표시용 가격은 여기서 우선 가져온다.
- * 실패하면 호출부가 KRX 저장 종가로 폴백한다.
+ * 카드용 시세 — 야후 실시간(상단 티커와 같은 소스·같은 전일종가 규칙, lib/yahoo-quote).
+ * KRX Open API는 며칠 지연돼 티커의 실시간 값과 크게 어긋나므로 표시용은 여기서 먼저
+ * 가져오고, 실패하면 호출부가 KRX 저장 종가로 폴백한다.
+ * 등락률을 못 내면 null을 준다 — 가격만 보여주면 변동을 오해할 수 있다.
  */
-async function fetchYahooQuote(symbol: string): Promise<{ price: number; changeRate: number } | null> {
-  try {
-    const res = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`,
-      { headers: { "User-Agent": "Mozilla/5.0" }, next: { revalidate: 600 } },
-    );
-    if (!res.ok) return null;
-    const result = (await res.json())?.chart?.result?.[0];
-    const price = result?.meta?.regularMarketPrice;
-    if (typeof price !== "number") return null;
-
-    // 전일 종가 판정은 상단 티커(app/api/ticker)와 동일한 규칙을 쓴다 — 같은 종목이
-    // 두 곳에서 다른 등락률로 보이지 않도록. 마지막 일봉 종가가 현재가와 (거의) 같으면
-    // 그건 진행 중인 오늘 세션이므로 그 직전 종가를 전일로 삼는다.
-    const closes: number[] = (result?.indicators?.quote?.[0]?.close ?? []).filter(
-      (x: unknown): x is number => typeof x === "number",
-    );
-    let prev: number | null = null;
-    if (closes.length >= 1) {
-      const last = closes[closes.length - 1];
-      const lastIsCurrent = Math.abs(last - price) / price < 0.0005;
-      prev = lastIsCurrent ? (closes.length >= 2 ? closes[closes.length - 2] : null) : last;
-    }
-    if (prev === null && typeof result?.meta?.chartPreviousClose === "number") prev = result.meta.chartPreviousClose;
-    if (typeof prev !== "number" || !prev) return null;
-    return { price, changeRate: (price / prev - 1) * 100 };
-  } catch {
-    return null;
-  }
+async function stockQuote(symbol: string): Promise<{ price: number; changeRate: number } | null> {
+  const q = await fetchYahooQuote(symbol, { next: { revalidate: 600 } });
+  if (!q) return null;
+  const changeRate = changeRateOf(q);
+  return changeRate === null ? null : { price: q.price, changeRate };
 }
 
 /** 종목명 + 최신 종가/등락률(마이그레이션 015 이전이면 가격은 null). */
@@ -332,7 +310,7 @@ export async function getSurgingStocks(limit = 5): Promise<SurgingStock[]> {
   // 표시용 가격은 실시간(야후) 우선 — KRX 저장 종가는 며칠 지연돼 상단 티커와 어긋난다.
   // 조회 실패 시 KRX 종가(priceDate 라벨과 함께)를 그대로 쓴다.
   const quotes = await Promise.all(
-    list.map((s) => fetchYahooQuote(`${s.code}.${s.market === "KOSDAQ" ? "KQ" : "KS"}`)),
+    list.map((s) => stockQuote(`${s.code}.${s.market === "KOSDAQ" ? "KQ" : "KS"}`)),
   );
   list.forEach((s, i) => {
     const q = quotes[i];
@@ -524,7 +502,7 @@ export async function getStockReport(code: string): Promise<StockReport | null> 
     if (best) topMessage = { text: best.text, channelTitle: best.channelTitle, views: best.views, forwards: best.forwards };
   }
 
-  const quote = await fetchYahooQuote(`${code}.${stock.market === "KOSDAQ" ? "KQ" : "KS"}`);
+  const quote = await stockQuote(`${code}.${stock.market === "KOSDAQ" ? "KQ" : "KS"}`);
 
   return {
     code,
@@ -750,9 +728,19 @@ export async function getRisingChannels(limit = 10): Promise<RisingChannel[]> {
   // 지금은 모니터링 채널이 12개뿐이라 "늘어난 곳"만 세면 8개 안팎에서 멈춘다 —
   // 시트에 채널이 늘면 이 보충분은 자연히 밀려나 사라진다.
   const filled = [...real, ...flat].slice(0, limit);
-  // 그래도 모자라면(채널 수 자체가 정원보다 적으면) 마지막 행을 복제해 자리를 채운다.
+  // 그래도 모자라면(채널 수 자체가 정원보다 적으면) '빈 행'으로 자리만 채운다.
+  // 예전엔 마지막 행을 복제했는데, 그러면 같은 채널이 두 번 표시돼 없는 데이터를
+  // 지어내는 꼴이었다 — 카드 높이를 지키자고 사용자에게 거짓을 보일 순 없다.
   while (filled.length && filled.length < limit) {
-    filled.push({ ...filled[filled.length - 1], isPlaceholder: true });
+    filled.push({
+      handle: null,
+      title: "",
+      photo: null,
+      subscriberCount: 0,
+      delta7d: 0,
+      isPlaceholder: true,
+      spanDays,
+    });
   }
   return filled;
 }
