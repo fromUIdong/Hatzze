@@ -8,6 +8,14 @@
 
 raw_value는 그대로 둔 채 details만 갱신 upsert한다. normalized_score는 payload에
 넣지 않아 그대로 보존된다.
+
+**details는 반드시 병합해서 쓴다(덮어쓰지 않는다).** 이 컬럼은 fetch 스크립트만
+쓰는 게 아니다 — calculate_score.py도 같은 행의 details에 자기 키를 남긴다(실물–증시
+괴리의 real_stress/market_strength/divergence). 예전엔 여기서 dict를 통째로 새로
+만들어 넣어서, fetch가 돌 때마다 calculate_score가 쓴 키가 날아갔다. 평소엔
+워크플로우 순서(fetch… → calculate_score)가 마지막에 복원해줘서 안 보였지만,
+그 사이에서 실행이 끊기면(2026-07-20 17:09 취소된 실행) 복원이 안 돼 카드의 두 축이
+0으로 표시됐다. 순서에 기대지 않도록 기존 키를 보존하고 자기 키만 갱신한다.
 """
 
 from __future__ import annotations
@@ -32,12 +40,13 @@ def store_vs_average_details(
     start = (date.today() - timedelta(days=backfill_days)).isoformat()
     result = (
         client.table("indicator_values")
-        .select("date,raw_value")
+        .select("date,raw_value,details")
         .eq("indicator_id", indicator_id)
         .gte("date", start)
         .execute()
     )
     values = {row["date"]: float(row["raw_value"]) for row in result.data}
+    existing = {row["date"]: (row.get("details") or {}) for row in result.data}
     dates_sorted = sorted(values)
 
     rows = []
@@ -52,7 +61,9 @@ def store_vs_average_details(
                 "indicator_id": indicator_id,
                 "date": d,
                 "raw_value": values[d],
+                # 남이 쓴 키(calculate_score의 괴리 3종 등)를 보존하고 내 키만 갱신한다.
                 "details": {
+                    **existing.get(d, {}),
                     "avg_index": round(avg, 1),
                     "vs_avg": round(values[d] / avg, 2),
                 },
@@ -90,12 +101,13 @@ def store_abs_scale_details(
     start = (date.today() - timedelta(days=backfill_days)).isoformat()
     result = (
         client.table("indicator_values")
-        .select("date,raw_value")
+        .select("date,raw_value,details")
         .eq("indicator_id", indicator_id)
         .gte("date", start)
         .execute()
     )
     values = {row["date"]: float(row["raw_value"]) for row in result.data}
+    existing = {row["date"]: (row.get("details") or {}) for row in result.data}
     dates_sorted = sorted(values)
 
     rows = []
@@ -111,7 +123,8 @@ def store_abs_scale_details(
                 "indicator_id": indicator_id,
                 "date": d,
                 "raw_value": values[d],
-                "details": {"scale": round(scale, 2)},
+                # store_vs_average_details 와 같은 이유로 병합한다(모듈 docstring 참고).
+                "details": {**existing.get(d, {}), "scale": round(scale, 2)},
             }
         )
 
