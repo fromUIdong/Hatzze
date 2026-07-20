@@ -245,7 +245,16 @@ function TitleRow({
             </span>
           )}
         </div>
-        {right}
+        {/* height:0 으로 감싸 제목 행의 높이 계산에서 뺀다. 제목(17px)보다 큰 숫자가
+            right로 들어오면(괴리도 28px) 행이 그만큼 높아지고, alignItems:center가
+            제목을 아래로 밀어 같은 행 카드들끼리 제목·부제 세로 위치가 어긋났다.
+            폭은 그대로 차지하므로 space-between 배치는 유지되고, 내용은 행 중앙선에
+            걸쳐 넘치며 시각적으로는 지금과 같은 위치에 보인다. */}
+        {right && (
+          <div style={{ height: 0, display: "flex", alignItems: "center", flexShrink: 0 }}>
+            {right}
+          </div>
+        )}
       </div>
       {desc && (
         <p style={{ margin: "7px 0 0", fontSize: 12, lineHeight: 1.5, color: C.sub, wordBreak: "keep-all" }}>{desc}</p>
@@ -456,7 +465,9 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
       <div style={{ flex: 1, minWidth: 280 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
           <span style={{ fontSize: 22, fontWeight: 800, color: C.blue }}>햇쩨 지수</span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: `${stage.color}24`, color: stage.color, fontWeight: 800, fontSize: 16, padding: "5px 14px", borderRadius: 999, whiteSpace: "nowrap" }}>
+          {/* 상태 텍스트는 옆의 "햇쩨 지수"(22px)와 같은 크기로 둔다 — 둘이 한 쌍으로 읽히는 자리라
+              크기가 다르면 상태 쪽이 부속처럼 보인다. */}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: `${stage.color}24`, color: stage.color, fontWeight: 800, fontSize: 22, padding: "5px 14px", borderRadius: 999, whiteSpace: "nowrap" }}>
             {stage.emoji} {stageLabel}
           </span>
         </div>
@@ -1251,7 +1262,11 @@ function CardDivergence({ v }: { v: Pick }) {
           </span>
         }
       />
-      <div style={{ background: C.bg, borderRadius: 10, padding: 16, marginTop: 6, display: "flex", gap: 22 }}>
+      {/* 이 카드는 span=2 인데 내용이 짧아, 같은 행의 긴 카드(증권앱)에 맞춰 늘어난 만큼
+          남는 공간이 Foot 의 marginTop:auto 로 전부 아래에 몰렸다 — 박스와 divider 사이만
+          56px 로 벌어졌다. 박스에도 auto 를 줘 남는 공간을 위아래가 나눠 갖게 한다
+          (auto 마진 두 개면 균등 분배). 고정값이 아니라 행 높이가 달라져도 유지된다. */}
+      <div style={{ background: C.bg, borderRadius: 10, padding: 16, marginTop: "auto", display: "flex", gap: 22 }}>
         <DivergenceBar label="실물 스트레스" hint="자영업 폐업 검색" value={real} color={C.cold} />
         <DivergenceBar label="증시 강세" hint="신고가 근접도" value={market} color={C.hot} />
       </div>
