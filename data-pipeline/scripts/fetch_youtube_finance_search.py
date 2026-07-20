@@ -31,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.config import YOUTUBE_API_KEY  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
+from common.indicator import ensure_indicator  # noqa: E402
 from config.finance_content_keywords import FINANCE_KEYWORDS  # noqa: E402
 
 YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
@@ -49,17 +50,6 @@ INDICATOR_META = {
     "description_beginner": "재테크 유튜브 조회수가 확 뛰면, 콘텐츠가 평소보다 빠르게 퍼진다는 신호예요",
     "unit": "회",
 }
-
-
-def ensure_indicator(client) -> str:
-    existing = (
-        client.table("indicators").select("id").eq("slug", INDICATOR_SLUG).execute()
-    )
-    if existing.data:
-        return existing.data[0]["id"]
-
-    inserted = client.table("indicators").insert(INDICATOR_META).execute()
-    return inserted.data[0]["id"]
 
 
 def _get_with_retry(url: str, params: dict) -> dict:
@@ -125,7 +115,7 @@ def fetch_view_counts(video_ids: list[str]) -> list[int]:
 
 def main() -> None:
     client = get_client()
-    indicator_id = ensure_indicator(client)
+    indicator_id = ensure_indicator(client, INDICATOR_META)
     print(f"[Supabase] indicator '{INDICATOR_SLUG}' id: {indicator_id}")
 
     video_ids = search_finance_video_ids()

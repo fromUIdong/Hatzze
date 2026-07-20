@@ -37,6 +37,7 @@ from anthropic import Anthropic  # noqa: E402
 
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
+from common.supabase_client import load_all  # noqa: E402
 
 # Haiku 4.5 — 분류는 대량 호출이라 속도/비용이 중요하고, 3지선다 + 명사 추출 난이도엔
 # 충분하다. 하루 ~300건이면 월 2~3달러 수준. (히어로 요약도 같은 모델을 쓴다.)
@@ -97,18 +98,6 @@ SCHEMA = {
     "required": ["results"],
     "additionalProperties": False,
 }
-
-
-def load_all(db, table: str, columns: str) -> list[dict]:
-    """Supabase 기본 페이지 크기(1000)를 넘겨 전량을 읽는다."""
-    rows, start = [], 0
-    while True:
-        page = db.table(table).select(columns).range(start, start + 999).execute().data
-        if not page:
-            break
-        rows += page
-        start += 1000
-    return rows
 
 
 def pending_messages(db) -> list[dict]:

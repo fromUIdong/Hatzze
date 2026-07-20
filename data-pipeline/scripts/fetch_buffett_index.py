@@ -32,6 +32,7 @@ from common.config import ECOS_API_KEY  # noqa: E402
 from common.krx_client import krx_get  # noqa: E402
 from common.retry import backoff_delay  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
+from common.indicator import ensure_indicator  # noqa: E402
 
 KRX_URL = "http://data-dbg.krx.co.kr/svc/apis/idx/kospi_dd_trd"
 TARGET_INDEX_NAME = "코스피"
@@ -71,17 +72,6 @@ BUFFETT_META = {
     "description_beginner": "나라 경제 규모(GDP)에 비해 주식시장 전체 몸집이 얼마나 커졌는지 보는 지표예요. 이 비율이 지나치게 높으면 실물 경제가 감당하기 어려운 거품일 수 있다는 대표적인 경고 신호예요",
     "unit": "%",
 }
-
-
-def ensure_indicator(client, meta: dict) -> str:
-    existing = (
-        client.table("indicators").select("id").eq("slug", meta["slug"]).execute()
-    )
-    if existing.data:
-        return existing.data[0]["id"]
-
-    inserted = client.table("indicators").insert(meta).execute()
-    return inserted.data[0]["id"]
 
 
 def fetch_kospi_market_cap(bas_dd: str) -> float | None:

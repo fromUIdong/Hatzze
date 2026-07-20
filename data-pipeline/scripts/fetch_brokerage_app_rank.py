@@ -26,6 +26,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client  # noqa: E402
+from common.indicator import ensure_indicator  # noqa: E402
 
 # genre=6015 = 금융(Finance). limit=100 상위 100개 무료앱.
 RSS_URL = "https://itunes.apple.com/kr/rss/topfreeapplications/genre=6015/limit=100/json"
@@ -57,16 +58,6 @@ INDICATOR_META = {
 }
 
 
-def ensure_indicator(client) -> str:
-    existing = (
-        client.table("indicators").select("id").eq("slug", INDICATOR_SLUG).execute()
-    )
-    if existing.data:
-        return existing.data[0]["id"]
-    inserted = client.table("indicators").insert(INDICATOR_META).execute()
-    return inserted.data[0]["id"]
-
-
 def _is_brokerage(name: str, artist: str) -> bool:
     hay = f"{name} {artist}".lower()
     if any(kw.lower() in hay for kw in EXCLUDE_KEYWORDS):
@@ -95,7 +86,7 @@ def fetch_brokerage_froth() -> tuple[float, list[dict]]:
 
 def main() -> None:
     client = get_client()
-    indicator_id = ensure_indicator(client)
+    indicator_id = ensure_indicator(client, INDICATOR_META)
     print(f"[Supabase] indicator '{INDICATOR_SLUG}' id: {indicator_id}")
 
     score, charted = fetch_brokerage_froth()

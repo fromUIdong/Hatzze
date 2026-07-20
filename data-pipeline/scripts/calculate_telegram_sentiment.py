@@ -39,6 +39,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client  # noqa: E402
 from common.timeutil import KST  # noqa: E402
+from common.supabase_client import load_all  # noqa: E402
 from config.issue_keywords import (  # noqa: E402
     ALIASES,
     EXCLUDE,
@@ -53,17 +54,6 @@ OVERALL = "overall"
 # 정규화 시 지우는 것: 공백·가운뎃점·하이픈·언더스코어.
 # "금리 인하" / "금리·인하" / "금리-인하" 가 한 버킷에 모이게 한다.
 STRIP_RE = re.compile(r"[\s·\-_]+")
-
-
-def load_all(db, table: str, columns: str) -> list[dict]:
-    rows, start = [], 0
-    while True:
-        page = db.table(table).select(columns).range(start, start + 999).execute().data
-        if not page:
-            break
-        rows += page
-        start += 1000
-    return rows
 
 
 def norm(word: str) -> str:

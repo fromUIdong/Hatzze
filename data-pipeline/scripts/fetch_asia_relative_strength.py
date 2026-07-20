@@ -28,6 +28,7 @@ import yfinance as yf
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client  # noqa: E402
+from common.indicator import ensure_indicator  # noqa: E402
 
 TICKERS = {
     "일본(니케이225)": "^N225",
@@ -50,17 +51,6 @@ INDICATOR_META = {
     # 높게 잡는다. 지정하지 않으면 다른 새 지표들처럼 안전하게 1로 들어간다.
     "weight": 3,
 }
-
-
-def ensure_indicator(client) -> str:
-    existing = (
-        client.table("indicators").select("id").eq("slug", INDICATOR_SLUG).execute()
-    )
-    if existing.data:
-        return existing.data[0]["id"]
-
-    inserted = client.table("indicators").insert(INDICATOR_META).execute()
-    return inserted.data[0]["id"]
 
 
 def get_indicator_id(client, slug: str) -> str:
@@ -102,7 +92,7 @@ def compute_20d_return(prices: dict[str, float]) -> dict[str, float]:
 
 def main() -> None:
     client = get_client()
-    indicator_id = ensure_indicator(client)
+    indicator_id = ensure_indicator(client, INDICATOR_META)
     kospi_raw_id = get_indicator_id(client, KOSPI_RAW_SLUG)
     print(f"[Supabase] indicator '{INDICATOR_SLUG}' id: {indicator_id}")
 

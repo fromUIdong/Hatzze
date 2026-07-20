@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import sys
 import time
-from datetime import date, timedelta
+from datetime import timedelta
 from pathlib import Path
 
 import requests
@@ -35,6 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from common.details import store_abs_scale_details  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
+from common.indicator import ensure_indicator  # noqa: E402
 from config.sentiment_keywords import NEGATIVE_KEYWORDS, POSITIVE_KEYWORDS  # noqa: E402
 
 GALLERY_IDS = ["krstock", "stockus"]
@@ -72,22 +73,6 @@ INDICATOR_META = {
     "description_beginner": "낙관적인 얘기만 쏟아지면, 개인 투자 심리가 과열됐다는 신호예요",
     "unit": "pt",
 }
-
-
-def ensure_indicator(client) -> str:
-    existing = (
-        client.table("indicators").select("id").eq("slug", INDICATOR_SLUG).execute()
-    )
-    if existing.data:
-        indicator_id = existing.data[0]["id"]
-        # 지표 정의가 바뀌었을 수 있으므로(게시글 수 -> 감성 지수, 갤러리 교체) 메타데이터를 최신화한다.
-        client.table("indicators").update(
-            {k: v for k, v in INDICATOR_META.items() if k != "slug"}
-        ).eq("id", indicator_id).execute()
-        return indicator_id
-
-    inserted = client.table("indicators").insert(INDICATOR_META).execute()
-    return inserted.data[0]["id"]
 
 
 def classify_sentiment(title: str) -> str:
@@ -313,7 +298,7 @@ def backfill_daily_sentiment(client, indicator_id: str) -> None:
 
 def main() -> None:
     client = get_client()
-    indicator_id = ensure_indicator(client)
+    indicator_id = ensure_indicator(client, INDICATOR_META)
     print(f"[Supabase] indicator '{INDICATOR_SLUG}' id: {indicator_id}")
 
     if "--backfill" in sys.argv:

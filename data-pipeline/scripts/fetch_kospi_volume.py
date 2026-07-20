@@ -19,6 +19,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.krx_client import krx_get  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
+from common.indicator import ensure_indicator  # noqa: E402
+from common.timeutil import business_days  # noqa: E402
 
 KRX_URL = "http://data-dbg.krx.co.kr/svc/apis/idx/kospi_dd_trd"
 BACKFILL_DAYS = 365
@@ -36,17 +38,6 @@ INDICATOR_META = {
     "description_beginner": "거래가 평소보다 훨씬 몰리면, 다들 흥분해 달려든다는 신호예요",
     "unit": "억원",
 }
-
-
-def ensure_indicator(client) -> str:
-    existing = (
-        client.table("indicators").select("id").eq("slug", INDICATOR_SLUG).execute()
-    )
-    if existing.data:
-        return existing.data[0]["id"]
-
-    inserted = client.table("indicators").insert(INDICATOR_META).execute()
-    return inserted.data[0]["id"]
 
 
 def fetch_trading_value(bas_dd: str) -> float | None:
@@ -70,14 +61,6 @@ def fetch_trading_value(bas_dd: str) -> float | None:
         return None  # 휴장일 등으로 값이 비어있는 경우
     won = float(str(value).replace(",", ""))
     return won / WON_PER_EOK
-
-
-def business_days(start: date, end: date):
-    current = start
-    while current <= end:
-        if current.weekday() < 5:  # 0=Mon ... 4=Fri
-            yield current
-        current += timedelta(days=1)
 
 
 def backfill(client, indicator_id: str) -> None:
@@ -167,7 +150,7 @@ def store_rolling_average_details(client, indicator_id: str) -> None:
 
 def main() -> None:
     client = get_client()
-    indicator_id = ensure_indicator(client)
+    indicator_id = ensure_indicator(client, INDICATOR_META)
     print(f"[Supabase] indicator '{INDICATOR_SLUG}' id: {indicator_id}")
 
     backfill(client, indicator_id)

@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client  # noqa: E402
 from common.timeutil import KST  # noqa: E402
+from common.supabase_client import load_all  # noqa: E402
 
 # 트렌딩 점수 가중치(트렌딩 메시지 공식과 동일).
 W_VIEWS, W_FWD, W_REPLIES = 0.5, 3.0, 1.5
@@ -35,17 +36,6 @@ def trending_score(m: dict) -> float:
         + (m["forwards"] or 0) * W_FWD
         + (m["replies"] or 0) * W_REPLIES
     )
-
-
-def load_all(db, table: str, columns: str) -> list[dict]:
-    rows, start = [], 0
-    while True:
-        page = db.table(table).select(columns).range(start, start + 999).execute().data
-        if not page:
-            break
-        rows += page
-        start += 1000
-    return rows
 
 
 def main() -> None:

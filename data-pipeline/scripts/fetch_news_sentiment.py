@@ -26,6 +26,7 @@ from common.config import NAVER_CLIENT_ID, NAVER_CLIENT_SECRET  # noqa: E402
 from common.details import store_abs_scale_details  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
+from common.indicator import ensure_indicator  # noqa: E402
 from config.news_sentiment_keywords import NEGATIVE_KEYWORDS, POSITIVE_KEYWORDS  # noqa: E402
 
 NAVER_NEWS_SEARCH_URL = "https://openapi.naver.com/v1/search/news.json"
@@ -58,17 +59,6 @@ def clean_title(raw_title: str) -> str:
 def parse_pub_date(pub_date: str) -> date:
     # 예: "Wed, 08 Jul 2026 14:32:00 +0900"
     return datetime.strptime(pub_date, "%a, %d %b %Y %H:%M:%S %z").date()
-
-
-def ensure_indicator(client) -> str:
-    existing = (
-        client.table("indicators").select("id").eq("slug", INDICATOR_SLUG).execute()
-    )
-    if existing.data:
-        return existing.data[0]["id"]
-
-    inserted = client.table("indicators").insert(INDICATOR_META).execute()
-    return inserted.data[0]["id"]
 
 
 def classify_sentiment(title: str) -> str:
@@ -284,7 +274,7 @@ def backfill_daily_sentiment(client, indicator_id: str) -> None:
 
 def main() -> None:
     client = get_client()
-    indicator_id = ensure_indicator(client)
+    indicator_id = ensure_indicator(client, INDICATOR_META)
     print(f"[Supabase] indicator '{INDICATOR_SLUG}' id: {indicator_id}")
 
     if "--backfill" in sys.argv:

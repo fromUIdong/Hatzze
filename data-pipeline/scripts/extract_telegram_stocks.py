@@ -34,6 +34,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client  # noqa: E402
+from common.supabase_client import load_all  # noqa: E402
 from config.stock_extraction import (  # noqa: E402
     ALIASES,
     AMBIGUOUS_NAMES,
@@ -52,22 +53,6 @@ LATIN_ACRONYM = re.compile(r"^[A-Za-z][A-Za-z0-9&]*$")  # SK, LG, E1 … (한글
 URL_RE = re.compile(r"(?:https?://|www\.)\S+")
 # 마스킹 채움 문자 — 한글/영숫자/한자 어디에도 안 걸려 경계 판정이 공백과 같아진다.
 MASK_CHAR = "\x00"
-
-
-def load_all(db, table: str, columns: str) -> list[dict]:
-    """Supabase 기본 페이지 크기(1000)를 넘겨 전량을 읽는다.
-
-    stocks는 KOSPI만일 땐 944행이라 캡에 안 걸렸지만, 코스닥 승인(2026-07-20)으로
-    2,765행이 되며 조용히 잘려나갔다. 1000행을 넘길 수 있는 표는 반드시 이걸 쓴다.
-    """
-    rows, start = [], 0
-    while True:
-        page = db.table(table).select(columns).range(start, start + 999).execute().data
-        if not page:
-            break
-        rows += page
-        start += 1000
-    return rows
 
 
 def load_dictionary(db) -> tuple[dict[str, str], dict[str, str], set[str]]:

@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from common.config import NAVER_CLIENT_ID, NAVER_CLIENT_SECRET  # noqa: E402
 from common.details import store_vs_average_details  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
+from common.indicator import ensure_indicator  # noqa: E402
 
 NAVER_DATALAB_URL = "https://openapi.naver.com/v1/datalab/search"
 LOOKBACK_DAYS = 365
@@ -104,20 +105,6 @@ def fetch_search_trends() -> list[list[dict]]:
             raise RuntimeError(f"'{config['group_name']}' 그룹에 데이터가 없습니다")
         data_by_group.append(data_points)
     return data_by_group
-
-
-def ensure_indicator(client, meta: dict) -> str:
-    slug = meta["slug"]
-    existing = client.table("indicators").select("id").eq("slug", slug).execute()
-    if existing.data:
-        indicator_id = existing.data[0]["id"]
-        client.table("indicators").update(
-            {k: v for k, v in meta.items() if k != "slug"}
-        ).eq("id", indicator_id).execute()
-        return indicator_id
-
-    inserted = client.table("indicators").insert(meta).execute()
-    return inserted.data[0]["id"]
 
 
 def upsert_all(client, indicator_id: str, data_points: list[dict]) -> None:

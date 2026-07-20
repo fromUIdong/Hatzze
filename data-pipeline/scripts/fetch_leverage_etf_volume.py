@@ -59,6 +59,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.krx_client import krx_get  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
+from common.indicator import ensure_indicator  # noqa: E402
+from common.timeutil import business_days  # noqa: E402
 
 ETF_URL = "http://data-dbg.krx.co.kr/svc/apis/etp/etf_bydd_trd"
 FUTURES_URL = "http://data-dbg.krx.co.kr/svc/apis/drv/fut_bydd_trd"
@@ -108,28 +110,6 @@ COMPOSITE_META = {
     "description_beginner": "레버리지 ETF 거래대금과 코스피200 선물 미결제약정을 함께 봐요. 개인들이 빚내서 두 배로, 그리고 얼마나 오래 공격적으로 베팅을 이어가고 있는지 가늠할 수 있어요",
     "unit": "pt",
 }
-
-
-def ensure_indicator(client, meta: dict) -> str:
-    slug = meta["slug"]
-    existing = client.table("indicators").select("id").eq("slug", slug).execute()
-    if existing.data:
-        indicator_id = existing.data[0]["id"]
-        client.table("indicators").update(
-            {k: v for k, v in meta.items() if k != "slug"}
-        ).eq("id", indicator_id).execute()
-        return indicator_id
-
-    inserted = client.table("indicators").insert(meta).execute()
-    return inserted.data[0]["id"]
-
-
-def business_days(start: date, end: date):
-    current = start
-    while current <= end:
-        if current.weekday() < 5:  # 0=Mon ... 4=Fri
-            yield current
-        current += timedelta(days=1)
 
 
 def get_existing_dates(client, indicator_id: str, start: date) -> set[str]:

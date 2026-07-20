@@ -25,18 +25,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client  # noqa: E402
+from common.supabase_client import load_all  # noqa: E402
 from config.stock_themes import THEMES  # noqa: E402
-
-
-def load_all(db, table: str, columns: str) -> list[dict]:
-    rows, start = [], 0
-    while True:
-        page = db.table(table).select(columns).range(start, start + 999).execute().data
-        if not page:
-            break
-        rows += page
-        start += 1000
-    return rows
 
 
 def main() -> None:

@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.krx_client import krx_get  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
+from common.indicator import ensure_indicator  # noqa: E402
 
 KRX_URL = "http://data-dbg.krx.co.kr/svc/apis/sto/stk_bydd_trd"
 TOP_N = 10
@@ -41,15 +42,6 @@ INDICATOR_META = {
     "description_beginner": "거래가 소수 인기 종목에 쏠릴수록, 다들 같은 핫한 종목만 쫓는다는 과열 신호일 수 있어요",
     "unit": "%",
 }
-
-
-def ensure_indicator(client) -> str:
-    existing = (
-        client.table("indicators").select("id").eq("slug", INDICATOR_SLUG).execute()
-    )
-    if existing.data:
-        return existing.data[0]["id"]
-    return client.table("indicators").insert(INDICATOR_META).execute().data[0]["id"]
 
 
 def _to_float(s: str) -> float:
@@ -88,7 +80,7 @@ def fetch_concentration(bas_dd: str):
 
 def main() -> None:
     client = get_client()
-    indicator_id = ensure_indicator(client)
+    indicator_id = ensure_indicator(client, INDICATOR_META)
     print(f"[Supabase] indicator '{INDICATOR_SLUG}' id: {indicator_id}")
 
     saved = 0

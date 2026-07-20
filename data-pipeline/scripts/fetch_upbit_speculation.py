@@ -42,6 +42,7 @@ import yfinance as yf
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client  # noqa: E402
+from common.indicator import ensure_indicator  # noqa: E402
 
 UPBIT_CANDLES_URL = "https://api.upbit.com/v1/candles/days"
 UPBIT_MARKET = "KRW-BTC"
@@ -66,17 +67,6 @@ INDICATOR_META = {
     "unit": "pt",
     "weight": 2,
 }
-
-
-def ensure_indicator(client) -> str:
-    existing = (
-        client.table("indicators").select("id").eq("slug", INDICATOR_SLUG).execute()
-    )
-    if existing.data:
-        return existing.data[0]["id"]
-
-    inserted = client.table("indicators").insert(INDICATOR_META).execute()
-    return inserted.data[0]["id"]
 
 
 def fetch_upbit_candles(min_days: int) -> dict[str, dict]:
@@ -134,7 +124,7 @@ def compute_volume_surge(upbit_candles: dict[str, dict]) -> dict[str, float]:
 
 def main() -> None:
     client = get_client()
-    indicator_id = ensure_indicator(client)
+    indicator_id = ensure_indicator(client, INDICATOR_META)
     print(f"[Supabase] indicator '{INDICATOR_SLUG}' id: {indicator_id}")
 
     today = date.today()

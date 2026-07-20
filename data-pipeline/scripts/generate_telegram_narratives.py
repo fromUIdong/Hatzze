@@ -32,6 +32,7 @@ from anthropic import Anthropic  # noqa: E402
 from common.config import ANTHROPIC_API_KEY  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.timeutil import KST  # noqa: E402
+from common.supabase_client import load_all  # noqa: E402
 
 MODEL = "claude-haiku-4-5"
 
@@ -100,17 +101,6 @@ STOCK_SYSTEM = COMMON + f"""
 - 대표 메시지 발췌는 '무엇이 화제였는지'의 근거로만 쓰고, 그대로 베끼지 마세요.
 - **반드시 {LEN_MIN}자 이상 {LEN_MAX}자 이하**로 쓰세요(공백 포함). 카드 높이가 이 길이에
   맞춰져 있어 넘치면 레이아웃이 깨집니다. 한 문장 또는 두 문장으로 자연스럽게 맞추세요."""
-
-
-def load_all(db, table: str, columns: str) -> list[dict]:
-    rows, start = [], 0
-    while True:
-        page = db.table(table).select(columns).range(start, start + 999).execute().data
-        if not page:
-            break
-        rows += page
-        start += 1000
-    return rows
 
 
 def build_brief_digest(db, latest: str) -> str | None:

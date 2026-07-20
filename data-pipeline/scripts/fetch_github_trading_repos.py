@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.config import GITHUB_TOKEN  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
+from common.indicator import ensure_indicator  # noqa: E402
 
 GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
 KEYWORDS = ["trading-bot", "quant-trading", "stock-bot", "algo-trading"]
@@ -43,17 +44,6 @@ INDICATOR_META = {
     "unit": "건",
     # weight 미지정 -> 기본값 1(검증 전 새 지표 안전장치)
 }
-
-
-def ensure_indicator(client) -> str:
-    existing = (
-        client.table("indicators").select("id").eq("slug", INDICATOR_SLUG).execute()
-    )
-    if existing.data:
-        return existing.data[0]["id"]
-
-    inserted = client.table("indicators").insert(INDICATOR_META).execute()
-    return inserted.data[0]["id"]
 
 
 def fetch_trading_bot_repo_count() -> int:
@@ -84,7 +74,7 @@ def fetch_trading_bot_repo_count() -> int:
 
 def main() -> None:
     client = get_client()
-    indicator_id = ensure_indicator(client)
+    indicator_id = ensure_indicator(client, INDICATOR_META)
     print(f"[Supabase] indicator '{INDICATOR_SLUG}' id: {indicator_id}")
 
     count = fetch_trading_bot_repo_count()

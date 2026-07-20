@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import re
 import sys
-from datetime import date
 from pathlib import Path
 
 import requests
@@ -25,6 +24,7 @@ from bs4 import BeautifulSoup
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client  # noqa: E402
+from common.indicator import ensure_indicator  # noqa: E402
 
 NAVER_URL = "https://finance.naver.com/sise/sise_deposit.naver"
 REQUEST_TIMEOUT_SEC = 15
@@ -39,15 +39,6 @@ INDICATOR_META = {
     "description_beginner": "증권계좌에 대기 중인 매수 자금(예탁금)이 늘수록, 사려는 돈이 몰린다는 신호예요",
     "unit": "억원",
 }
-
-
-def ensure_indicator(client) -> str:
-    existing = (
-        client.table("indicators").select("id").eq("slug", INDICATOR_SLUG).execute()
-    )
-    if existing.data:
-        return existing.data[0]["id"]
-    return client.table("indicators").insert(INDICATOR_META).execute().data[0]["id"]
 
 
 def fetch_daily_deposit() -> list[tuple[str, float]]:
@@ -80,7 +71,7 @@ def fetch_daily_deposit() -> list[tuple[str, float]]:
 
 def main() -> None:
     client = get_client()
-    indicator_id = ensure_indicator(client)
+    indicator_id = ensure_indicator(client, INDICATOR_META)
     print(f"[Supabase] indicator '{INDICATOR_SLUG}' id: {indicator_id}")
 
     daily = fetch_daily_deposit()  # 최신순

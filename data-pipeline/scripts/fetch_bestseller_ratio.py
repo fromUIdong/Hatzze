@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.config import ALADIN_TTB_KEY  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
+from common.indicator import ensure_indicator  # noqa: E402
 
 ALADIN_URL = "https://www.aladin.co.kr/ttb/api/ItemList.aspx"
 MAX_RESULTS = 50
@@ -40,17 +41,6 @@ INDICATOR_META = {
     "description_beginner": "베스트셀러에 재테크 책이 많으면, 관심이 쏠렸다는 신호",
     "unit": "%",
 }
-
-
-def ensure_indicator(client) -> str:
-    existing = (
-        client.table("indicators").select("id").eq("slug", INDICATOR_SLUG).execute()
-    )
-    if existing.data:
-        return existing.data[0]["id"]
-
-    inserted = client.table("indicators").insert(INDICATOR_META).execute()
-    return inserted.data[0]["id"]
 
 
 def fetch_bestseller_list() -> list[dict]:
@@ -90,7 +80,7 @@ def fetch_bestseller_list() -> list[dict]:
 
 def main() -> None:
     client = get_client()
-    indicator_id = ensure_indicator(client)
+    indicator_id = ensure_indicator(client, INDICATOR_META)
     print(f"[Supabase] indicator '{INDICATOR_SLUG}' id: {indicator_id}")
 
     items = fetch_bestseller_list()

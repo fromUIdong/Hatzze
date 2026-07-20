@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from common.config import NAVER_CLIENT_ID, NAVER_CLIENT_SECRET  # noqa: E402
 from common.details import store_vs_average_details  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
+from common.indicator import ensure_indicator  # noqa: E402
 
 NAVER_DATALAB_URL = "https://openapi.naver.com/v1/datalab/search"
 KEYWORD_GROUP_NAME = "명품수입차소비"
@@ -79,21 +80,6 @@ def fetch_search_trend() -> list[dict]:
     return data_points
 
 
-def ensure_indicator(client) -> str:
-    existing = (
-        client.table("indicators").select("id").eq("slug", INDICATOR_SLUG).execute()
-    )
-    if existing.data:
-        indicator_id = existing.data[0]["id"]
-        client.table("indicators").update(
-            {k: v for k, v in INDICATOR_META.items() if k != "slug"}
-        ).eq("id", indicator_id).execute()
-        return indicator_id
-
-    inserted = client.table("indicators").insert(INDICATOR_META).execute()
-    return inserted.data[0]["id"]
-
-
 def upsert_all(client, indicator_id: str, data_points: list[dict]) -> None:
     rows = [
         {
@@ -117,7 +103,7 @@ def main() -> None:
     )
 
     client = get_client()
-    indicator_id = ensure_indicator(client)
+    indicator_id = ensure_indicator(client, INDICATOR_META)
     print(f"[Supabase] indicator '{INDICATOR_SLUG}' id: {indicator_id}")
 
     upsert_all(client, indicator_id, data_points)

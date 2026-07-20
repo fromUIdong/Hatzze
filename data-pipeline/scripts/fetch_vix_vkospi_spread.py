@@ -32,6 +32,7 @@ import yfinance as yf
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client  # noqa: E402
+from common.indicator import ensure_indicator  # noqa: E402
 
 VIX_TICKER = "^VIX"
 BACKFILL_DAYS = 365
@@ -53,22 +54,6 @@ INDICATOR_META = {
     "direction": "high",
     "weight": 2,
 }
-
-
-def ensure_indicator(client) -> str:
-    existing = (
-        client.table("indicators").select("id").eq("slug", INDICATOR_SLUG).execute()
-    )
-    if existing.data:
-        indicator_id = existing.data[0]["id"]
-        # 이름/설명/방향이 바뀌었을 때 기존 레코드에도 반영되도록 매 실행 갱신한다.
-        client.table("indicators").update(
-            {k: v for k, v in INDICATOR_META.items() if k != "slug"}
-        ).eq("id", indicator_id).execute()
-        return indicator_id
-
-    inserted = client.table("indicators").insert(INDICATOR_META).execute()
-    return inserted.data[0]["id"]
 
 
 def get_indicator_id(client, slug: str) -> str:
@@ -115,7 +100,7 @@ def trailing_percentiles(series: dict[str, float]) -> dict[str, float]:
 
 def main() -> None:
     client = get_client()
-    indicator_id = ensure_indicator(client)
+    indicator_id = ensure_indicator(client, INDICATOR_META)
     vkospi_id = get_indicator_id(client, VKOSPI_SLUG)
     print(f"[Supabase] indicator '{INDICATOR_SLUG}' id: {indicator_id}")
 

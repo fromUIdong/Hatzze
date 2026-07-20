@@ -24,6 +24,7 @@ from bs4 import BeautifulSoup
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client  # noqa: E402
+from common.indicator import ensure_indicator  # noqa: E402
 
 NAVER_URL = "https://finance.naver.com/sise/investorDealTrendDay.naver"
 SOSOK_KOSPI = "01"
@@ -39,15 +40,6 @@ INDICATOR_META = {
     "description_beginner": "개인 투자자가 순매수로 몰릴수록, 개미가 시장을 떠받치는 과열 신호일 수 있어요",
     "unit": "억원",
 }
-
-
-def ensure_indicator(client) -> str:
-    existing = (
-        client.table("indicators").select("id").eq("slug", INDICATOR_SLUG).execute()
-    )
-    if existing.data:
-        return existing.data[0]["id"]
-    return client.table("indicators").insert(INDICATOR_META).execute().data[0]["id"]
 
 
 def fetch_daily_individual() -> list[tuple[str, float]]:
@@ -82,7 +74,7 @@ def fetch_daily_individual() -> list[tuple[str, float]]:
 
 def main() -> None:
     client = get_client()
-    indicator_id = ensure_indicator(client)
+    indicator_id = ensure_indicator(client, INDICATOR_META)
     print(f"[Supabase] indicator '{INDICATOR_SLUG}' id: {indicator_id}")
 
     daily = fetch_daily_individual()  # 최신순

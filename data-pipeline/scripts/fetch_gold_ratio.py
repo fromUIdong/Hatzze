@@ -25,6 +25,7 @@ import yfinance as yf
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.supabase_client import get_client  # noqa: E402
+from common.indicator import ensure_indicator  # noqa: E402
 
 GOLD_TICKER = "GC=F"
 BACKFILL_DAYS = 365
@@ -39,17 +40,6 @@ INDICATOR_META = {
     "description_beginner": "이 비율이 높아질수록 다들 위험을 두려워하지 않고 주식에 베팅하고 있다는 과열 신호일 수 있어요",
     "unit": "배",
 }
-
-
-def ensure_indicator(client) -> str:
-    existing = (
-        client.table("indicators").select("id").eq("slug", INDICATOR_SLUG).execute()
-    )
-    if existing.data:
-        return existing.data[0]["id"]
-
-    inserted = client.table("indicators").insert(INDICATOR_META).execute()
-    return inserted.data[0]["id"]
 
 
 def get_indicator_id(client, slug: str) -> str:
@@ -81,7 +71,7 @@ def get_indicator_values(client, indicator_id: str, start: date) -> dict[str, fl
 
 def main() -> None:
     client = get_client()
-    indicator_id = ensure_indicator(client)
+    indicator_id = ensure_indicator(client, INDICATOR_META)
     kospi_indicator_id = get_indicator_id(client, KOSPI_RAW_SLUG)
     print(f"[Supabase] indicator '{INDICATOR_SLUG}' id: {indicator_id}")
 
