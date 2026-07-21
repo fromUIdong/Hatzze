@@ -77,6 +77,38 @@ def store_vs_average_details(
     return len(rows)
 
 
+def sentiment_details(result: dict) -> dict:
+    """감성 분류 결과에서 카드가 '낙관:비관'을 그릴 수 있는 키만 뽑는다.
+
+    raw_value(순감성 = (긍정-부정)/전체×100)만으로는 낙관:비관 비율을 되돌릴 수
+    없다 — 중립이 몇 건이었는지가 사라지기 때문이다. 그래서 건수를 그대로 남긴다.
+    디시·뉴스 두 스크립트가 같은 키 이름을 써야 카드가 하나의 코드로 둘 다 그린다.
+    """
+    return {
+        "pos_count": result["positive"],
+        "neg_count": result["negative"],
+        "neu_count": result["neutral"],
+        "total_count": result["total"],
+    }
+
+
+def merge_details(client, indicator_id: str, day: str, new_keys: dict) -> dict:
+    """그 날짜의 기존 details에 new_keys만 얹은 dict를 돌려준다(저장은 호출자가).
+
+    details는 여러 writer가 공유하는 칸이라 통째로 대입하면 남의 키가 날아간다
+    (모듈 docstring 참고). 여기서 기존 값을 먼저 읽어 병합해 준다.
+    """
+    existing = (
+        client.table("indicator_values")
+        .select("details")
+        .eq("indicator_id", indicator_id)
+        .eq("date", day)
+        .execute()
+    )
+    current = (existing.data[0].get("details") or {}) if existing.data else {}
+    return {**current, **new_keys}
+
+
 DEFAULT_SCALE_WINDOW = 60
 DEFAULT_SCALE_FLOOR = 1.0
 DEFAULT_SCALE_MIN_POINTS = 3

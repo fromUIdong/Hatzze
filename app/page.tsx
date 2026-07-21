@@ -1,6 +1,6 @@
 import { getLatestDailyScore, getPublicIndicators, getTopStockHighGaps } from "@/lib/data";
 import type { DailyScore, IndicatorCategory, IndicatorWithLatestValue, StockHighGap } from "@/lib/data";
-import { formatEokMixed, formatIndicatorValue, formatKstUpdate } from "@/lib/format";
+import { formatEokMixed, formatIndicatorValue, formatKstUpdate, sentimentTone } from "@/lib/format";
 import { C, Icon, MONO, stageForScore } from "./ui";
 
 // 지표는 하루 단위(GitHub Actions 배치)로 갱신되므로, 빌드 시점에 정적으로
@@ -721,7 +721,8 @@ function CardBuffett({ v }: { v: Pick }) {
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
       <TitleRow desc={v.headline} icon="payments" name={v.name} badge={sourceBadge(v, "당일 기준")} />
-      <Big disp={v.disp} unit={v.unit} color={v.color} size={52} sub={ratio !== null ? `${ratio.toFixed(1)}배` : undefined} />
+      {/* 크기는 같은 2칸 카드인 레버리지 ETF 종합 지수(44)에 맞춘다. */}
+      <Big disp={v.disp} unit={v.unit} color={v.color} size={44} sub={ratio !== null ? `${ratio.toFixed(1)}배` : undefined} />
       <div style={{ background: C.bg, borderRadius: 10, padding: "18px 18px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, color: C.sub, marginBottom: 6 }}>
@@ -833,7 +834,8 @@ function CardMarketActions({ v }: { v: Pick }) {
       <TitleRow desc={v.headline} icon="speed" name={v.name} badge="최근 한 달" />
       {verdict ? (
         <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginBottom: 12 }}>
-          <span style={{ fontSize: 34, fontWeight: 800, color: verdict.c, lineHeight: 1 }}>{verdict.t}</span>
+          {/* 크기는 같은 2칸 카드인 레버리지 ETF 종합 지수(44)에 맞춘다. */}
+          <span style={{ fontSize: 44, fontWeight: 800, color: verdict.c, lineHeight: 1 }}>{verdict.t}</span>
         </div>
       ) : (
         <Big disp={v.raw !== null && v.raw > 0 ? `+${v.disp}` : v.disp} color={v.color} size={44} sub="최근 30일 순 쏠림" />
@@ -1306,24 +1308,95 @@ function CardTrend({ v, icon, span }: { v: Pick; icon: string; span?: 1 | 2 }) {
 // 중앙 기준 감성/카운트 바 (커뮤니티/뉴스)
 // 감성 지표(뉴스·커뮤니티) — 과열도가 아니라 비관↔낙관 양극 게이지로 보여준다.
 // raw = (긍정-부정)/전체*100 이라 -100~+100 범위. 중앙=중립, 좌=비관, 우=낙관.
-function CardSentiment({ v, icon, span = 1 }: { v: Pick; icon: string; span?: 1 | 2 }) {
+// 감성 카드의 헤드라인은 '낙관:비관 비율'(중립 제외) — 카더라 리포트의 테마 막대와
+// 같은 언어다. 'N pt'(순감성)는 정확하지만 그 수가 뭔지 설명 없이는 안 읽혔다.
+//
+// 비율은 raw_value(순감성)만으로 되돌릴 수 없어(중립 건수가 사라진다) 파이프라인이
+// details에 남긴 건수를 쓴다. 그 키가 아직 없는 과거 행은 예전 표기로 폴백한다 —
+// 파이프라인이 한 번 더 돌면 자연히 새 표기로 바뀐다.
+function sentimentRatio(
+  details: Record<string, number> | null,
+): { pos: number; neg: number; decided: number; total: number } | null {
+  const p = details?.pos_count;
+  const n = details?.neg_count;
+  if (typeof p !== "number" || typeof n !== "number") return null;
+  const decided = p + n;
+  // 낙관+비관이 몇 건 안 되면 한두 건에 100:0이 찍혀 실제보다 단정적으로 보인다.
+  // 카더라 테마 막대와 같은 하한(8건)을 쓴다.
+  if (decided < 8) return null;
+  const pos = Math.round((p / decided) * 100);
+  // 전체 건수(중립 포함)는 '몇 건을 보고 낸 비율인지' 캡션에 쓴다. 옛 행에 없을 수 있어
+  // 없으면 낙관+비관만으로 대신한다.
+  const total = typeof details?.total_count === "number" ? details.total_count : decided;
+  return { pos, neg: 100 - pos, decided, total };
+}
+
+function CardSentiment({
+  v,
+  icon,
+  // 무엇을 센 건수인지는 지표마다 다르다(디시=게시글, 뉴스=뉴스). "낙관:비관 · N건"처럼
+  // 비율 설명을 반복하는 것보다, 표본이 뭔지 알려주는 쪽이 정보량이 크다.
+  countNoun,
+  span = 1,
+}: {
+  v: Pick;
+  icon: string;
+  countNoun: string;
+  span?: 1 | 2;
+}) {
   const raw = v.raw ?? 0;
-  // 감성 스코어는 뉴스·디시 모두 (긍정-부정)/전체×100 = 순감성%(-100~100)로 같은 단위다.
-  // 예전엔 지표별 details.scale(자기 최근 |최대|)로 정규화했는데, 그러면 디시(-2.71%)가
-  // 자기 범위의 극단이라 뉴스(-20.57%)보다 bar가 더 길어 보이는 착시가 생긴다. 두 카드가
-  // 같은 단위이므로 공유 절대 축으로 바꿔 bar 절반폭(%) = |순감성%|(±50 캡)이 되게 한다 —
-  // -20pt는 -2.7pt보다 항상 bar가 길고, 표시값과 bar가 1:1로 일치한다. 0(중립)은 항상 중앙.
-  const pos = 50 + Math.max(-50, Math.min(50, raw));
-  const optimistic = raw >= 0;
-  const barColor = raw === 0 ? C.neutral : optimistic ? C.hot : C.cold;
+  const ratio = sentimentRatio(v.details);
+  // 막대는 헤드라인과 **같은 기준**을 써야 한다. 비율 표기가 가능한 날엔 낙관 비중을
+  // 그대로 축에 올린다(50=중립). 한 카드 안에서 헤드라인은 낙관인데 막대는 비관을
+  // 가리키는 모순이 생기지 않게 하려는 것 — 카더라 센티먼트의 색/라벨 어긋남과 같은 종류의
+  // 사고를 여기서 미리 막는다.
+  //
+  // 건수가 없는 옛 행은 순감성(-100~100)으로 폴백한다. 뉴스·디시 모두 (긍정-부정)/전체×100
+  // 이라 단위가 같으므로 공유 절대 축(bar 절반폭 = |순감성%|, ±50 캡)을 쓴다 — 지표별
+  // details.scale로 정규화하면 디시가 자기 범위의 극단이라 뉴스보다 길어 보이는 착시가 났다.
+  const pos = ratio ? ratio.pos : 50 + Math.max(-50, Math.min(50, raw));
+  const optimistic = ratio ? ratio.pos >= 50 : raw >= 0;
+  // 색도 라벨과 같은 3구간을 따른다. 단순히 50 기준으로 갈라 칠하면 55:45가 "중립"이라고
+  // 적힌 채 낙관색이 되는, 카더라에서 고친 것과 똑같은 어긋남이 생긴다.
+  const tone = ratio ? sentimentTone(ratio.pos).tone : null;
+  const barColor = tone
+    ? tone === "hot"
+      ? C.hot
+      : tone === "cold"
+        ? C.cold
+        : C.sub
+    : raw === 0
+      ? C.neutral
+      : optimistic
+        ? C.hot
+        : C.cold;
   return (
     <Shell span={span} hit={v.isHit} minH={210}>
       <TitleRow desc={v.headline} icon={icon} name={v.name} />
-      <div style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: barColor, letterSpacing: "-0.03em", margin: "8px 0 0" }}>
-        {raw > 0 ? "+" : ""}
-        {v.disp}
-        {v.unit}
-      </div>
+      {ratio ? (
+        /* 카더라 생태계 센티먼트와 같은 짜임 — 큰 수치 + 우세 라벨, 그 아래 기준 캡션.
+           라벨·색 구간도 그쪽과 공유한다(lib/format.ts sentimentTone). */
+        <div style={{ margin: "8px 0 0" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
+            {/* 순서는 앱 전체에서 '비관 : 낙관'으로 통일한다(카더라 테마 막대도 동일). */}
+            <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, letterSpacing: "-0.03em" }}>
+              <span style={{ color: C.cold }}>{ratio.neg}</span>
+              <span style={{ color: C.sub }}>:</span>
+              <span style={{ color: C.hot }}>{ratio.pos}</span>
+            </span>
+            <span style={{ fontSize: 12, fontWeight: 800, color: barColor }}>{sentimentTone(ratio.pos).label}</span>
+          </div>
+          <div style={{ fontSize: 10, color: C.sub, marginTop: 4 }}>
+            {countNoun} <span style={{ fontFamily: MONO }}>{ratio.total.toLocaleString("ko-KR")}</span>건 분석
+          </div>
+        </div>
+      ) : (
+        <div style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: barColor, letterSpacing: "-0.03em", margin: "8px 0 0" }}>
+          {raw > 0 ? "+" : ""}
+          {v.disp}
+          {v.unit}
+        </div>
+      )}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
         <div style={{ position: "relative", height: 16, background: C.bg, borderRadius: 999 }}>
           <div style={{ position: "absolute", left: "50%", top: -3, bottom: -3, width: 2, background: "var(--c-marker)" }} />
@@ -1428,8 +1501,13 @@ function CardUpbit({ v }: { v: Pick }) {
   return (
     <Shell hit={v.isHit} minH={210}>
       <TitleRow desc={v.headline} icon="currency_bitcoin" name={v.name} />
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
-        <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}{v.unit}</span>
+      {/* 이 지표의 raw_value는 두 서브지표의 '기준값 대비 진행률' 가중평균이라 0~100
+          과열도 점수다 — 감성 지표의 pt(순감성)와는 축이 다르다. 같은 'pt'를 달면
+          둘이 같은 단위처럼 보여 오해를 키우므로 '/100'으로 척도를 드러낸다. */}
+      <div style={{ display: "flex", alignItems: "baseline", gap: 3, marginBottom: 6 }}>
+        <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}</span>
+        <span style={{ fontFamily: MONO, fontSize: 14, fontWeight: 700, color: C.sub }}>/100</span>
+        <span style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginLeft: 4 }}>과열도</span>
       </div>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
         {dt ? (
@@ -1730,8 +1808,8 @@ export default async function Home() {
                              [명품2·봇레포·베스트셀러] — 3행이 정확히 채워진다. */}
                 <CardTrend v={p("naver_search_trend")} icon="search" />
                 <CardUpbit v={p("upbit_speculation_index")} />
-                <CardSentiment v={p("dcinside_post_count")} icon="forum" />
-                <CardSentiment v={p("news_sentiment")} icon="newspaper" />
+                <CardSentiment v={p("dcinside_post_count")} icon="forum" countNoun="게시글" />
+                <CardSentiment v={p("news_sentiment")} icon="newspaper" countNoun="뉴스" />
                 <CardBrokerage v={p("brokerage_app_rank")} />
                 <CardYoutube v={p("youtube_finance_search_views")} />
                 <CardDivergence v={p("small_business_crisis_index")} />
