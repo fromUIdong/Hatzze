@@ -29,7 +29,10 @@ from common.llm_sentiment import LlmUnavailableError, classify_titles  # noqa: E
 
 QUERIES = ["코스피", "증시"]
 DISPLAY_PER_PAGE = 100
-MAX_START = 1000  # 네이버 뉴스 검색 API 한도: start + display - 1 <= 1000
+# API HUB 한도는 start <= 1000 이다(초과 시 400 "Invalid start value"). 구 개발자센터의
+# 'start + display - 1 <= 1000' 보다 느슨하지만, start 를 100씩 늘리므로 실질 상한은
+# 그대로 1,000건이다 — 값을 바꿀 이유는 없고 규칙만 바로잡아 둔다.
+MAX_START = 1000
 REQUEST_DELAY_SEC = 0.2
 # 정렬이 흐트러진 예외적인 기사 한두 건 때문에 조기 종료되지 않도록, 목표 범위보다
 # 오래된 기사가 연속으로 여러 건 나올 때만 완전히 지난 것으로 판단한다.
@@ -69,11 +72,12 @@ def fetch_page(query: str, start: int) -> list[dict]:
         }
     )
     if resp.status_code == 401:
-        # naver_client 는 '미구독(401)'이면 구 API 로 폴백하므로, 여기까지 401 이 오면
-        # 양쪽 다 막힌 것이다 — 두 플랫폼을 모두 안내한다.
+        # NAVER API HUB 는 '해당 API 가 Application 에 등록 안 됨'을 401 로 준다
+        # (없는 경로는 404). 그래서 401 이면 키가 아니라 등록 여부를 먼저 본다.
         raise PermissionError(
-            "네이버 뉴스 검색이 401을 반환했습니다. 네이버 클라우드 콘솔에서 뉴스 검색 API "
-            "구독 상태를, 또는 developers.naver.com에서 '검색' API 활성화 상태를 확인하세요."
+            "네이버 뉴스 검색이 401을 반환했습니다. 네이버 클라우드 콘솔의 "
+            "NAVER API HUB > Application > API 관리에서 'NAVER 검색 > 뉴스'가 "
+            "등록돼 있는지, 그리고 NAVER_HUB_KEY_ID/KEY 가 그 Application 의 키인지 확인하세요."
         )
     resp.raise_for_status()
     return resp.json().get("items", [])
