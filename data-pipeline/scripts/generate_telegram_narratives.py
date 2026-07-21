@@ -90,16 +90,20 @@ COMMON = """\
 BRIEF_TONE_SYSTEM = COMMON + """
 
 [이번 문장 — 전체 분위기]
-오늘 텔레그램 메시지의 톤 구성(낙관/중립/비관 비율)과 가장 많이 오르내린 화제어를 엮어,
-지금 이 생태계의 분위기를 한 문장으로 요약하세요. 비율 수치를 그대로 읽어주기보다,
-무엇이 대화를 주도하고 있는지가 드러나게 쓰세요."""
+오늘 텔레그램 메시지의 낙관도와 가장 많이 오르내린 화제어를 엮어, 지금 이 생태계의
+분위기를 한 문장으로 요약하세요. 비율 수치를 그대로 읽어주기보다, 무엇이 대화를
+주도하고 있는지가 드러나게 쓰세요.
+**숫자를 쓸 거면 digest에 적힌 '낙관도' 값만 쓰세요.** 중립까지 포함한 비율을 따로
+계산해 말하지 마세요 — 화면의 막대가 낙관도 기준이라 다른 숫자를 말하면 어긋납니다."""
 
 BRIEF_CONTRAST_SYSTEM = COMMON + """
 
 [이번 문장 — 테마별 온도차]
-테마별 낙관 비중을 비교해, 관심이나 분위기가 어느 테마로 쏠리고 어느 쪽이 식었는지를
+테마별 낙관도를 비교해, 관심이나 분위기가 어느 테마로 쏠리고 어느 쪽이 식었는지를
 한 문장으로 쓰세요. 테마 이름을 최소 2개 언급해 대비가 드러나게 하세요.
-표본(메시지 수)이 너무 적은 테마는 언급하지 마세요."""
+표본(메시지 수)이 너무 적은 테마는 언급하지 마세요.
+**숫자를 쓸 거면 digest에 적힌 '낙관도' 값만 쓰세요.** 중립까지 포함한 비율을 따로
+계산해 말하지 마세요 — 화면의 테마 막대가 낙관도 기준이라 다른 숫자를 말하면 어긋납니다."""
 
 STOCK_SYSTEM = COMMON + f"""
 
@@ -109,6 +113,22 @@ STOCK_SYSTEM = COMMON + f"""
 - 대표 메시지 발췌는 '무엇이 화제였는지'의 근거로만 쓰고, 그대로 베끼지 마세요.
 - **반드시 {LEN_MIN}자 이상 {LEN_MAX}자 이하**로 쓰세요(공백 포함). 카드 높이가 이 길이에
   맞춰져 있어 넘치면 레이아웃이 깨집니다. 한 문장 또는 두 문장으로 자연스럽게 맞추세요."""
+
+
+def optimism(positive: int, negative: int) -> int | None:
+    """낙관도 = 중립을 뺀 '낙관 : 비관' 중 낙관 쪽 비중(%).
+
+    화면(카더라 리포트의 종합 막대·테마 막대, 시장 브리핑 감성 카드)이 전부 이 기준을
+    쓴다. 예전엔 여기서 전체 건수로 나눠(중립 포함) 총평만 다른 숫자를 말했다 — 같은
+    반도체를 두고 총평은 "낙관 51%", 막대는 "31:69"라 어느 쪽이 맞는지 알 수 없었다.
+
+    중립을 빼는 이유: 시황·공시 전달처럼 담담한 글이 원래 절반쯤이라, 같이 세면 낙관이
+    아무리 좋아도 50%를 넘기 어려워 늘 비관 쪽으로 기울어 보인다.
+    """
+    decided = positive + negative
+    if decided == 0:
+        return None
+    return round(positive / decided * 100)
 
 
 def build_brief_digest(db, latest: str) -> str | None:
@@ -141,34 +161,36 @@ def build_brief_digest(db, latest: str) -> str | None:
         return None
 
     n = overall["total"]
+    overall_opt = optimism(overall["positive"], overall["negative"])
+    if overall_opt is None:
+        return None
     lines = [
         f"[전체] 최근 {WINDOW_DAYS}일 분석 메시지 {n}건 · "
-        f"낙관 {overall['positive'] * 100 // n}% · "
-        f"중립 {overall['neutral'] * 100 // n}% · "
-        f"비관 {overall['negative'] * 100 // n}%",
+        f"낙관도 {overall_opt}% (낙관 : 비관 = {overall_opt} : {100 - overall_opt})",
+        f"  ※ 낙관도는 중립을 뺀 값입니다. 전체의 {overall['neutral'] * 100 // n}%가 중립이라 제외했습니다.",
     ]
 
-    # 최근 며칠 낙관 비율 궤적(오래된→오늘) — 분위기가 어느 쪽으로 움직였는지의 근거.
+    # 최근 며칠 낙관도 궤적(오래된→오늘) — 분위기가 어느 쪽으로 움직였는지의 근거.
     trail = []
     for r in sorted((x for x in sent if x["scope"] == "overall"), key=lambda x: x["date"])[-5:]:
-        if r["message_count"]:
-            trail.append(f"{r['date'][5:]} {r['positive_count'] * 100 // r['message_count']}%")
+        o = optimism(r["positive_count"], r["negative_count"])
+        if o is not None:
+            trail.append(f"{r['date'][5:]} {o}%")
     if len(trail) > 1:
-        lines.append(f"[낙관 비율 추이] {' → '.join(trail)}")
+        lines.append(f"[낙관도 추이] {' → '.join(trail)}")
 
     lines.append("")
-    lines.append("[테마별] 낙관 비중 (메시지 수가 적은 테마는 참고만)")
+    lines.append("[테마별] 낙관도 (중립 제외 / 메시지 수가 적은 테마는 참고만)")
     themes = sorted(
         ((s, c) for s, c in window.items() if s != "overall" and c["total"]),
         key=lambda kv: kv[1]["total"],
         reverse=True,
     )[:6]
     for scope, c in themes:
-        m = c["total"]
-        lines.append(
-            f"- {scope}: {m}건 · 낙관 {c['positive'] * 100 // m}% · "
-            f"비관 {c['negative'] * 100 // m}%"
-        )
+        o = optimism(c["positive"], c["negative"])
+        if o is None:
+            continue
+        lines.append(f"- {scope}: {c['total']}건 · 낙관도 {o}% (낙관 {c['positive']}건 · 비관 {c['negative']}건)")
 
     kws = load_all(db, "telegram_keyword_daily", "date,keyword,mention_count")
     recent = Counter()
@@ -242,11 +264,12 @@ def build_stock_digests(db, latest: str) -> list[tuple[str, str, str]]:
 
         tone = Counter(analysis[k] for k in keys if k in analysis)
         if tone:
-            t = sum(tone.values())
-            lines.append(
-                f"[언급 톤] 낙관 {tone['positive'] * 100 // t}% · "
-                f"중립 {tone['neutral'] * 100 // t}% · 비관 {tone['negative'] * 100 // t}%"
-            )
+            o = optimism(tone["positive"], tone["negative"])
+            if o is not None:
+                lines.append(
+                    f"[언급 톤] 낙관도 {o}% (낙관 {tone['positive']}건 · 비관 {tone['negative']}건 · "
+                    f"중립 {tone['neutral']}건은 제외)"
+                )
 
         # 가장 널리 퍼진 메시지 3건을 근거로 준다 — '왜 화제였는지'를 지어내지 않도록.
         keys.sort(

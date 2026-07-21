@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 
+import { sentimentTone } from "@/lib/format";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { changeRateOf, fetchYahooQuote } from "@/lib/yahoo-quote";
 
@@ -806,6 +807,8 @@ export type EcosystemSentiment = {
    *  기준이 하나로 통일된다. */
   score: number;
   label: string;
+  /** 헤드라인 숫자에 쓸 색 톤. label과 같은 구간에서 같이 나온다(sentimentTone). */
+  tone: "hot" | "neutral" | "cold";
   positive: number;
   neutral: number;
   negative: number; // 셋의 합은 항상 100(반올림 보정). 아래 3분할 막대가 이걸 그린다
@@ -816,12 +819,8 @@ export type EcosystemSentiment = {
   byTheme: { name: string; pos: number; positive: number; negative: number; total: number }[];
 };
 
-/** 낙관도 → 라벨. LLM에 맡기지 않고 결정적으로 정한다(같은 수치면 항상 같은 말). */
-function sentimentLabel(optimismPct: number): string {
-  if (optimismPct >= 60) return "낙관 우세";
-  if (optimismPct >= 45) return "중립";
-  return "비관 우세";
-}
+// 낙관도 → 라벨/색 구간은 시장 브리핑의 감성 카드와 공유한다(lib/format.ts sentimentTone).
+// LLM에 맡기지 않고 결정적으로 정해서, 같은 수치면 두 화면이 항상 같은 말을 쓴다.
 
 /** 합이 100이 되도록 반올림을 보정한다(단순 반올림은 99·101이 나와 막대가 어긋난다). */
 function toPercents(pos: number, neu: number, neg: number): [number, number, number] {
@@ -849,7 +848,10 @@ function toPercents(pos: number, neu: number, neg: number): [number, number, num
  */
 export async function getEcosystemSentiment(): Promise<EcosystemSentiment | null> {
   const db = getSupabaseAdmin();
-  const since = daysAgoISO(7).slice(0, 10);
+  // 날짜 컬럼에 gte라 경계일이 포함된다 — 7일치를 보려면 오늘 포함 6일 전부터다.
+  // daysAgoISO(7)이면 8일치가 잡혀 카드 헤더('최근 7일')와도, 같은 창을 latest-6으로
+  // 잡는 파이프라인 총평(generate_telegram_narratives.py)과도 어긋났다.
+  const since = daysAgoISO(6).slice(0, 10);
   const { data } = await db
     .from("telegram_sentiment_daily")
     .select("date,scope,positive_count,neutral_count,negative_count,message_count")
@@ -896,9 +898,12 @@ export async function getEcosystemSentiment(): Promise<EcosystemSentiment | null
   const decided = overall.pos + overall.neg;
   const optimism = decided ? Math.round((overall.pos / decided) * 100) : 50;
 
+  const { label, tone } = sentimentTone(optimism);
+
   return {
     score: optimism,
-    label: sentimentLabel(optimism),
+    label,
+    tone,
     positive,
     neutral,
     negative,

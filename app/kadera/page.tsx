@@ -355,7 +355,7 @@ export default async function KaderaPage() {
             title="텔레그램 생태계 센티먼트"
             note="최근 7일 · LLM 분석"
             desc="메시지 톤으로 본 시장 분위기"
-            noteHelp="수집한 메시지를 한 건씩 낙관/중립/비관으로 분류한 뒤 그 비율을 집계한 값이에요. 사실을 담담히 전하는 시황·공시 요약은 중립으로 봅니다. 큰 숫자는 중립을 뺀 낙관↔비관 비율(낙관도)이고, 아래 막대는 중립까지 포함한 실제 구성이에요. 테마별 막대도 같은 낙관도 기준이에요."
+            noteHelp="수집한 메시지를 한 건씩 비관/중립/낙관으로 분류한 뒤, 편을 든 것끼리만 견준 비율이에요. 사실을 담담히 전하는 시황·공시 요약은 중립으로 보고 빼는데, 이런 글이 원래 절반쯤 돼서 같이 세면 분위기가 아무리 좋아도 늘 비관 쪽으로 기울어 보이거든요. 테마별 막대도 같은 기준이에요."
           />
           {summary.lastUpdated && (
             <p style={{ margin: "-8px 0 14px", fontSize: 11, color: C.sub, fontFamily: MONO }}>
@@ -386,38 +386,55 @@ export default async function KaderaPage() {
               <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "center" }}>
                 {/* 메시지 톤 종합 — 점수와 그 근거 막대를 한 덩어리로 묶는다 */}
                 <div style={{ flex: "1 1 300px", minWidth: 280 }}>
+                  {/* 이 카드가 답하는 건 "지금 분위기 좋아, 나빠?" 하나다. 그래서 숫자도 한 벌만
+                      쓴다 — 예전엔 헤드라인이 낙관도(중립 제외, 59%)이고 아래 막대는 중립 포함
+                      구성(낙관 32%)이라, 한 카드에서 '낙관'이 두 숫자로 나와 어느 쪽이 진짜인지
+                      알 수 없었다. 이제 비관:낙관 한 기준으로만 말하고, 막대는 그 비율을 그림으로
+                      반복한다(숫자와 그림이 어긋날 수가 없다). 중립은 얼마나 뺐는지만 각주로. */}
                   <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-                    <span style={{ fontSize: 40, fontWeight: 800, color: C.hot, lineHeight: 1 }}>{sentiment.score}%</span>
-                    <span style={{ fontSize: 14, fontWeight: 800, color: C.ink }}>{sentiment.label}</span>
+                    <span style={{ fontSize: 40, fontWeight: 800, lineHeight: 1 }}>
+                      <span style={{ color: C.cold }}>{100 - sentiment.score}</span>
+                      <span style={{ color: C.sub }}>:</span>
+                      <span style={{ color: C.hot }}>{sentiment.score}</span>
+                    </span>
+                    {/* 유저가 실제로 가져가는 답은 이 라벨이다 — 색도 여기가 tone을 쓴다. */}
+                    <span
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 800,
+                        color: sentiment.tone === "hot" ? C.hot : sentiment.tone === "cold" ? C.cold : C.sub,
+                      }}
+                    >
+                      {sentiment.label}
+                    </span>
                   </div>
-                  {/* 헤드라인 숫자는 낙관↔비관 비율(중립 제외)이고 아래 막대는 중립 포함이라
-                      기준이 다르다 — 다만 막대에 중립이 버젓이 있는데 부제에 "(중립 제외)"를
-                      달면 서로 부딪혀 보인다. 정확한 계산 기준은 제목 옆 툴팁에 적어 둔다. */}
-                  <div style={{ fontSize: 11, color: C.sub, margin: "6px 0 10px" }}>
-                    낙관 ↔ 비관 · <span style={{ fontFamily: MONO }}>{sentiment.messageCount.toLocaleString("ko-KR")}</span>건 분석
+                  {/* 두 라벨을 막대의 양 끝에 붙여 어느 쪽이 어느 색인지 위치로 바로 읽히게 한다. */}
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, margin: "6px 0 6px" }}>
+                    <span style={{ color: C.cold }}>비관</span>
+                    <span style={{ color: C.hot }}>낙관</span>
                   </div>
                   <div style={{ display: "flex", height: 14, borderRadius: 999, overflow: "hidden" }}>
-                    <div style={{ width: `${sentiment.positive}%`, background: C.hot }} />
-                    <div style={{ width: `${sentiment.neutral}%`, background: C.track }} />
-                    <div style={{ width: `${sentiment.negative}%`, background: C.cold }} />
+                    <div style={{ width: `${100 - sentiment.score}%`, background: C.cold }} />
+                    <div style={{ width: `${sentiment.score}%`, background: C.hot }} />
                   </div>
-                  <div style={{ display: "flex", gap: 14, marginTop: 9, fontSize: 11, color: C.sub, flexWrap: "wrap" }}>
-                    <span><b style={{ color: C.hot }}>■</b> 긍정 {sentiment.positive}%</span>
-                    <span><b style={{ color: C.sub }}>■</b> 중립 {sentiment.neutral}%</span>
-                    <span><b style={{ color: C.cold }}>■</b> 비관 {sentiment.negative}%</span>
+                  <div style={{ marginTop: 9, fontSize: 11, color: C.sub }}>
+                    총 <span style={{ fontFamily: MONO }}>{sentiment.messageCount.toLocaleString("ko-KR")}</span>건 중{" "}
+                    <span style={{ fontFamily: MONO }}>{sentiment.neutral}</span>%는 중립이라 빼고 계산했어요
                   </div>
                 </div>
 
                 {sentiment.byTheme.length > 0 && (
                   <div style={{ flex: "1 1 250px", minWidth: 235, display: "flex", flexDirection: "column", gap: 9 }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: C.sub, display: "flex", justifyContent: "space-between" }}>
-                      <span>인기 테마별 낙관 ↔ 비관</span>
+                      {/* 중립을 뺀 기준이라는 설명은 왼쪽 종합 막대 각주에 이미 있다 —
+                          같은 카드 안에서 두 번 말할 필요는 없다. */}
+                      <span>인기 테마별 비관 ↔ 낙관</span>
                     </div>
                     {sentiment.byTheme.map((t) => (
                       <div
                         key={t.name}
                         className="hz-tip"
-                        data-tip={`${t.name} 언급 ${t.total}건 중 낙관 ${t.positive}건 · 비관 ${t.negative}건 (중립 제외 비율)`}
+                        data-tip={`${t.name} 언급 ${t.total}건 중 비관 ${t.negative}건 · 낙관 ${t.positive}건 (중립 제외 비율)`}
                         style={{ display: "flex", alignItems: "center", gap: 8 }}
                       >
                         {/* 실제 테마명은 '지주·밸류업'·'인터넷·플랫폼'처럼 길어서
@@ -436,13 +453,14 @@ export default async function KaderaPage() {
                         >
                           {t.name}
                         </span>
-                        {/* 낙관(왼쪽)과 비관(오른쪽)을 한 바에 나눠 담아 비율이 바로 보이게 */}
+                        {/* 비관(왼쪽)과 낙관(오른쪽)을 한 바에 나눠 담아 비율이 바로 보이게.
+                            순서는 시장 브리핑 감성 카드와 맞춘 '비관 : 낙관'이다. */}
                         <div style={{ flex: 1, display: "flex", height: 8, borderRadius: 999, overflow: "hidden" }}>
-                          <div style={{ width: `${t.pos}%`, background: C.hot }} />
                           <div style={{ width: `${100 - t.pos}%`, background: C.cold }} />
+                          <div style={{ width: `${t.pos}%`, background: C.hot }} />
                         </div>
                         <span style={{ fontFamily: MONO, fontSize: 10, color: C.sub, width: 62, textAlign: "right", whiteSpace: "nowrap" }}>
-                          <b style={{ color: C.hot }}>{t.pos}</b>:<b style={{ color: C.cold }}>{100 - t.pos}</b>
+                          <b style={{ color: C.cold }}>{100 - t.pos}</b>:<b style={{ color: C.hot }}>{t.pos}</b>
                         </span>
                       </div>
                     ))}

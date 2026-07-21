@@ -105,6 +105,13 @@ def _classify_batch(client: Anthropic, batch: list[str], system: str) -> dict[in
                 max_tokens=4000,
                 system=system,
                 messages=[{"role": "user", "content": prompt}],
+                # 분류는 매번 같은 답이 나와야 한다. 기본값(1.0)으로 두면 편차가 큰데,
+                # 2026-07-21 실측에서 **완전히 동일한 제목 2,987건**을 몇 분 간격으로 두 번
+                # 분류했더니 낙관도가 36% ↔ 48%로 갈렸다. 우리 구간표(비관 0~40 / 중립
+                # 41~59)를 넘나드는 폭이라 입력이 그대로인데 화면 라벨이 뒤집힌다 —
+                # "어제보다 나빠졌다"가 시장 변화인지 분류 흔들림인지 구분할 수 없게 된다.
+                # 0으로 두면 편차가 크게 줄어든다(완전히 0이 되지는 않는다).
+                temperature=0,
                 output_config={"format": {"type": "json_schema", "schema": _SCHEMA}},
             )
             raw = "".join(b.text for b in resp.content if b.type == "text")

@@ -35,7 +35,10 @@ function Sidebar() {
     >
       <div style={{ padding: "0 32px", marginBottom: 48 }}>
         <h1 style={{ margin: 0 }}>
-          <LogoLockup symbolSize={29} wordmarkSize={30} gap={7} />
+          {/* 로고는 메인(시장 브리핑)으로 가는 링크 — 어느 페이지에서든 홈으로 돌아올 수 있게. */}
+          <Link href="/" aria-label="hatzze 홈" className="hz-logo-link" style={{ display: "inline-flex" }}>
+            <LogoLockup symbolSize={29} wordmarkSize={30} gap={7} />
+          </Link>
         </h1>
         <p style={{ margin: "8px 0 0", fontSize: 11, fontWeight: 700, color: C.sub, letterSpacing: "0.02em", lineHeight: 1.5 }}>
           데이터와 감성으로 읽는 시장
@@ -212,7 +215,10 @@ export default function AppShell({
         display: "flex",
         background: C.bg,
         color: C.ink,
-        fontFamily: "'Plus Jakarta Sans', var(--font-pretendard), sans-serif",
+        // 사이트 전체를 Pretendard 하나로 통일한다. 예전엔 Plus Jakarta Sans가 앞에 있어서
+        // 라틴·숫자만 그 서체로 렌더되고 한글만 Pretendard로 떨어졌다 — 한 줄 안에서 서체가
+        // 갈렸다. Pretendard는 next/font/local로 자체 호스팅하므로 mac·윈도우 모두 동일하다.
+        fontFamily: "var(--font-pretendard), sans-serif",
         WebkitFontSmoothing: "antialiased",
         overflow: "hidden",
       }}

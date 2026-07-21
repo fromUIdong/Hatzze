@@ -25,7 +25,13 @@ export function stageForScore(score: number): string {
   return "초고온";
 }
 
-export const MONO = "'JetBrains Mono', monospace";
+// 숫자를 자릿수 고정으로 보여주려고 쓰던 이름. 예전엔 JetBrains Mono였는데, 그 서체엔
+// 한글 글리프가 없어서 "31℃ · 상온"처럼 한글이 섞인 자리는 Pretendard도 건너뛰고 OS 기본
+// 한글 폰트로 떨어졌다(맥·윈도우가 서로 다르게 보이던 원인). 이제 Pretendard 하나로 통일한다.
+//
+// 폭 고정은 서체가 아니라 tabular-nums로 낸다 — Pretendard가 이 기능을 지원해서
+// 111/847/000이 모두 같은 폭으로 찍힌다. 실제 적용은 globals.css의 body 규칙이 맡는다.
+export const MONO = "var(--font-pretendard), sans-serif";
 
 export function Icon({ name, style }: { name: string; style?: React.CSSProperties }) {
   return (

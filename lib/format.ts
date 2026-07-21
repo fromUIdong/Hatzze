@@ -84,3 +84,24 @@ export function formatEokMixed(eok: number): string {
   if (rest === 0) return `${sign}${jo.toLocaleString("ko-KR")}조`;
   return `${sign}${jo.toLocaleString("ko-KR")}조 ${rest.toLocaleString("ko-KR")}억`;
 }
+
+/**
+ * 낙관도(중립 제외한 낙관 비중 %) → 라벨 + 색 톤.
+ *
+ * 카더라 리포트의 생태계 센티먼트와 시장 브리핑의 감성 카드(디시·뉴스)가 **같은 구간·같은
+ * 말**을 쓰도록 여기 하나로 모아 둔다. 두 화면이 같은 성격의 수치를 다른 말로 부르면
+ * 사용자가 매번 다시 배워야 한다.
+ *
+ * 라벨과 색을 한 번에 돌려주는 게 핵심이다 — 예전엔 라벨만 구간으로 정하고 색은 화면에서
+ * 낙관색으로 고정해 둬서, 중립 구간의 위쪽(59%)이 "중립"이라고 적힌 채 낙관색으로 칠해지는
+ * 모순이 있었다.
+ */
+export function sentimentTone(optimismPct: number): {
+  label: string;
+  tone: "hot" | "neutral" | "cold";
+} {
+  // 구간: 비관 0~40 · 중립 41~59 · 낙관 60~100.
+  if (optimismPct >= 60) return { label: "낙관 우세", tone: "hot" };
+  if (optimismPct >= 41) return { label: "중립", tone: "neutral" };
+  return { label: "비관 우세", tone: "cold" };
+}

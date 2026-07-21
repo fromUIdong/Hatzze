@@ -23,7 +23,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.config import NAVER_CLIENT_ID, NAVER_CLIENT_SECRET  # noqa: E402
-from common.details import store_abs_scale_details  # noqa: E402
+from common.details import merge_details, sentiment_details, store_abs_scale_details  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
@@ -235,7 +235,9 @@ def backfill_daily_sentiment(client, indicator_id: str) -> None:
             continue
         result = compute_sentiment(list(links.values()))
         score = round(result["score"], 2)
-        rows_to_save.append({"indicator_id": indicator_id, "date": d, "raw_value": score})
+        rows_to_save.append(
+            {"indicator_id": indicator_id, "date": d, "raw_value": score, "details": sentiment_details(result)}
+        )
         print(
             f"[Naver News] {d}: 긍정 {result['positive']} / 부정 {result['negative']} / "
             f"중립 {result['neutral']} (전체 {result['total']}) -> {score}pt"
@@ -286,8 +288,14 @@ def main() -> None:
     score = round(result["score"], 2)
     print(f"[Naver News] 감성 스코어: {score}pt")
 
+    # 같은 날 재실행이면 이미 details가 있을 수 있어 병합해서 쓴다(공유 칸).
     client.table("indicator_values").upsert(
-        {"indicator_id": indicator_id, "date": today, "raw_value": score},
+        {
+            "indicator_id": indicator_id,
+            "date": today,
+            "raw_value": score,
+            "details": merge_details(client, indicator_id, today, sentiment_details(result)),
+        },
         on_conflict="indicator_id,date",
     ).execute()
     print(f"[Supabase] indicator_values upsert 완료: date={today}, raw_value={score}")

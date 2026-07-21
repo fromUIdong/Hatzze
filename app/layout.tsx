@@ -63,9 +63,11 @@ export default async function RootLayout({
   return (
     <html lang="ko" data-theme={theme} className={`${pretendard.variable} h-full antialiased`}>
       <head>
-        {/* 대시보드 목업이 쓰는 웹폰트. Pretendard는 위에서 로컬로 자체
-            호스팅하지만, 본문/숫자용 서체와 Material Symbols 아이콘은
-            빌드 시점 폰트 페치 실패를 피하려고 런타임 CDN 링크로 둔다. */}
+        {/* 본문·숫자는 전부 Pretendard(위에서 next/font/local로 자체 호스팅)라 CDN에서
+            받아오는 건 두 가지뿐이다: 워드마크 전용 Bricolage Grotesque와 Material Symbols
+            아이콘. 둘 다 빌드 시점 폰트 페치 실패를 피하려고 런타임 CDN 링크로 둔다.
+            (예전엔 Plus Jakarta Sans·JetBrains Mono도 받았는데, 한글 글리프가 없어 서체가
+             갈리는 원인이라 Pretendard로 통일하며 걷어냈다.) */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"
@@ -73,7 +75,7 @@ export default async function RootLayout({
           crossOrigin="anonymous"
         />
         <link
-          href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&display=swap"
           rel="stylesheet"
         />
         <link
