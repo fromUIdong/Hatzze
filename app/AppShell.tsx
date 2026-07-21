@@ -31,9 +31,7 @@ function Sidebar() {
   return (
     <aside
       className="hz-sidebar"
-      // 232px: '햇쩨 커뮤니티 합류'가 210px 에선 두 줄로 깨졌다. 메뉴 항목마다 글자
-      // 크기나 좌우 여백을 따로 두면 아이콘 세로줄이 어긋나 보여서, 폭 자체를 넓혔다.
-      style={{ width: 232, flexShrink: 0, background: C.card, borderRight: `1px solid ${C.line}`, padding: "32px 0" }}
+      style={{ width: 210, flexShrink: 0, background: C.card, borderRight: `1px solid ${C.line}`, padding: "32px 0" }}
     >
       <div style={{ padding: "0 32px", marginBottom: 48 }}>
         <h1 style={{ margin: 0 }}>
@@ -89,7 +87,7 @@ function Sidebar() {
           }}
         >
           <Icon name="send" />
-          <span style={{ fontSize: 15 }}>햇쩨 커뮤니티 합류</span>
+          <span style={{ fontSize: 15 }}>커뮤니티 합류</span>
         </a>
       </nav>
     </aside>
