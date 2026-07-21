@@ -835,8 +835,12 @@ function CardMarketActions({ v }: { v: Pick }) {
       <TitleRow desc={v.headline} icon="speed" name={v.name} badge="최근 한 달" />
       {verdict ? (
         <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginBottom: 12 }}>
-          {/* 주요 수치 크기는 VKOSPI 카드(40)를 기준으로 맞춘다. */}
-          <span style={{ fontSize: 40, fontWeight: 800, color: verdict.c, lineHeight: 1 }}>{verdict.t}</span>
+          {/* 다른 카드의 주요 수치(191%·48)와 '눈에 보이는 크기'를 맞춘 값이다. 한글은
+              같은 font-size 라도 글리프가 em box 를 더 꽉 채워 숫자보다 커 보인다 —
+              Pretendard 800 기준 실측으로 40px 일 때 숫자는 글자높이 29.1px, "매도 우세"는
+              35.9px 였다. 32px 면 28.7px 라 숫자와 거의 같아진다. font-size 를 40 으로
+              맞추면 수치는 같아도 화면에서는 이 카드만 커 보인다. */}
+          <span style={{ fontSize: 32, fontWeight: 800, color: verdict.c, lineHeight: 1 }}>{verdict.t}</span>
         </div>
       ) : (
         <Big disp={v.raw !== null && v.raw > 0 ? `+${v.disp}` : v.disp} color={v.color} size={44} sub="최근 30일 순 쏠림" />
