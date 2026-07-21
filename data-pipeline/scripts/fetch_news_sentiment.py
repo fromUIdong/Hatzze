@@ -18,18 +18,15 @@ import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-import requests
-
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.config import NAVER_CLIENT_ID, NAVER_CLIENT_SECRET  # noqa: E402
+from common.naver_client import search_news  # noqa: E402
 from common.details import merge_details, sentiment_details, store_abs_scale_details  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
 from common.llm_sentiment import LlmUnavailableError, classify_titles  # noqa: E402
 
-NAVER_NEWS_SEARCH_URL = "https://openapi.naver.com/v1/search/news.json"
 QUERIES = ["코스피", "증시"]
 DISPLAY_PER_PAGE = 100
 MAX_START = 1000  # 네이버 뉴스 검색 API 한도: start + display - 1 <= 1000
@@ -63,24 +60,20 @@ def parse_pub_date(pub_date: str) -> date:
 
 
 def fetch_page(query: str, start: int) -> list[dict]:
-    resp = requests.get(
-        NAVER_NEWS_SEARCH_URL,
-        headers={
-            "X-Naver-Client-Id": NAVER_CLIENT_ID,
-            "X-Naver-Client-Secret": NAVER_CLIENT_SECRET,
-        },
-        params={
+    resp = search_news(
+        {
             "query": query,
             "display": DISPLAY_PER_PAGE,
             "start": start,
             "sort": "date",
-        },
-        timeout=10,
+        }
     )
     if resp.status_code == 401:
+        # naver_client 는 '미구독(401)'이면 구 API 로 폴백하므로, 여기까지 401 이 오면
+        # 양쪽 다 막힌 것이다 — 두 플랫폼을 모두 안내한다.
         raise PermissionError(
-            "네이버 API가 401을 반환했습니다. developers.naver.com에서 해당 "
-            "애플리케이션에 '검색' API가 활성화되어 있는지 확인하세요."
+            "네이버 뉴스 검색이 401을 반환했습니다. 네이버 클라우드 콘솔에서 뉴스 검색 API "
+            "구독 상태를, 또는 developers.naver.com에서 '검색' API 활성화 상태를 확인하세요."
         )
     resp.raise_for_status()
     return resp.json().get("items", [])
