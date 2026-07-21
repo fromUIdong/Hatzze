@@ -387,14 +387,34 @@ export type TrendingMessage = {
 /**
  * 트렌딩 메시지가 볼 수 있는 창.
  *
- * "today"만 일수가 아니라 **KST 달력상 오늘 0시부터**다 — 화면 라벨이 "오늘"이라
- * 24시간 롤링(daysAgoISO(1))으로 하면 어제 저녁 글이 오늘 것으로 섞인다.
+ * "today"는 일수가 아니라 KST 달력 기준이다 — 화면 라벨이 "오늘"이라 24시간
+ * 롤링(daysAgoISO(1))으로 하면 어제 저녁 글이 늘 오늘 것으로 섞인다.
+ * 다만 오전 첫 수집 전에는 전날 0시부터로 잡는다(아래 trendingTodayStartISO).
  */
 export type TrendingWindow = "today" | number;
 
-/** KST 오늘 0시(=UTC 전날 15시). Postgres가 그대로 timestamptz 로 파싱한다. */
-function kstTodayStartISO(): string {
-  return `${todayKstDate()}T00:00:00+09:00`;
+/** 수집 워크플로우의 첫 실행 시각(KST). .github/workflows/daily-update.yml 의 cron 과 맞춘다. */
+const FIRST_COLLECTION_HOUR_KST = 9;
+
+/**
+ * '오늘' 창의 시작 시각.
+ *
+ * KST 오늘 0시로 그냥 잡으면 자정 직후 이 카드가 통째로 빈다 — 수집이 09시·17시에만
+ * 돌아서 새벽에는 오늘 글이 DB 에 아예 없기 때문이다(실측 KST 2026-07-22 00:31:
+ * 오늘 0건 / 어제 471건). 볼 게 없는 게 아니라 아직 안 담긴 것뿐인데 "아직 화제
+ * 메시지가 없어요" 만 뜬다.
+ *
+ * 그래서 첫 수집이 도는 09시 전에는 전날 0시를 창 시작으로 쓴다. 09시가 지나면
+ * 그날 글이 담기므로 자연스럽게 오늘 0시로 넘어간다.
+ */
+function trendingTodayStartISO(): string {
+  // Date.now()+9h 의 UTC 시각 = KST 시각(todayKstDate 와 같은 방식).
+  const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const start = new Date(`${todayKstDate()}T00:00:00+09:00`);
+  if (kstNow.getUTCHours() < FIRST_COLLECTION_HOUR_KST) {
+    start.setUTCDate(start.getUTCDate() - 1);
+  }
+  return start.toISOString();
 }
 
 /** 트렌딩 메시지 TOP N (창: windowDays). 점수는 view가 지배적이라 view순으로 후보를 좁힌 뒤 정확 점수로 정렬. */
@@ -403,7 +423,7 @@ export async function getTrendingMessages(
   limit = 8,
 ): Promise<TrendingMessage[]> {
   const db = getSupabaseAdmin();
-  const since = windowDays === "today" ? kstTodayStartISO() : daysAgoISO(windowDays);
+  const since = windowDays === "today" ? trendingTodayStartISO() : daysAgoISO(windowDays);
   const { data: msgs } = await db
     .from("telegram_messages")
     .select("channel_handle,message_id,text,views,forwards,replies,posted_at")
