@@ -15,8 +15,12 @@ jobs:
       issues: write
     env:
       FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+      # 구 개발자센터 키 — 2027-06-30 까지. 뉴스 검색 구독 전까지 폴백에 쓰인다.
       NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
       NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+      # 네이버 클라우드(NAVER API HUB) 키 — 있으면 common/naver_client.py 가 우선 사용.
+      NAVER_HUB_KEY_ID: ${{ secrets.NAVER_HUB_KEY_ID }}
+      NAVER_HUB_KEY: ${{ secrets.NAVER_HUB_KEY }}
       KRX_API_KEY: ${{ secrets.KRX_API_KEY }}
       ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
       ALADIN_TTB_KEY: ${{ secrets.ALADIN_TTB_KEY }}
