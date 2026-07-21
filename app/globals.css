@@ -73,6 +73,10 @@
 body {
   background: var(--background);
   color: var(--foreground);
+  /* 지표·시세가 많은 화면이라 숫자는 자릿수 고정(tabular)으로 깐다. 예전엔 JetBrains Mono가
+     이 역할을 했는데 한글 글리프가 없어 서체가 갈렸다 — Pretendard 하나로 통일하고 폭 고정만
+     이 기능으로 낸다(app/ui.tsx MONO 주석 참고). 값이 바뀔 때 자릿수가 흔들리지 않는다. */
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── HATZZE 대시보드 (Claude Design 목업 이식) ──────────────────────
@@ -246,4 +250,14 @@ body {
 }
 .hz-row-link:hover {
   background: var(--c-bg);
+}
+
+/* 사이드바 로고 → 홈 링크. 워드마크 색을 건드리면 브랜드가 흐트러지므로
+   투명도만 살짝 줄여 눌리는 요소임을 알린다. */
+.hz-logo-link {
+  text-decoration: none;
+  transition: opacity 0.14s ease;
+}
+.hz-logo-link:hover {
+  opacity: 0.72;
 }
