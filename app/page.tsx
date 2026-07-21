@@ -1820,7 +1820,7 @@ export default async function Home() {
                 {extra("감성").map((i) => (
                   <GenericCard key={i.id} v={pick(i)} icon={FALLBACK_ICONS["감성"]} />
                 ))}
-                <a href="#" style={{ border: `2px dashed ${C.line}`, borderRadius: 14, padding: 24, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, minHeight: 210, color: C.sub, textAlign: "center" }}>
+                <a href="https://forms.gle/P4wzp2DkP2wyTPWP9" target="_blank" rel="noopener noreferrer" style={{ border: `2px dashed ${C.line}`, borderRadius: 14, padding: 24, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, minHeight: 210, color: C.sub, textAlign: "center" }}>
                   <Icon name="add_circle" style={{ fontSize: 34 }} />
                   <span style={{ fontSize: 14, fontWeight: 700 }}>새로운 지표 제보하기</span>
                   <span style={{ fontSize: 11, fontWeight: 500, color: "var(--c-muted)" }}>아이디어가 있다면 알려주세요</span>

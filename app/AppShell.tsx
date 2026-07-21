@@ -31,7 +31,9 @@ function Sidebar() {
   return (
     <aside
       className="hz-sidebar"
-      style={{ width: 210, flexShrink: 0, background: C.card, borderRight: `1px solid ${C.line}`, padding: "32px 0" }}
+      // 232px: '햇쩨 커뮤니티 합류'가 210px 에선 두 줄로 깨졌다. 메뉴 항목마다 글자
+      // 크기나 좌우 여백을 따로 두면 아이콘 세로줄이 어긋나 보여서, 폭 자체를 넓혔다.
+      style={{ width: 232, flexShrink: 0, background: C.card, borderRight: `1px solid ${C.line}`, padding: "32px 0" }}
     >
       <div style={{ padding: "0 32px", marginBottom: 48 }}>
         <h1 style={{ margin: 0 }}>
@@ -68,6 +70,27 @@ function Sidebar() {
             </Link>
           );
         })}
+        {/* 외부(텔레그램) 링크라 NAV 배열이 아니라 따로 둔다 — pathname 기반 active 판정
+            대상이 아니고, 새 탭으로 열려야 해서 next/link 가 아닌 <a> 를 쓴다. */}
+        <a
+          href="https://t.me/hatzze_kr"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hz-nav-external"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "16px 20px",
+            color: C.sub,
+            fontWeight: 600,
+            borderRadius: 14,
+            textDecoration: "none",
+          }}
+        >
+          <Icon name="send" />
+          <span style={{ fontSize: 15 }}>햇쩨 커뮤니티 합류</span>
+        </a>
       </nav>
     </aside>
   );

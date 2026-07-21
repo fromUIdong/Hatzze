@@ -328,9 +328,10 @@ export default async function KaderaPage() {
               </div>
             ))}
           </div>
-          {/* TODO: 구글폼 URL 연결 */}
           <a
-            href="#"
+            href="https://forms.gle/PRapNH9rz8YuF2zu9"
+            target="_blank"
+            rel="noopener noreferrer"
             style={{
               marginTop: "auto",
               paddingTop: 16,
