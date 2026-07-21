@@ -1,81 +1,68 @@
-"""네이버 오픈 API 호출 공통 — 개발자센터(구) ↔ 네이버 클라우드(신) 양쪽을 다룬다.
+"""네이버 오픈 API 호출 공통 — NAVER API HUB(네이버 클라우드) 단일 경로.
 
-**배경.** 2026-07-30 24:00 부로 개발자센터의 Search / Search Trend / Shopping Insight
-신규 접수가 끊기고, 기존 이용자도 2027-06-30 까지만 쓸 수 있다. 그 뒤로는 NAVER
-API HUB(네이버 클라우드) 로 옮겨야 한다. 2026-07-31 에 유예 없이 즉시 끊기는 건
-Search API 중 '쇼핑'·'책'·'학술정보' 인데, 우리는 셋 다 안 쓴다(뉴스만 쓴다).
+**배경.** 개발자센터의 Search / Search Trend / Shopping Insight 는 2026-07-30 부로
+신규 접수가 끊기고 기존 이용자도 2027-06-30 까지만 쓸 수 있다. 그 뒤로는 NAVER
+API HUB 로 옮겨야 한다. (2026-07-31 에 유예 없이 즉시 끊기는 '쇼핑'·'책'·'학술정보'
+는 우리가 안 쓴다. finance.naver.com 스크래핑 두 곳은 API 가 아니라 무관하다.)
 
-**전환 상태 (2026-07-22 실측).**
-- 데이터랩: 새 키로 HUB_DATALAB_URL 이 200 OK. 응답 JSON 이 구 API 와 **완전히 동일**
-  해서(같은 요청으로 대조 확인) 호출부의 파싱 코드는 그대로 둔다.
-- 뉴스: HUB_NEWS_URL 이 401 "A subscription to the API is required" — 경로는 맞고
-  콘솔에서 해당 API 구독 신청이 안 된 상태다. 그래서 구독 전까지는 구 API 로
-  폴백하고 경고를 남긴다. 구독이 끝나면 코드 변경 없이 저절로 새 API 를 탄다.
+**우리가 쓰는 두 API.** 콘솔에서 Application 하나에 둘 다 등록하면 키 하나로 호출된다.
 
-폴백은 '구독 안 됨(401)' 한 가지에만 적용한다. 그 외 오류는 그대로 올려 호출부의
-재시도·에러 처리가 원래대로 동작하게 둔다 — 조용히 삼키면 문제를 못 본다.
+    NAVER 검색 > 뉴스        → /search/v1/news        (GET)
+    Data Lab  > 검색어트렌드 → /search-trend/v1/search (POST)
+
+경로를 찾을 때 헤맸던 부분이라 적어 둔다: 검색어트렌드의 경로 카테고리는 콘솔 표기
+('Data Lab')를 따르지 않고 **search-trend** 다. datalab/dataLab/data-lab 조합은 전부
+404 였다. 게이트웨이는 **미구독이면 401, 없는 경로면 404** 를 주므로 둘을 구분해
+진단하면 된다.
+
+**응답 형식.** 구 개발자센터 API 와 동일하다 — 같은 요청으로 대조해 JSON 이 완전히
+같음을 확인했다(2026-07-22). 그래서 호출부의 파싱 코드는 그대로 두고 호출 지점만
+이 모듈로 모았다.
 """
 
 from __future__ import annotations
 
 import requests
 
-from common.config import (
-    NAVER_CLIENT_ID,
-    NAVER_CLIENT_SECRET,
-    NAVER_HUB_KEY,
-    NAVER_HUB_KEY_ID,
-)
+from common.config import NAVER_HUB_KEY, NAVER_HUB_KEY_ID
 
-LEGACY_NEWS_URL = "https://openapi.naver.com/v1/search/news.json"
-LEGACY_DATALAB_URL = "https://openapi.naver.com/v1/datalab/search"
-# 뉴스는 API HUB, 데이터랩은 아직 AI·NAVER API 호스트에만 있다(HUB 호스트의 datalab
-# 경로 후보 6종 모두 404 확인). 호스트가 갈리는 게 오타처럼 보이지만 실측 결과다.
-HUB_NEWS_URL = "https://naverapihub.apigw.ntruss.com/search/v1/news"
-HUB_DATALAB_URL = "https://naveropenapi.apigw.ntruss.com/datalab/v1/search"
+BASE = "https://naverapihub.apigw.ntruss.com"
+NEWS_URL = f"{BASE}/search/v1/news"
+SEARCH_TREND_URL = f"{BASE}/search-trend/v1/search"
 
 
-def has_hub_keys() -> bool:
-    return bool(NAVER_HUB_KEY_ID and NAVER_HUB_KEY)
-
-
-def _hub_headers(json_body: bool = False) -> dict:
+def _headers(json_body: bool = False) -> dict:
+    if not (NAVER_HUB_KEY_ID and NAVER_HUB_KEY):
+        raise RuntimeError(
+            "NAVER_HUB_KEY_ID / NAVER_HUB_KEY 가 없습니다. 네이버 클라우드 콘솔의 "
+            "NAVER API HUB > Application > 인증 정보에서 발급한 값을 넣어 주세요."
+        )
     h = {"X-NCP-APIGW-API-KEY-ID": NAVER_HUB_KEY_ID, "X-NCP-APIGW-API-KEY": NAVER_HUB_KEY}
     if json_body:
         h["Content-Type"] = "application/json"
     return h
 
 
-def _legacy_headers(json_body: bool = False) -> dict:
-    h = {"X-Naver-Client-Id": NAVER_CLIENT_ID, "X-Naver-Client-Secret": NAVER_CLIENT_SECRET}
-    if json_body:
-        h["Content-Type"] = "application/json"
-    return h
-
-
-def _needs_subscription(resp: requests.Response) -> bool:
-    """새 플랫폼에서 '아직 구독 안 된 API' 를 부를 때의 응답인지."""
-    return resp.status_code == 401 and "subscription" in resp.text.lower()
-
-
-def datalab_search(body: dict, timeout: int = 15) -> requests.Response:
-    """데이터랩 검색어 트렌드. 새 키가 있으면 새 플랫폼으로 보낸다."""
-    if has_hub_keys():
-        resp = requests.post(HUB_DATALAB_URL, headers=_hub_headers(True), json=body, timeout=timeout)
-        if not _needs_subscription(resp):
-            return resp
-        print("[Naver] 데이터랩이 새 플랫폼에서 미구독 상태 — 구 API 로 폴백합니다.")
-    return requests.post(LEGACY_DATALAB_URL, headers=_legacy_headers(True), json=body, timeout=timeout)
+def _explain(resp: requests.Response, what: str) -> None:
+    """진단이 필요한 상태코드에 무엇을 확인해야 하는지 붙여 준다."""
+    if resp.status_code == 401:
+        print(
+            f"[Naver] {what} 401 — Application 에 해당 API 가 등록돼 있는지 "
+            "(NAVER API HUB > Application > API 관리) 확인하세요."
+        )
+    elif resp.status_code == 404:
+        print(f"[Naver] {what} 404 — 호출 경로가 바뀌었을 수 있습니다. NCP API 문서를 확인하세요.")
 
 
 def search_news(params: dict, timeout: int = 10) -> requests.Response:
-    """뉴스 검색. 새 키가 있고 구독까지 됐으면 새 플랫폼으로 보낸다."""
-    if has_hub_keys():
-        resp = requests.get(HUB_NEWS_URL, headers=_hub_headers(), params=params, timeout=timeout)
-        if not _needs_subscription(resp):
-            return resp
-        print(
-            "[Naver] 뉴스 검색 API 가 새 플랫폼에서 미구독 상태 — 구 API 로 폴백합니다. "
-            "네이버 클라우드 콘솔에서 구독하면 자동으로 새 API 를 씁니다."
-        )
-    return requests.get(LEGACY_NEWS_URL, headers=_legacy_headers(), params=params, timeout=timeout)
+    """뉴스 검색. params: query / display / start / sort."""
+    resp = requests.get(NEWS_URL, headers=_headers(), params=params, timeout=timeout)
+    _explain(resp, "뉴스 검색")
+    return resp
+
+
+def search_trend(body: dict, timeout: int = 15) -> requests.Response:
+    """검색어 트렌드. body: startDate / endDate / timeUnit / keywordGroups."""
+    resp = requests.post(SEARCH_TREND_URL, headers=_headers(True), json=body, timeout=timeout)
+    _explain(resp, "검색어 트렌드")
+    return resp

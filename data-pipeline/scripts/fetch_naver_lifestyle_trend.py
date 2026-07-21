@@ -20,7 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.naver_client import datalab_search  # noqa: E402
+from common.naver_client import search_trend  # noqa: E402
 from common.details import store_vs_average_details  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
@@ -81,7 +81,7 @@ def fetch_search_trends() -> list[list[dict]]:
     end = date.today()
     start = end - timedelta(days=LOOKBACK_DAYS)
 
-    resp = datalab_search(
+    resp = search_trend(
         {
             "startDate": start.isoformat(),
             "endDate": end.isoformat(),

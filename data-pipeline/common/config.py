@@ -7,10 +7,9 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 load_dotenv(ROOT_DIR / ".env.local")
 
 FRED_API_KEY = os.environ.get("FRED_API_KEY")
-# 개발자센터(구) 키. 2027-06-30 까지만 유효하다 — 그 뒤로는 아래 HUB 키만 남는다.
-NAVER_CLIENT_ID = os.environ.get("NAVER_CLIENT_ID")
-NAVER_CLIENT_SECRET = os.environ.get("NAVER_CLIENT_SECRET")
-# 네이버 클라우드(NAVER API HUB) 키. 있으면 common/naver_client.py 가 이쪽을 먼저 쓴다.
+# 네이버 클라우드(NAVER API HUB) 키. Application 하나에 뉴스·검색어트렌드를 함께
+# 등록해 두 API 를 이 키 하나로 호출한다(common/naver_client.py).
+# 구 개발자센터 키(NAVER_CLIENT_ID/SECRET)는 2026-07-22 이관 완료로 제거했다.
 NAVER_HUB_KEY_ID = os.environ.get("NAVER_HUB_KEY_ID")
 NAVER_HUB_KEY = os.environ.get("NAVER_HUB_KEY")
 KRX_API_KEY = os.environ.get("KRX_API_KEY")
