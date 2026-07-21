@@ -56,7 +56,7 @@
 
 ```mermaid
 flowchart LR
-    A["24개 fetch 스크립트<br/>KRX · ECOS · 네이버 · 유튜브 · GitHub …"] --> B["calculate_score.py<br/>26개 지표 → 과열도 가중평균"]
+    A["27개 fetch 스크립트<br/>KRX · ECOS · NAVER API HUB · 유튜브 · GitHub …"] --> B["calculate_score.py<br/>26개 지표 → 과열도 가중평균"]
     B --> C["generate_daily_summary.py<br/>Claude Haiku · 오늘의 요약"]
     C --> D[("Supabase<br/>PostgreSQL")]
     T1["fetch_telegram.py<br/>Telethon · 채널 메시지"] --> T2["종목 추출 · 일별 집계<br/>종목 · 테마"]
@@ -100,7 +100,7 @@ hatzze/
 
 - 코스피 신고가 대비 괴리율
 - 버핏지수 (시가총액 / GDP)
-- 코스피 거래대금 급증도
+- 거래대금 급증도
 - VKOSPI (변동성지수)
 - 금 대비 코스피 상대강도
 - 원/달러 환율 변동성
@@ -122,13 +122,13 @@ hatzze/
 - 주식 초보 검색량 지수
 - 디씨 주식 갤러리 감성 지수
 - 경제뉴스 헤드라인 감성 지수
-- 경제·재테크 도서 베스트셀러 비중
-- 재테크 유튜브 검색 콘텐츠 조회수
+- 경제 베스트셀러 비중 (베스트셀러 100권 중 경제 도서)
+- 재테크 유튜브 조회수
 - 명품·수입차 소비 검색 지수
 - 오마카세·파인다이닝 웨이팅 검색 지수
 - 실물–증시 괴리 지수
 - 업비트 투기 과열 지수
-- 깃헙 트레이딩봇 저장소 생성 수
+- 깃헙 거래봇 생성 수
 - 증권 앱 인기차트 순위
 
 </details>
@@ -187,7 +187,7 @@ cp .env.example .env.local
 | `SUPABASE_SECRET_KEY` | 파이프라인 쓰기용 + 카더라 리포트 조회용 |
 | `KRX_API_KEY` | 코스피 시세·신고가·시총·VKOSPI 등 |
 | `ECOS_API_KEY` | 한국은행 GDP (버핏지수) |
-| `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` | 네이버 데이터랩·종목토론방 |
+| `NAVER_HUB_KEY_ID` / `NAVER_HUB_KEY` | NAVER API HUB — 검색어트렌드 · 뉴스 검색 |
 | `YOUTUBE_API_KEY` | 유튜브 재테크 콘텐츠 |
 | `ALADIN_TTB_KEY` | 알라딘 베스트셀러 |
 | `ANTHROPIC_API_KEY` | 오늘의 요약 · 카더라 리포트 LLM 분석(Claude Haiku) |
@@ -220,4 +220,4 @@ cp .env.example .env.local
 
 ## 데이터 출처
 
-KRX 정보데이터시스템 · 한국은행 ECOS · 네이버 데이터랩/오픈API · YouTube Data API · 알라딘 · GitHub Search API · Apple App Store · DCInside · Upbit · Yahoo Finance · Telegram(공개 채널)
+KRX 정보데이터시스템 · 한국은행 ECOS · NAVER API HUB(검색어트렌드·뉴스) · 네이버 금융 · YouTube Data API · 알라딘 · GitHub Search API · Apple App Store · DCInside · Upbit · Yahoo Finance · Telegram(공개 채널)
