@@ -4,21 +4,17 @@
 upsert해도 값을 덮어쓸 뿐이라 멱등적이며, 별도의 최초/이후 실행 분기가 필요 없다.
 """
 
-import json
 import sys
 from datetime import date, timedelta
 from pathlib import Path
 
-import requests
-
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.config import NAVER_CLIENT_ID, NAVER_CLIENT_SECRET  # noqa: E402
+from common.naver_client import search_trend  # noqa: E402
 from common.details import store_vs_average_details  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
 
-NAVER_DATALAB_URL = "https://openapi.naver.com/v1/datalab/search"
 KEYWORD_GROUP_NAME = "주식초보"
 # 주식을 '처음 시작하는 사람'의 검색 의도만 모은다 — 종목명·시황 검색어를 섞으면
 # 기존 투자자의 관심까지 잡혀 '초보 유입'이라는 지표의 뜻이 흐려진다.
@@ -54,24 +50,13 @@ def fetch_search_trend() -> list[dict]:
     end = date.today()
     start = end - timedelta(days=LOOKBACK_DAYS)
 
-    resp = requests.post(
-        NAVER_DATALAB_URL,
-        headers={
-            "X-Naver-Client-Id": NAVER_CLIENT_ID,
-            "X-Naver-Client-Secret": NAVER_CLIENT_SECRET,
-            "Content-Type": "application/json",
-        },
-        data=json.dumps(
-            {
-                "startDate": start.isoformat(),
-                "endDate": end.isoformat(),
-                "timeUnit": "date",
-                "keywordGroups": [
-                    {"groupName": KEYWORD_GROUP_NAME, "keywords": KEYWORDS}
-                ],
-            }
-        ),
-        timeout=15,
+    resp = search_trend(
+        {
+            "startDate": start.isoformat(),
+            "endDate": end.isoformat(),
+            "timeUnit": "date",
+            "keywordGroups": [{"groupName": KEYWORD_GROUP_NAME, "keywords": KEYWORDS}],
+        }
     )
     resp.raise_for_status()
     data_points = resp.json()["results"][0]["data"]

@@ -15,8 +15,9 @@ jobs:
       issues: write
     env:
       FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-      NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
-      NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+      # NAVER API HUB 키 하나로 뉴스·검색어트렌드를 모두 호출한다.
+      NAVER_HUB_KEY_ID: ${{ secrets.NAVER_HUB_KEY_ID }}
+      NAVER_HUB_KEY: ${{ secrets.NAVER_HUB_KEY }}
       KRX_API_KEY: ${{ secrets.KRX_API_KEY }}
       ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
       ALADIN_TTB_KEY: ${{ secrets.ALADIN_TTB_KEY }}
