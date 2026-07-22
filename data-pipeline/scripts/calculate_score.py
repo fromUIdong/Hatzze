@@ -75,6 +75,14 @@ from config.indicator_weights import INDICATOR_WEIGHTS  # noqa: E402
 
 KOSPI_HIGH_GAP_FALLBACK_FLOOR = -20.0  # kospi_close_raw 히스토리가 부족할 때의 대체값
 KOSPI_CLOSE_RAW_SLUG = "kospi_close_raw"
+# 실물–증시 괴리의 실물 축 = 소비자심리지수(CCSI). 내부용 원본이라 점수에 직접
+# 참여하지 않고(INDICATOR_THRESHOLDS에 없음) 여기서 stress progress로 뒤집어 쓴다.
+CCSI_SLUG = "consumer_sentiment_index"
+# CCSI는 낮을수록 실물 심리가 나쁘다 = stress가 크다. 100(장기평균)에서 stress 0,
+# CCSI_STRESS_FLOOR에서 stress 100으로 선형 반전한다. 70은 실측상 깊은 침체 국면
+# (2020 코로나 초기 등)에서 닿는 수준이라, 그쯤을 '실물 stress 최고조'로 본다.
+CCSI_NEUTRAL = 100.0
+CCSI_STRESS_FLOOR = 70.0
 MIN_FLOOR_HISTORY_SAMPLES = 5  # kospi_high_gap floor 계산에 필요한 최소 과거 데이터 개수
 NEUTRAL_PROGRESS = 50.0  # 값이 아예 없는 지표(no_value)를 표에 표시할 때 쓰는 자리표시자
 HIT_ZONE = 75.0  # Hit 기준 = 초고온 진입선(진행률 ≥ 75). stage 밴드(25/50/75)의 초고온 경계와 동일.
@@ -138,6 +146,24 @@ def compute_kospi_high_gap_floor(client) -> float:
     year_high = max(values)
     year_low = min(values)
     return round((year_low - year_high) / year_high * 100, 2)
+
+
+def ccsi_stress_progress(client) -> float | None:
+    """CCSI 최신값을 '실물 stress progress'(0~100, 심리가 나쁠수록 높음)로 반전한다.
+
+    CCSI 지표가 아직 없으면(첫 배포 전 등) None — 호출부는 이때 예전처럼 자영업 검색을
+    실물 축으로 폴백한다.
+    """
+    ccsi_id = get_indicator_id_or_none(client, CCSI_SLUG)
+    if ccsi_id is None:
+        return None
+    try:
+        _, current = get_latest_value(client, ccsi_id)
+    except InsufficientHistoryError:
+        return None
+    # 100(평균)→0, 70→100 선형. cap_progress가 0~100으로 조인다.
+    stress = (CCSI_NEUTRAL - current) / (CCSI_NEUTRAL - CCSI_STRESS_FLOOR) * 100
+    return cap_progress(stress)
 
 
 def get_window_values(client, indicator_id: str, window_days: int) -> list[float]:
@@ -290,15 +316,21 @@ def main() -> None:
             }
         )
 
-    # 실물–증시 괴리: 자영업 폐업 검색(실물 stress)과 신고가 근접(증시 강세)이 둘 다
-    # 높을 때만 = "실물 없는 랠리". small_business_crisis_index의 점수 기여를 이 괴리로
-    # 대체한다(자영업 단독은 과열 신호로 역방향이라 부적합). raw_value·threshold는 그대로
-    # 두고 progress만 곱으로 덮어써, GenericCard의 과열도 바가 괴리를 반영한다.
+    # 실물–증시 괴리: 실물 심리 위축(stress)과 신고가 근접(증시 강세)이 둘 다 높을 때만
+    # = "실물 없는 랠리". small_business_crisis_index의 점수 기여를 이 괴리로 대체한다.
+    # raw_value·threshold는 그대로 두고 progress만 곱으로 덮어써, GenericCard의 과열도
+    # 바가 괴리를 반영한다.
+    #
+    # 실물 축은 CCSI(소비자심리지수)다. 예전엔 자영업 폐업 검색량이었는데 검색은 노이즈가
+    # 커서, 한국은행 월간 조사인 CCSI로 바꿨다(2026-07). CCSI는 낮을수록 stress가 크므로
+    # 100→0 / 70→100으로 선형 반전해 stress progress를 만든다.
     by_slug = {r["slug"]: r for r in results}
     sb = by_slug.get("small_business_crisis_index")
     hg = by_slug.get("kospi_high_gap")
     if sb and hg and not sb["no_value"] and not hg["no_value"]:
-        real_stress = sb["capped_progress"]      # 자영업 폐업 검색 = 실물 stress
+        # CCSI가 있으면 그 반전값을, 없으면(첫 배포 전) 예전처럼 자영업 검색 progress를 실물 축으로.
+        ccsi = ccsi_stress_progress(client)
+        real_stress = ccsi if ccsi is not None else sb["capped_progress"]
         market_strength = hg["capped_progress"]  # 신고가 근접 = 증시 강세
         # 둘 다 높아야 "실물 없는 랠리"라는 AND 성격은 유지하되(어느 한쪽이 0이면 0),
         # 곱÷100은 한쪽만 낮아도 바닥으로 눌러 지나치게 빡세서(예: 4×28/100=1.1) 기하평균으로
