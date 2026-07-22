@@ -36,7 +36,7 @@ INDICATOR_META = {
     "name": "거래대금 급증도",
     "headline": "평소 대비 오늘 오간 거래대금",
     "category": "시장",
-    "description_beginner": "코스피 거래가 평소보다 훨씬 몰리면, 다들 흥분해 달려든다는 신호예요",
+    "description_beginner": "코스피 거래가 평소보다 훨씬 몰리면, 다들 흥분해 달려든다는 신호입니다",
     "unit": "억원",
 }
 

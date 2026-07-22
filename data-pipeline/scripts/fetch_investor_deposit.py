@@ -36,7 +36,7 @@ INDICATOR_META = {
     "name": "투자자예탁금",
     "category": "시장",
     "headline": "증권계좌에 대기 중인 매수 자금",
-    "description_beginner": "증권계좌에 대기 중인 매수 자금(예탁금)이 늘수록, 사려는 돈이 몰린다는 신호예요",
+    "description_beginner": "증권계좌에 대기 중인 매수 자금(예탁금)이 늘수록, 사려는 돈이 몰린다는 신호입니다",
     "unit": "억원",
 }
 

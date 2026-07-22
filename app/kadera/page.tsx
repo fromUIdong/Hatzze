@@ -297,7 +297,7 @@ export default async function KaderaPage() {
   const miniStats: { label: string; value: string; help?: string }[] = [
     { label: "모니터링 채널", value: `${summary.channelCount}개` },
     { label: "총 구독자", value: formatKR(summary.totalSubscribers) },
-    { label: "활성 채널 (7일)", value: `${summary.activeChannels}개`, help: "최근 7일 안에 메시지를 올린 채널이에요." },
+    { label: "활성 채널 (7일)", value: `${summary.activeChannels}개`, help: "최근 7일 안에 메시지를 올린 채널입니다." },
     { label: "총 메시지 (7일)", value: `${summary.messages7d.toLocaleString("ko-KR")}개` },
   ];
 
@@ -312,8 +312,8 @@ export default async function KaderaPage() {
         <div style={{ height: 1, flex: 1, background: C.line }} />
       </div>
       <p style={{ margin: 0, fontSize: 14, lineHeight: 1.7, color: C.sub }}>
-        한국 주식 텔레그램 채널들이 <b style={{ color: C.ink }}>지금 무엇에 주목하는지</b>를 모아 보여줘요.
-        조회·확산·언급량을 종합한 <b style={{ color: C.ink }}>화제성</b> 지표이며, 매수·매도 신호가 아니에요.
+        한국 주식 텔레그램 채널들이 <b style={{ color: C.ink }}>지금 무엇에 주목하는지</b>를 모아 보여줍니다.
+        조회·확산·언급량을 종합한 <b style={{ color: C.ink }}>화제성</b> 지표이며, 매수·매도 신호가 아닙니다.
       </p>
 
       <div className="hz-grid">
@@ -370,7 +370,7 @@ export default async function KaderaPage() {
             </p>
           )}
           {!sentiment ? (
-            <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 분석된 메시지가 없어요.</p>
+            <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 분석된 메시지가 없습니다.</p>
           ) : (
             <>
               {sentiment.summary && (
@@ -419,7 +419,7 @@ export default async function KaderaPage() {
                       {/* 계산 기준 도움말 — 헤더에서 이 라벨 옆으로 옮겼다(무엇을 잰 수치인지 바로 옆에서 설명). */}
                       <span
                         className="hz-tip hz-tip-wide"
-                        data-tip="메시지를 비관/중립/낙관으로 나눈 뒤, 중립을 뺀 비관↔낙관 비율이에요. 시황·공시 같은 담담한 글이 절반이라, 같이 세면 늘 비관으로 기울거든요."
+                        data-tip="메시지를 비관/중립/낙관으로 나눈 뒤, 중립을 뺀 비관↔낙관 비율입니다. 시황·공시 같은 담담한 글이 절반이라, 같이 세면 늘 비관으로 기웁니다."
                         style={{ display: "inline-flex", cursor: "help" }}
                       >
                         <Icon name="help" style={{ fontSize: 13, color: C.sub }} />
@@ -437,7 +437,7 @@ export default async function KaderaPage() {
                   </div>
                   <div style={{ marginTop: 9, fontSize: 11, color: C.sub }}>
                     총 <span style={{ fontFamily: MONO }}>{sentiment.messageCount.toLocaleString("ko-KR")}</span>건 중{" "}
-                    <span style={{ fontFamily: MONO }}>{sentiment.neutral}</span>%는 중립이라 빼고 계산했어요
+                    <span style={{ fontFamily: MONO }}>{sentiment.neutral}</span>%는 중립이라 빼고 계산했습니다
                   </div>
                 </div>
 
@@ -498,7 +498,7 @@ export default async function KaderaPage() {
             desc="평소보다 언급이 갑자기 뛴 종목"
           />
           {surging.length === 0 ? (
-            <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 급부상 신호가 뚜렷한 종목이 없어요. 데이터가 쌓일수록 또렷해져요.</p>
+            <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 급부상 신호가 뚜렷한 종목이 없습니다. 데이터가 쌓일수록 또렷해집니다.</p>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: 12 }}>
               {/* auto-fill: 종목 수가 적어도 타일이 전체폭으로 늘어나지 않게 */}
@@ -571,10 +571,10 @@ export default async function KaderaPage() {
             title="테마 로테이션"
             note="최근 3일 vs 이전"
             desc="관심이 어느 테마로 옮겨가는지"
-            noteHelp="최근 3일 평균 점유율을 그 이전과 비교해요. 하루치끼리 재면 표본 얇은 날에 크게 요동쳐서, 며칠씩 묶어 봐요."
+            noteHelp="최근 3일 평균 점유율을 그 이전과 비교합니다. 하루치끼리 재면 표본 얇은 날에 크게 요동쳐서, 며칠씩 묶어서 봅니다."
           />
           {themes.length === 0 ? (
-            <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 집계된 테마가 없어요.</p>
+            <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 집계된 테마가 없습니다.</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {themes.map((t) => (
@@ -631,7 +631,7 @@ export default async function KaderaPage() {
             desc="가장 많이 회자된 종목의 추이와 흐름"
           />
           {stockReports.length === 0 ? (
-            <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 리포트를 만들 종목이 없어요.</p>
+            <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 리포트를 만들 종목이 없습니다.</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {stockReports.map((r) => {
@@ -699,10 +699,10 @@ export default async function KaderaPage() {
             title="채널 파워 랭킹"
             note="영향력 점수"
             desc="조회율·확산력까지 반영한 채널 영향력"
-            noteHelp="조회율·포워드율·구독자 규모·게시 빈도를 합쳐 52~100으로 낸 점수예요. 구독자만 많고 안 읽히는 채널은 낮게 나와요."
+            noteHelp="조회율·포워드율·구독자 규모·게시 빈도를 합쳐 52~100으로 낸 점수입니다. 구독자만 많고 안 읽히는 채널은 낮게 나옵니다."
           />
           {channels.length === 0 ? (
-            <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 채널 점수가 없어요.</p>
+            <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 채널 점수가 없습니다.</p>
           ) : (
             <ExpandableList items={channelItems} initial={10} step={10} />
           )}
@@ -770,7 +770,7 @@ export default async function KaderaPage() {
           <SectionHead icon="tag" title="이슈 키워드" note="7일" desc="종목명이 아닌 화제어" />
           <div style={{ display: "flex", flexDirection: "column", gap: 23 }}>
             {keywords.length === 0 ? (
-              <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 뽑을 화제어가 없어요.</p>
+              <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 뽑을 화제어가 없습니다.</p>
             ) : (
               keywords.map((k, i) => {
                 const max = keywords[0].count;

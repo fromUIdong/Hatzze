@@ -38,7 +38,7 @@ INDICATOR_META = {
     "name": "금 대비 코스피 상대강도",
     "headline": "안전자산 금과 견준 코스피 강도",
     "category": "시장",
-    "description_beginner": "이 비율이 높아질수록 다들 위험을 두려워하지 않고 주식에 베팅하고 있다는 과열 신호일 수 있어요",
+    "description_beginner": "이 비율이 높아질수록 다들 위험을 두려워하지 않고 주식에 베팅하고 있다는 과열 신호일 수 있습니다",
     "unit": "배",
 }
 

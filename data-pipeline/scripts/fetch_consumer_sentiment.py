@@ -45,7 +45,7 @@ INDICATOR_META = {
     "name": "소비자심리지수 (CCSI, 내부용 원본)",
     "category": "시장",
     "headline": "실물 소비심리 (100=평균)",
-    "description_beginner": "한국은행이 매달 재는 소비심리예요. 100 아래로 내려갈수록 사람들이 지갑을 닫는다는 실물경제 위축 신호예요.",
+    "description_beginner": "한국은행이 매달 재는 소비심리입니다. 100 아래로 내려갈수록 사람들이 지갑을 닫는다는 실물경제 위축 신호입니다.",
     "unit": "",
     "is_public": False,
 }

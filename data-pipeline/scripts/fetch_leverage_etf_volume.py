@@ -87,7 +87,7 @@ ETF_RAW_META = {
     "slug": ETF_RAW_SLUG,
     "name": "레버리지 ETF 거래대금 (내부용 원본)",
     "category": "시장",
-    "description_beginner": "레버리지 ETF·선물 미결제약정 종합 지수 계산을 위해 내부적으로 저장하는 KODEX 레버리지 ETF 거래대금 데이터예요.",
+    "description_beginner": "레버리지 ETF·선물 미결제약정 종합 지수 계산을 위해 내부적으로 저장하는 KODEX 레버리지 ETF 거래대금 데이터입니다.",
     "unit": "억원",
     "is_public": False,
 }
@@ -97,7 +97,7 @@ OI_RAW_META = {
     "slug": OI_RAW_SLUG,
     "name": "코스피200 선물 미결제약정 (내부용 원본)",
     "category": "시장",
-    "description_beginner": "레버리지 ETF·선물 미결제약정 종합 지수 계산을 위해 내부적으로 저장하는 코스피200 선물 미결제약정 데이터예요.",
+    "description_beginner": "레버리지 ETF·선물 미결제약정 종합 지수 계산을 위해 내부적으로 저장하는 코스피200 선물 미결제약정 데이터입니다.",
     "unit": "계약",
     "is_public": False,
 }
@@ -108,7 +108,7 @@ COMPOSITE_META = {
     "name": "레버리지 ETF·선물 미결제약정 종합 지수",
     "headline": "레버리지 ETF와 선물 미결제약정",
     "category": "시장",
-    "description_beginner": "레버리지 ETF 거래대금과 코스피200 선물 미결제약정을 함께 봐요. 개인들이 빚내서 두 배로, 그리고 얼마나 오래 공격적으로 베팅을 이어가고 있는지 가늠할 수 있어요",
+    "description_beginner": "레버리지 ETF 거래대금과 코스피200 선물 미결제약정을 함께 봅니다. 개인들이 빚내서 두 배로, 그리고 얼마나 오래 공격적으로 베팅을 이어가고 있는지 가늠할 수 있습니다",
     "unit": "pt",
 }
 

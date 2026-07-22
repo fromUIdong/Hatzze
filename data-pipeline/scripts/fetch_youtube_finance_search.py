@@ -48,7 +48,7 @@ INDICATOR_META = {
     "name": "재테크 유튜브 조회수",
     "headline": "재테크 영상이 얼마나 재생됐나",
     "category": "감성",
-    "description_beginner": "재테크 유튜브 조회수가 확 뛰면, 콘텐츠가 평소보다 빠르게 퍼진다는 신호예요",
+    "description_beginner": "재테크 유튜브 조회수가 확 뛰면, 콘텐츠가 평소보다 빠르게 퍼진다는 신호입니다",
     "unit": "회",
 }
 

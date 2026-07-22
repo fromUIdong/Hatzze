@@ -38,7 +38,7 @@ INDICATOR_META = {
     "name": "코스피 대비 코스닥 상대강도",
     "headline": "코스피와 견준 코스닥 강도",
     "category": "시장",
-    "description_beginner": "코스닥이 유독 앞서가면 투기성 자금이 위험을 무릅쓰고 몰리고 있다는 신호일 수 있어요",
+    "description_beginner": "코스닥이 유독 앞서가면 투기성 자금이 위험을 무릅쓰고 몰리고 있다는 신호일 수 있습니다",
     "unit": "배",
 }
 

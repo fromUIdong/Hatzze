@@ -16,7 +16,7 @@ const pretendard = localFont({
 const SITE_URL = "https://hatzze.fun";
 const TITLE = "hatzze | 데이터와 감성으로 읽는 시장";
 const DESCRIPTION =
-  "시장 지표와 감성 지표로 오늘의 코스피 과열도를 확인하세요. 버핏지수·VKOSPI·레버리지 등 26개 지표를 매일 0~100 점수로.";
+  "시장 지표와 감성 지표로 오늘의 코스피 과열도를 보여줍니다. 버핏지수·VKOSPI·레버리지 등 26개 지표를 매일 0~100 점수로.";
 
 // opengraph-image.tsx(파일 컨벤션)가 openGraph/twitter 이미지를 자동으로 채운다.
 export const metadata: Metadata = {

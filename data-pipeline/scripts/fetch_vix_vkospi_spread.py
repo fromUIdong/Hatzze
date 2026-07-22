@@ -46,7 +46,7 @@ INDICATOR_META = {
     "name": "VIX 대비 VKOSPI 스프레드",
     "category": "시장",
     "headline": "미국과 한국의 변동성 지수 격차",
-    "description_beginner": "미국은 불안한데 한국 증시만 잠잠할수록, 방심 신호로 봐요",
+    "description_beginner": "미국은 불안한데 한국 증시만 잠잠할수록, 방심 신호로 봅니다",
     "unit": "pt",
     # 2026-07-20 대시보드에서 내림: 1년의 76%가 과열도 0이라 종합점수에 기여하지
     #   못했고(같은 이유로 market_actions 공식을 갈아엎었다), VKOSPI 에서 파생된

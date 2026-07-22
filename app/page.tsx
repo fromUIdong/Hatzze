@@ -469,7 +469,7 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
             {/* 카더라 SectionHead 의 도움말과 같은 패턴(hz-tip-wide + help 아이콘). */}
             <span
               className="hz-tip hz-tip-wide hz-tip-below"
-              data-tip="시장·감성 지표 26개의 과열도를 가중 평균한 값이에요. 지표마다 신호의 무게가 달라 다른 가중치로 합산해요. 25·50·75를 경계로 저온·상온·고온·초고온이 나뉘어요."
+              data-tip="시장·감성 지표 26개의 과열도를 가중 평균한 값입니다. 지표마다 신호의 무게가 달라 다른 가중치로 합산합니다. 25·50·75를 경계로 저온·상온·고온·초고온이 나뉩니다."
               style={{ display: "inline-flex", cursor: "help" }}
             >
               <Icon name="help" style={{ fontSize: 16, color: C.sub }} />
@@ -487,7 +487,7 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
           <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 15, lineHeight: 1.6, color: "var(--c-ink-soft)", fontWeight: 500 }}>
             {/* 고정 오프너 — 두 문장을 한 문단으로. 이 아래 LLM 문장들이 각각 한 문단씩
                 붙어 전체가 3문단 정도가 된다. */}
-            <p style={{ margin: 0 }}>오늘은 시장 지표 <b style={{ color: C.ink }}>{tradHits}개</b>, 감성 지표 <b style={{ color: C.ink }}>{socialHits}개</b>가 기준선을 넘었어요. 지표들이 가리키는 현재 시장 온도는 <b style={{ color: stage.color }}>{stageLabel}</b> 구간이에요.</p>
+            <p style={{ margin: 0 }}>오늘은 시장 지표 <b style={{ color: C.ink }}>{tradHits}개</b>, 감성 지표 <b style={{ color: C.ink }}>{socialHits}개</b>가 기준선을 넘었습니다. 지표들이 가리키는 현재 시장 온도는 <b style={{ color: stage.color }}>{stageLabel}</b> 구간입니다.</p>
             {/* LLM(generate_daily_summary.py) 상세 요약을 문장별로 줄바꿈해 이어붙인다.
                 없으면(마이그레이션 전이거나 생성 실패) 오프너만 보여준다. */}
             {dailyScore.ai_summary
@@ -503,7 +503,7 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
           </div>
         </div>
         <p style={{ margin: "12px 2px 0", fontSize: 11, lineHeight: 1.5, color: "var(--c-muted)" }}>
-          저온·상온·고온·초고온은 시장의 과열 정도를 나타낸 표현일 뿐, 재미·참고용이며 매수·매도 신호가 아니에요.
+          저온·상온·고온·초고온은 시장의 과열 정도를 나타낸 표현일 뿐, 재미·참고용이며 매수·매도 신호가 아닙니다.
         </p>
       </div>
     </section>
@@ -762,7 +762,7 @@ function CardBuffett({ v }: { v: Pick }) {
           </div>
         </div>
         <p style={{ margin: "2px 0 0", fontSize: 11, fontWeight: 700, color: "var(--c-ink-soft)", textAlign: "center" }}>
-          증시가 실물 경제보다 <span style={{ color: v.color }}>{ratio !== null ? `${ratio.toFixed(1)}배 커진` : "커진"}</span> 상태예요
+          증시가 실물 경제보다 <span style={{ color: v.color }}>{ratio !== null ? `${ratio.toFixed(1)}배 커진` : "커진"}</span> 상태입니다
         </p>
       </div>
       <Foot text={v.desc} />
@@ -1203,7 +1203,7 @@ function CardComingSoon() {
             <path d="M0 34 L20 32 L40 28 L60 22 L80 15 L100 8" fill="none" stroke={C.line} strokeDasharray="4,3" strokeWidth="2.5" strokeLinecap="round" />
           </svg>
         </div>
-        <Foot text="빚내서 주식 사는 돈이 불어나면 과열의 대표 신호로 볼 수 있어요." color="var(--c-muted)" />
+        <Foot text="빚내서 주식 사는 돈이 불어나면 과열의 대표 신호로 볼 수 있습니다." color="var(--c-muted)" />
       </div>
     </Shell>
   );
@@ -1281,13 +1281,13 @@ function CardDivergence({ v }: { v: Pick }) {
   const ccsi = dt?.ccsi_value;
   const realTip =
     ccsi != null
-      ? `한국은행 소비자심리지수(CCSI) 최신값은 ${ccsi}예요. 이게 역대(2008~) 분포에서 몇 번째로 높은지를 0~100으로 매긴 값이 실물 강도예요. 그래서 ${ccsi} → ${Math.round(real)}/100(역대 ${Math.round(real)}% 지점)이 돼요.`
+      ? `한국은행 소비자심리지수(CCSI) 최신값은 ${ccsi}입니다. 이게 역대(2008~) 분포에서 몇 번째로 높은지를 0~100으로 매긴 값이 실물 강도입니다. 그래서 ${ccsi} → ${Math.round(real)}/100(역대 ${Math.round(real)}% 지점)이 됩니다.`
       : undefined;
   // 증시 강세 툴팁 — 전고점 대비 낙폭과 백분위 변환 근거.
   const gap = dt?.kospi_gap;
   const marketTip =
     gap != null
-      ? `코스피는 지금 전고점보다 ${Math.abs(gap)}% 아래예요. 이 낙폭이 역대(10년) 분포에서 얼마나 얕은지를 0~100으로 매긴 값이 증시 강세예요. 그래서 ${Math.round(market)}/100(역대 ${Math.round(market)}% 지점)이 돼요.`
+      ? `코스피는 지금 전고점보다 ${Math.abs(gap)}% 아래입니다. 이 낙폭이 역대(10년) 분포에서 얼마나 얕은지를 0~100으로 매긴 값이 증시 강세입니다. 그래서 ${Math.round(market)}/100(역대 ${Math.round(market)}% 지점)이 됩니다.`
       : undefined;
   return (
     <Shell span={2} hit={v.isHit} minH={236}>

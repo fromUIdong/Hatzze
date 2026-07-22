@@ -52,7 +52,7 @@ INDICATOR_META = {
     "name": "증권 앱 인기차트 순위",
     "category": "감성",
     "headline": "앱스토어 인기차트에 오른 증권 앱",
-    "description_beginner": "증권 앱이 앱스토어 인기차트 상위로 치솟으면, 개미가 대거 몰려든다는 신호예요",
+    "description_beginner": "증권 앱이 앱스토어 인기차트 상위로 치솟으면, 개미가 대거 몰려든다는 신호입니다",
     "unit": "점",
     # weight 미지정 -> 기본값 1(검증 전 새 지표 안전장치)
 }

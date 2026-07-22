@@ -49,7 +49,7 @@ INDICATOR_META = {
     "name": "경제 베스트셀러 비중",
     "headline": "베스트셀러 100권 중 경제 책 비중",
     "category": "감성",
-    "description_beginner": "베스트셀러에 재테크 책이 많으면, 관심이 쏠렸다는 신호",
+    "description_beginner": "베스트셀러에 재테크 책이 많으면, 관심이 쏠렸다는 신호입니다",
     "unit": "%",
 }
 

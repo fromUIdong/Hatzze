@@ -77,7 +77,7 @@ export function TrendingTabs({
       <SectionHead icon={icon} title={title} desc={desc} right={tabs} />
       {current?.count === 0 ? (
         <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>
-          {current.label} 기준으로는 아직 화제 메시지가 없어요.
+          {current.label} 기준으로는 아직 화제 메시지가 없습니다.
         </p>
       ) : (
         <Fragment key={current?.key}>{current?.node}</Fragment>
