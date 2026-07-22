@@ -294,10 +294,10 @@ export default async function KaderaPage() {
     </li>
   ));
 
-  const miniStats = [
+  const miniStats: { label: string; value: string; help?: string }[] = [
     { label: "모니터링 채널", value: `${summary.channelCount}개` },
     { label: "총 구독자", value: formatKR(summary.totalSubscribers) },
-    { label: "활성 채널 (7일)", value: `${summary.activeChannels}개` },
+    { label: "활성 채널 (7일)", value: `${summary.activeChannels}개`, help: "최근 7일 안에 메시지를 한 건이라도 올린 채널이에요. 모니터링 채널 중 실제로 활동한 곳만 세요." },
     { label: "총 메시지 (7일)", value: `${summary.messages7d.toLocaleString("ko-KR")}개` },
   ];
 
@@ -323,7 +323,14 @@ export default async function KaderaPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
             {miniStats.map((s) => (
               <div key={s.label} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-                <span style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>{s.label}</span>
+                <span style={{ fontSize: 12, color: C.sub, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  {s.label}
+                  {s.help && (
+                    <span className="hz-tip hz-tip-wide" data-tip={s.help} style={{ display: "inline-flex", cursor: "help" }}>
+                      <Icon name="help" style={{ fontSize: 13, color: C.sub }} />
+                    </span>
+                  )}
+                </span>
                 <span style={{ fontSize: 18, fontWeight: 800, color: C.ink }}>{s.value}</span>
               </div>
             ))}
@@ -354,9 +361,8 @@ export default async function KaderaPage() {
           <SectionHead
             icon="psychology"
             title="텔레그램 생태계 센티먼트"
-            note="최근 7일 · LLM 분석"
+            note="최근 7일"
             desc="메시지 톤으로 본 시장 분위기"
-            noteHelp="수집한 메시지를 한 건씩 비관/중립/낙관으로 분류한 뒤, 편을 든 것끼리만 견준 비율이에요. 사실을 담담히 전하는 시황·공시 요약은 중립으로 보고 빼는데, 이런 글이 원래 절반쯤 돼서 같이 세면 분위기가 아무리 좋아도 늘 비관 쪽으로 기울어 보이거든요. 테마별 막대도 같은 기준이에요."
           />
           {summary.lastUpdated && (
             <p style={{ margin: "-8px 0 14px", fontSize: 11, color: C.sub, fontFamily: MONO }}>
@@ -401,12 +407,23 @@ export default async function KaderaPage() {
                     {/* 유저가 실제로 가져가는 답은 이 라벨이다 — 색도 여기가 tone을 쓴다. */}
                     <span
                       style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
                         fontSize: 14,
                         fontWeight: 800,
                         color: sentiment.tone === "hot" ? C.hot : sentiment.tone === "cold" ? C.cold : C.sub,
                       }}
                     >
                       {sentiment.label}
+                      {/* 계산 기준 도움말 — 헤더에서 이 라벨 옆으로 옮겼다(무엇을 잰 수치인지 바로 옆에서 설명). */}
+                      <span
+                        className="hz-tip hz-tip-wide"
+                        data-tip="수집한 메시지를 한 건씩 비관/중립/낙관으로 분류한 뒤, 편을 든 것끼리만 견준 비율이에요. 사실을 담담히 전하는 시황·공시 요약은 중립으로 보고 빼는데, 이런 글이 원래 절반쯤 돼서 같이 세면 분위기가 아무리 좋아도 늘 비관 쪽으로 기울어 보이거든요. 테마별 막대도 같은 기준이에요."
+                        style={{ display: "inline-flex", cursor: "help" }}
+                      >
+                        <Icon name="help" style={{ fontSize: 13, color: C.sub }} />
+                      </span>
                     </span>
                   </div>
                   {/* 두 라벨을 막대의 양 끝에 붙여 어느 쪽이 어느 색인지 위치로 바로 읽히게 한다. */}
