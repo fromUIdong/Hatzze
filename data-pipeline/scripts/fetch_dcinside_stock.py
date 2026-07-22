@@ -69,7 +69,7 @@ OLD_ROW_STREAK_THRESHOLD = 5
 INDICATOR_SLUG = "dcinside_post_count"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
-    "name": "디씨 주식 갤러리 감성 지수",
+    "name": "디씨 주갤 감성 지수",
     "headline": "주식 갤러리 글에 드러난 낙관·비관",
     "category": "감성",
     "description_beginner": "낙관적인 얘기만 쏟아지면, 개인 투자 심리가 과열됐다는 신호예요",

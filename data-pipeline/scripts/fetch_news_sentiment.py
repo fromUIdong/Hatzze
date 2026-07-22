@@ -43,7 +43,7 @@ BACKFILL_DAYS = 30  # 실제로는 API의 1000건 한도 안에서 도달 가능
 INDICATOR_SLUG = "news_sentiment"
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
-    "name": "경제뉴스 헤드라인 감성 지수",
+    "name": "경제뉴스 감성 지수",
     "headline": "경제뉴스 제목에 드러난 낙관·비관",
     "category": "감성",
     "description_beginner": "뉴스 제목마다 장밋빛 전망만 넘치면, 여론이 한쪽으로 쏠린 신호예요",

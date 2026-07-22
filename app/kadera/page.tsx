@@ -15,7 +15,7 @@ import {
 } from "@/lib/telegram-data";
 import type { TrendingMessage } from "@/lib/telegram-data";
 
-import { formatKstUpdate } from "@/lib/format";
+import { formatKstUpdate, shortDate } from "@/lib/format";
 
 import { C, Icon, MONO } from "../ui";
 import { ExpandableList } from "./ExpandableList";
@@ -640,9 +640,9 @@ export default async function KaderaPage() {
                     </div>
                     <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 48, margin: "14px 0 10px" }}>
                       {r.series.map((d) => (
-                        <div key={d.date} className="hz-tip" data-tip={`${d.date.slice(5)} · ${d.mentions}회`} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                        <div key={d.date} className="hz-tip" data-tip={`${shortDate(d.date)} · ${d.mentions}회`} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                           <div style={{ width: "100%", height: `${Math.max(4, (d.mentions / max) * 36)}px`, background: C.blue, borderRadius: 3, opacity: 0.85 }} />
-                          <span style={{ fontSize: 8, fontFamily: MONO, color: C.sub }}>{d.date.slice(5)}</span>
+                          <span style={{ fontSize: 8, fontFamily: MONO, color: C.sub }}>{shortDate(d.date)}</span>
                         </div>
                       ))}
                     </div>
