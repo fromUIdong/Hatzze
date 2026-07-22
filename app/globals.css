@@ -224,6 +224,15 @@ body {
   text-align: left;
 }
 
+/* 아래로 펼치는 변형 — 스크롤 컨테이너(main, overflow:auto) 최상단에 있는 요소는
+   기본값(위로 펼침)이면 툴팁이 컨테이너 경계에서 잘린다(햇쩨 지수 도움말이 그랬다).
+   위 공간이 없고 아래가 넉넉한 자리에서 쓴다. */
+.hz-tip-below::after {
+  bottom: auto;
+  top: 100%;
+  transform: translateX(-50%) translateY(6px);
+}
+
 /* 클릭 가능한 카드(트렌딩 메시지 등) — 마우스를 올리면 살짝 떠오르고 테두리가
    강조돼 "누를 수 있다"는 걸 알린다. */
 .hz-lift {

@@ -468,7 +468,7 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
             <span style={{ fontSize: 22, fontWeight: 800, color: C.blue }}>햇쩨 지수</span>
             {/* 카더라 SectionHead 의 도움말과 같은 패턴(hz-tip-wide + help 아이콘). */}
             <span
-              className="hz-tip hz-tip-wide"
+              className="hz-tip hz-tip-wide hz-tip-below"
               data-tip="시장·감성 지표 26개의 과열도(0~100)를 가중 평균해 하나의 온도로 나타낸 값이에요. 지표마다 시장에 주는 신호의 무게가 달라서, 저마다 다른 가중치를 두고 합산해요. 25·50·75를 경계로 저온·상온·고온·초고온 구간이 나뉘어요."
               style={{ display: "inline-flex", cursor: "help" }}
             >
