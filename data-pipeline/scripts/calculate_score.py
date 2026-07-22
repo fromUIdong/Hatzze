@@ -78,11 +78,16 @@ KOSPI_CLOSE_RAW_SLUG = "kospi_close_raw"
 # 실물–증시 괴리의 실물 축 = 소비자심리지수(CCSI). 내부용 원본이라 점수에 직접
 # 참여하지 않고(INDICATOR_THRESHOLDS에 없음) 여기서 stress progress로 뒤집어 쓴다.
 CCSI_SLUG = "consumer_sentiment_index"
-# CCSI는 낮을수록 실물 심리가 나쁘다 = stress가 크다. 100(장기평균)에서 stress 0,
-# CCSI_STRESS_FLOOR에서 stress 100으로 선형 반전한다. 70은 실측상 깊은 침체 국면
-# (2020 코로나 초기 등)에서 닿는 수준이라, 그쯤을 '실물 stress 최고조'로 본다.
-CCSI_NEUTRAL = 100.0
-CCSI_STRESS_FLOOR = 70.0
+# CCSI는 낮을수록 실물 심리가 나쁘다 = stress가 크다. CCSI_NEUTRAL에서 stress 0,
+# CCSI_STRESS_FLOOR에서 stress 100으로 선형 반전한다.
+#
+# 값 근거(2008~2026 216개월 실측 백테스트): CCSI 실제 평균은 101.4로 이론적 기준선
+# 100보다 높다. neutral=100이면 '평범한 달'도 stress로 잡혀 stress>0가 36%나 됐다.
+# neutral=98(역대 25%ile)로 올려 하위 1/4 국면부터 stress를 켜면 stress>0가 25%로
+# 정리되고, floor=75(2008 금융위기 67.7·2020 코로나 71.2 근처)에서 초고온 도달이
+# 5.1%가 되어 다른 지표 목표(1년 중 4~5%)와 맞는다.
+CCSI_NEUTRAL = 98.0
+CCSI_STRESS_FLOOR = 75.0
 MIN_FLOOR_HISTORY_SAMPLES = 5  # kospi_high_gap floor 계산에 필요한 최소 과거 데이터 개수
 NEUTRAL_PROGRESS = 50.0  # 값이 아예 없는 지표(no_value)를 표에 표시할 때 쓰는 자리표시자
 HIT_ZONE = 75.0  # Hit 기준 = 초고온 진입선(진행률 ≥ 75). stage 밴드(25/50/75)의 초고온 경계와 동일.

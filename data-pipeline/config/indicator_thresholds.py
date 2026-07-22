@@ -26,9 +26,11 @@ INDICATOR_THRESHOLDS = {
     # 이상에서만 "과열→하락" 신호가 나왔다. ceiling은 기여 상한이지 표시값 상한이 아니다.
     "buffett_index": {"kind": "fixed", "threshold": 235.0, "floor": 105.0},
     # kospi_high_gap: ATH 근접도. 피스와이즈 — ATH −3%~0% = 75~100%(초고온을 근처로 좁게),
-    # floor −30%~−3% = 0~75%. floor=−30%는 "약세장(−20%)도 아직 과열 끼가 남는" 시장 맥락
-    # (−20%인데 약세장 느낌 안 남)을 반영해 크래시급에서만 저온으로 본다.
-    "kospi_high_gap": {"kind": "fixed", "threshold": 0.0, "floor": -30.0, "kink": -3.0},
+    # floor −35%~−3% = 0~75%. floor=−35%는 코스피 10년 낙폭 실측 근거: 최대 낙폭 −43.9%지만
+    # 그건 극단이고 1%ile −33%·5%ile −28% 수준이라, −30%는 10년 중 2.4%만 닿아 흔한 낙폭
+    # (−20~−25%)의 강세값을 지나치게 눌렀다(−25%가 progress 11). −35%로 낮추면 −25%가 21로
+    # 올라 "전고점에서 크게 빠졌지만 아직 바닥은 아님"이 더 합리적으로 반영된다.
+    "kospi_high_gap": {"kind": "fixed", "threshold": 0.0, "floor": -35.0, "kink": -3.0},
     "naver_search_trend": {"kind": "fixed", "threshold": 70.0},
     # dcinside_post_count / news_sentiment: (긍정−부정)/전체×100 (−100~100).
     # 2026-07-20 분류를 키워드 매칭 → LLM 으로 바꾸면서 **값의 스케일이 커졌다.**
