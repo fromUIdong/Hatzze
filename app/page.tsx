@@ -1262,7 +1262,9 @@ function DivergenceBar({ label, hint, value, color }: { label: string; hint: str
 
 function CardDivergence({ v }: { v: Pick }) {
   const dt = v.details;
-  const real = dt?.real_stress ?? 0;
+  // 갭 모델: 실물강도(높을수록 실물 튼튼)와 증시강세를 나란히 보여준다. 증시 바가 실물
+  // 바보다 길면 그 차이가 곧 괴리 — 눈으로도 "증시가 실물을 앞질렀나"가 읽힌다.
+  const real = dt?.real_strength ?? 0;
   const market = dt?.market_strength ?? 0;
   const div = dt?.divergence ?? v.capped ?? 0;
   const c = overheatColor(div);
@@ -1284,7 +1286,7 @@ function CardDivergence({ v }: { v: Pick }) {
           56px 로 벌어졌다. 박스에도 auto 를 줘 남는 공간을 위아래가 나눠 갖게 한다
           (auto 마진 두 개면 균등 분배). 고정값이 아니라 행 높이가 달라져도 유지된다. */}
       <div style={{ background: C.bg, borderRadius: 10, padding: 16, marginTop: "auto", display: "flex", gap: 22 }}>
-        <DivergenceBar label="실물 스트레스" hint="소비심리 위축(CCSI)" value={real} color={C.cold} />
+        <DivergenceBar label="실물 강도" hint="소비심리(CCSI)" value={real} color={C.blue} />
         <DivergenceBar label="증시 강세" hint="신고가 근접도" value={market} color={C.hot} />
       </div>
       <Foot text={v.desc} />

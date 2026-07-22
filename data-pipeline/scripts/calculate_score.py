@@ -78,16 +78,12 @@ KOSPI_CLOSE_RAW_SLUG = "kospi_close_raw"
 # 실물–증시 괴리의 실물 축 = 소비자심리지수(CCSI). 내부용 원본이라 점수에 직접
 # 참여하지 않고(INDICATOR_THRESHOLDS에 없음) 여기서 stress progress로 뒤집어 쓴다.
 CCSI_SLUG = "consumer_sentiment_index"
-# CCSI는 낮을수록 실물 심리가 나쁘다 = stress가 크다. CCSI_NEUTRAL에서 stress 0,
-# CCSI_STRESS_FLOOR에서 stress 100으로 선형 반전한다.
-#
-# 값 근거(2008~2026 216개월 실측 백테스트): CCSI 실제 평균은 101.4로 이론적 기준선
-# 100보다 높다. neutral=100이면 '평범한 달'도 stress로 잡혀 stress>0가 36%나 됐다.
-# neutral=98(역대 25%ile)로 올려 하위 1/4 국면부터 stress를 켜면 stress>0가 25%로
-# 정리되고, floor=75(2008 금융위기 67.7·2020 코로나 71.2 근처)에서 초고온 도달이
-# 5.1%가 되어 다른 지표 목표(1년 중 4~5%)와 맞는다.
-CCSI_NEUTRAL = 98.0
-CCSI_STRESS_FLOOR = 75.0
+# CCSI를 실물경제 '강도'(0~100)로 매핑한다. 괴리 = 증시강세 − 실물강도(갭 모델)에 쓴다.
+# 평균 CCSI(100) = 강도 50(중간)이라, 실물이 평범한데 증시만 높으면 갭이 벌어진다.
+# 양끝점 80~120은 실측 근거: CCSI 표준편차 9.3의 약 ±2σ이고, 위기 저점(2008 67.7·
+# 2020 71.2)이 강도 0, 역대 최고 근처(120)가 강도 100에 놓인다.
+CCSI_STRENGTH_LOW = 80.0   # 이하 = 실물강도 0 (위기)
+CCSI_STRENGTH_HIGH = 120.0  # 이상 = 실물강도 100 (호황)
 MIN_FLOOR_HISTORY_SAMPLES = 5  # kospi_high_gap floor 계산에 필요한 최소 과거 데이터 개수
 NEUTRAL_PROGRESS = 50.0  # 값이 아예 없는 지표(no_value)를 표에 표시할 때 쓰는 자리표시자
 HIT_ZONE = 75.0  # Hit 기준 = 초고온 진입선(진행률 ≥ 75). stage 밴드(25/50/75)의 초고온 경계와 동일.
@@ -153,11 +149,10 @@ def compute_kospi_high_gap_floor(client) -> float:
     return round((year_low - year_high) / year_high * 100, 2)
 
 
-def ccsi_stress_progress(client) -> float | None:
-    """CCSI 최신값을 '실물 stress progress'(0~100, 심리가 나쁠수록 높음)로 반전한다.
+def ccsi_real_strength(client) -> float | None:
+    """CCSI 최신값을 실물경제 '강도'(0~100, 심리가 좋을수록 높음)로 매핑한다.
 
-    CCSI 지표가 아직 없으면(첫 배포 전 등) None — 호출부는 이때 예전처럼 자영업 검색을
-    실물 축으로 폴백한다.
+    CCSI 지표가 아직 없으면(첫 배포 전 등) None — 호출부는 이때 괴리 계산을 건너뛴다.
     """
     ccsi_id = get_indicator_id_or_none(client, CCSI_SLUG)
     if ccsi_id is None:
@@ -166,9 +161,9 @@ def ccsi_stress_progress(client) -> float | None:
         _, current = get_latest_value(client, ccsi_id)
     except InsufficientHistoryError:
         return None
-    # 100(평균)→0, 70→100 선형. cap_progress가 0~100으로 조인다.
-    stress = (CCSI_NEUTRAL - current) / (CCSI_NEUTRAL - CCSI_STRESS_FLOOR) * 100
-    return cap_progress(stress)
+    # 80→0, 120→100 선형(평균 100→50). cap_progress가 0~100으로 조인다.
+    strength = (current - CCSI_STRENGTH_LOW) / (CCSI_STRENGTH_HIGH - CCSI_STRENGTH_LOW) * 100
+    return cap_progress(strength)
 
 
 def get_window_values(client, indicator_id: str, window_days: int) -> list[float]:
@@ -321,35 +316,32 @@ def main() -> None:
             }
         )
 
-    # 실물–증시 괴리: 실물 심리 위축(stress)과 신고가 근접(증시 강세)이 둘 다 높을 때만
-    # = "실물 없는 랠리". small_business_crisis_index의 점수 기여를 이 괴리로 대체한다.
-    # raw_value·threshold는 그대로 두고 progress만 곱으로 덮어써, GenericCard의 과열도
-    # 바가 괴리를 반영한다.
+    # 실물–증시 괴리: "증시가 실물경제를 얼마나 앞질렀나"(갭 모델). 실물은 CCSI 강도로,
+    # 증시는 신고가 근접도로 각각 0~100 강도를 매기고, 괴리 = max(0, 증시강세 − 실물강도).
+    # small_business_crisis_index의 점수 기여를 이 괴리로 대체한다(raw_value·threshold는
+    # 그대로, progress만 덮어써 GenericCard 과열도 바가 괴리를 반영).
     #
-    # 실물 축은 CCSI(소비자심리지수)다. 예전엔 자영업 폐업 검색량이었는데 검색은 노이즈가
-    # 커서, 한국은행 월간 조사인 CCSI로 바꿨다(2026-07). CCSI는 낮을수록 stress가 크므로
-    # 100→0 / 70→100으로 선형 반전해 stress progress를 만든다.
+    # 예전엔 √(실물stress × 증시강세) 기하평균이라 실물이 평범(CCSI 평균)하면 stress가 0이
+    # 돼 괴리가 영원히 0이었다 — "실물은 그대론데 증시만 앞서가는" 거품 초입을 못 잡았다.
+    # 갭 모델은 실물 평균(강도 50) + 증시 높음(80)이면 괴리 30으로 그 국면을 잡고, 실물이
+    # 뜨거우면(강도 100) 증시가 높아도 0(정당한 상승)으로 둔다. '괴리(gap)'라는 이름값에
+    # 충실하다. 자영업 검색량은 이제 실물 축에서 완전히 빠진다(CCSI 없으면 괴리 계산 생략).
     by_slug = {r["slug"]: r for r in results}
     sb = by_slug.get("small_business_crisis_index")
     hg = by_slug.get("kospi_high_gap")
-    if sb and hg and not sb["no_value"] and not hg["no_value"]:
-        # CCSI가 있으면 그 반전값을, 없으면(첫 배포 전) 예전처럼 자영업 검색 progress를 실물 축으로.
-        ccsi = ccsi_stress_progress(client)
-        real_stress = ccsi if ccsi is not None else sb["capped_progress"]
+    real_strength = ccsi_real_strength(client)
+    if sb and hg and not sb["no_value"] and not hg["no_value"] and real_strength is not None:
         market_strength = hg["capped_progress"]  # 신고가 근접 = 증시 강세
-        # 둘 다 높아야 "실물 없는 랠리"라는 AND 성격은 유지하되(어느 한쪽이 0이면 0),
-        # 곱÷100은 한쪽만 낮아도 바닥으로 눌러 지나치게 빡세서(예: 4×28/100=1.1) 기하평균으로
-        # 완화한다. √(4×28)=10.5로 더 합리적. 초고온(≥75)은 둘 다 ~75여야 도달(√(75×75)=75).
-        divergence = (real_stress * market_strength) ** 0.5
+        divergence = max(0.0, market_strength - real_strength)  # 증시가 실물을 앞지른 폭
         sb["progress"] = divergence
         sb["capped_progress"] = cap_progress(divergence)
         sb["hit"] = sb["capped_progress"] >= HIT_ZONE  # 괴리 초고온(≥75)일 때 Hit
-        # 카드 인포그래픽용: 두 축(실물/증시) progress를 details에 남긴다.
+        # 카드 인포그래픽용: 두 축(실물강도/증시강세) progress를 details에 남긴다.
         # fetch 쪽(common/details.py)이 같은 컬럼에 vs_avg/avg_index를 쓰므로 병합한다 —
         # 통째로 갈아끼우면 아래 update가 그 키들을 지운다(반대 방향의 같은 사고).
         sb["details"] = {
             **(get_latest_details(client, sb["indicator_id"]) or {}),
-            "real_stress": round(real_stress, 1),
+            "real_strength": round(real_strength, 1),
             "market_strength": round(market_strength, 1),
             "divergence": round(cap_progress(divergence), 1),
         }
