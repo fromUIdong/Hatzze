@@ -297,7 +297,7 @@ export default async function KaderaPage() {
   const miniStats: { label: string; value: string; help?: string }[] = [
     { label: "모니터링 채널", value: `${summary.channelCount}개` },
     { label: "총 구독자", value: formatKR(summary.totalSubscribers) },
-    { label: "활성 채널 (7일)", value: `${summary.activeChannels}개`, help: "최근 7일 안에 메시지를 한 건이라도 올린 채널이에요. 모니터링 채널 중 실제로 활동한 곳만 세요." },
+    { label: "활성 채널 (7일)", value: `${summary.activeChannels}개`, help: "최근 7일 안에 메시지를 올린 채널이에요." },
     { label: "총 메시지 (7일)", value: `${summary.messages7d.toLocaleString("ko-KR")}개` },
   ];
 
@@ -419,7 +419,7 @@ export default async function KaderaPage() {
                       {/* 계산 기준 도움말 — 헤더에서 이 라벨 옆으로 옮겼다(무엇을 잰 수치인지 바로 옆에서 설명). */}
                       <span
                         className="hz-tip hz-tip-wide"
-                        data-tip="수집한 메시지를 한 건씩 비관/중립/낙관으로 분류한 뒤, 편을 든 것끼리만 견준 비율이에요. 사실을 담담히 전하는 시황·공시 요약은 중립으로 보고 빼는데, 이런 글이 원래 절반쯤 돼서 같이 세면 분위기가 아무리 좋아도 늘 비관 쪽으로 기울어 보이거든요. 테마별 막대도 같은 기준이에요."
+                        data-tip="메시지를 비관/중립/낙관으로 나눈 뒤, 중립을 뺀 비관↔낙관 비율이에요. 시황·공시 같은 담담한 글이 절반이라, 같이 세면 늘 비관으로 기울거든요."
                         style={{ display: "inline-flex", cursor: "help" }}
                       >
                         <Icon name="help" style={{ fontSize: 13, color: C.sub }} />
@@ -571,7 +571,7 @@ export default async function KaderaPage() {
             title="테마 로테이션"
             note="최근 3일 vs 이전"
             desc="관심이 어느 테마로 옮겨가는지"
-            noteHelp="최근 3일 평균 점유율을 5일 이상 이전 평균과 비교해요. 하루치끼리 비교하면 주말처럼 표본이 얇은 날에 점유율이 크게 요동쳐서, 며칠씩 묶어 안정적으로 봐요."
+            noteHelp="최근 3일 평균 점유율을 그 이전과 비교해요. 하루치끼리 재면 표본 얇은 날에 크게 요동쳐서, 며칠씩 묶어 봐요."
           />
           {themes.length === 0 ? (
             <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 집계된 테마가 없어요.</p>
@@ -699,7 +699,7 @@ export default async function KaderaPage() {
             title="채널 파워 랭킹"
             note="영향력 점수"
             desc="조회율·확산력까지 반영한 채널 영향력"
-            noteHelp="조회율(평균 조회수÷구독자 수), 포워드율, 구독자 규모, 주간 게시물 수를 각각 구간 점수로 환산해 합산한 뒤 52~100 범위로 보정한 점수예요. 구독자만 많고 실제로 안 읽히는 채널은 점수가 낮게 나와요."
+            noteHelp="조회율·포워드율·구독자 규모·게시 빈도를 합쳐 52~100으로 낸 점수예요. 구독자만 많고 안 읽히는 채널은 낮게 나와요."
           />
           {channels.length === 0 ? (
             <p style={{ margin: 0, color: C.sub, fontSize: 13 }}>아직 채널 점수가 없어요.</p>
