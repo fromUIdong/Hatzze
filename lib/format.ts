@@ -69,6 +69,16 @@ export function formatKstUpdate(isoString: string): string {
 }
 
 /**
+ * 툴팁·미니차트 축의 짧은 날짜 표기. "YYYY-MM-DD" 또는 "MM-DD" 를 "M/D" 로 바꾼다.
+ * 예: "2026-07-16" → "7/16", "07-16" → "7/16". 툴팁마다 date.slice(5) 를 흩뿌리지
+ * 않고 여기 하나로 모아, 표기(하이픈↔슬래시)를 한 곳에서 바꾼다.
+ */
+export function shortDate(iso: string): string {
+  const [, mm, dd] = iso.length > 5 ? iso.split("-") : ["", ...iso.split("-")];
+  return `${Number(mm)}/${Number(dd)}`;
+}
+
+/**
  * 억 단위 금액을 "1조 2,929억"처럼 조와 억을 함께 읽는 형태로 만든다.
  *
  * formatIndicatorValue 는 1조를 넘으면 "1.3조원"으로 반올림하는데, 순매수처럼

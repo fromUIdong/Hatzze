@@ -1,6 +1,6 @@
 import { getLatestDailyScore, getPublicIndicators, getTopStockHighGaps } from "@/lib/data";
 import type { DailyScore, IndicatorCategory, IndicatorWithLatestValue, StockHighGap } from "@/lib/data";
-import { formatEokMixed, formatIndicatorValue, formatKstUpdate, sentimentTone } from "@/lib/format";
+import { formatEokMixed, formatIndicatorValue, formatKstUpdate, sentimentTone, shortDate } from "@/lib/format";
 import { C, Icon, MONO, stageForScore } from "./ui";
 
 // 지표는 하루 단위(GitHub Actions 배치)로 갱신되므로, 빌드 시점에 정적으로
@@ -129,7 +129,7 @@ function pick(ind: Ind | undefined): Pick {
 function sourceBadge(v: Pick, fresh: string): string {
   if (v.staleDays < 2 || !v.details?.source_date) return fresh;
   const s = String(v.details.source_date);
-  return `${s.slice(4, 6)}-${s.slice(6, 8)} 기준`;
+  return `${shortDate(`${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`)} 기준`;
 }
 
 // ── 공용 카드 조각 ────────────────────────────────────────────────
@@ -464,7 +464,17 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
       </div>
       <div style={{ flex: 1, minWidth: 280 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-          <span style={{ fontSize: 22, fontWeight: 800, color: C.blue }}>햇쩨 지수</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 22, fontWeight: 800, color: C.blue }}>햇쩨 지수</span>
+            {/* 카더라 SectionHead 의 도움말과 같은 패턴(hz-tip-wide + help 아이콘). */}
+            <span
+              className="hz-tip hz-tip-wide"
+              data-tip="시장·감성 지표 26개의 과열도(0~100)를 가중 평균해 하나의 온도로 나타낸 값이에요. 지표마다 시장에 주는 신호의 무게가 달라서, 저마다 다른 가중치를 두고 합산해요. 25·50·75를 경계로 저온·상온·고온·초고온 구간이 나뉘어요."
+              style={{ display: "inline-flex", cursor: "help" }}
+            >
+              <Icon name="help" style={{ fontSize: 16, color: C.sub }} />
+            </span>
+          </span>
           {/* 상태 텍스트는 옆의 "햇쩨 지수"(22px)와 같은 크기로 둔다 — 둘이 한 쌍으로 읽히는 자리라
               크기가 다르면 상태 쪽이 부속처럼 보인다. */}
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: `${stage.color}24`, color: stage.color, fontWeight: 800, fontSize: 22, padding: "5px 14px", borderRadius: 999, whiteSpace: "nowrap" }}>
@@ -1167,7 +1177,7 @@ function CardFx({ v }: { v: Pick }) {
         <Sparkline
           data={v.history}
           color={v.color}
-          tips={v.historyPoints.map((pt) => `${pt.date.slice(5)} · ±${pt.value.toFixed(2)}%`)}
+          tips={v.historyPoints.map((pt) => `${shortDate(pt.date)} · ±${pt.value.toFixed(2)}%`)}
         />
       </div>
       <Foot text={v.desc} />
@@ -1537,6 +1547,8 @@ function CardNetBuy({ v }: { v: Pick }) {
   // 거래일은 주말·휴장을 건너뛰어 화면에서 역산할 수 없다 — 파이프라인이 넣어준
   // YYYYMMDD 정수를 그대로 쓴다. 옛 행에는 없을 수 있어 빈 배열로 폴백한다.
   const dates = dt?.dates5 ?? [];
+  // YYYYMMDD 정수 → "M/D"(shortDate 는 하이픈 문자열을 받는다).
+  const ymdShort = (ymd: number) => shortDate(`${String(ymd).slice(0, 4)}-${String(ymd).slice(4, 6)}-${String(ymd).slice(6, 8)}`);
   const maxAbs = Math.max(1, ...daily.map((d) => Math.abs(d)));
   const isBuy = cum >= 0;
   return (
@@ -1558,7 +1570,7 @@ function CardNetBuy({ v }: { v: Pick }) {
           const buy = d >= 0;
           const ymd = dates[i];
           const label = ymd
-            ? `${String(ymd).slice(4, 6)}-${String(ymd).slice(6, 8)} · ${d >= 0 ? "+" : ""}${formatEokMixed(d)} ${d >= 0 ? "순매수" : "순매도"}`
+            ? `${ymdShort(ymd)} · ${d >= 0 ? "+" : ""}${formatEokMixed(d)} ${d >= 0 ? "순매수" : "순매도"}`
             : `${d >= 0 ? "+" : ""}${formatEokMixed(d)}`;
           return (
             <div
@@ -1576,8 +1588,8 @@ function CardNetBuy({ v }: { v: Pick }) {
       {/* 예전엔 "5일 전 / 어제" 였는데 마지막 막대는 보통 '오늘'이라 틀린 표기였다.
           이제 dates5 가 있으니 실제 거래일을 적는다(거래일이라 달력상 5일 전이 아닐 수도 있다). */}
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 8, fontWeight: 700, color: "var(--c-faint)", marginTop: -4, marginBottom: 2 }}>
-        <span>{dates.length ? `${String(dates[0]).slice(4, 6)}-${String(dates[0]).slice(6, 8)}` : "5일 전"}</span>
-        <span>{dates.length ? `${String(dates[dates.length - 1]).slice(4, 6)}-${String(dates[dates.length - 1]).slice(6, 8)}` : "최근"}</span>
+        <span>{dates.length ? ymdShort(dates[0]) : "5일 전"}</span>
+        <span>{dates.length ? ymdShort(dates[dates.length - 1]) : "최근"}</span>
       </div>
       <Foot text={v.desc} />
     </Shell>
@@ -1609,7 +1621,7 @@ function CardDeposit({ v }: { v: Pick }) {
         <Sparkline
           data={recent}
           color={c}
-          tips={points.length === recent.length ? points.map((pt) => `${pt.date.slice(5)} · ${pt.jo.toFixed(1)}조원`) : undefined}
+          tips={points.length === recent.length ? points.map((pt) => `${shortDate(pt.date)} · ${pt.jo.toFixed(1)}조원`) : undefined}
         />
       </div>
       <Foot text={v.desc} />
