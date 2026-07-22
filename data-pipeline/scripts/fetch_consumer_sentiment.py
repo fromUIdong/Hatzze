@@ -38,13 +38,16 @@ ECOS_CYCLE = "M"
 LOOKBACK_MONTHS = 18  # details(추이·게이지)용으로 넉넉히 받는다
 
 INDICATOR_SLUG = "consumer_sentiment_index"
+# is_public=False: 독립 카드로 노출하지 않는 내부용 원본이다(kospi_close_raw 등과 같은 층).
+# 실물–증시 괴리 지수의 실물 축으로만 쓰이고, 그 카드의 실물 강도 툴팁에서 원값을 보여준다.
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
-    "name": "소비자심리지수 (CCSI)",
+    "name": "소비자심리지수 (CCSI, 내부용 원본)",
     "category": "시장",
     "headline": "실물 소비심리 (100=평균)",
     "description_beginner": "한국은행이 매달 재는 소비심리예요. 100 아래로 내려갈수록 사람들이 지갑을 닫는다는 실물경제 위축 신호예요.",
     "unit": "",
+    "is_public": False,
 }
 
 

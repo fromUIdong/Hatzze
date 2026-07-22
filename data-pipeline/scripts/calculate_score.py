@@ -149,10 +149,11 @@ def compute_kospi_high_gap_floor(client) -> float:
     return round((year_low - year_high) / year_high * 100, 2)
 
 
-def ccsi_real_strength(client) -> float | None:
-    """CCSI 최신값을 실물경제 '강도'(0~100, 심리가 좋을수록 높음)로 매핑한다.
+def ccsi_real_strength(client) -> tuple[float, float] | None:
+    """CCSI 최신값을 (실물강도 0~100, CCSI 원값)으로 돌려준다. 강도는 심리가 좋을수록 높음.
 
-    CCSI 지표가 아직 없으면(첫 배포 전 등) None — 호출부는 이때 괴리 계산을 건너뛴다.
+    원값도 함께 주는 이유: 카드의 실물 강도 툴팁이 "CCSI 106.6 → 강도 67" 처럼 실제
+    지수와 변환 근거를 같이 보여주기 때문이다. CCSI 지표가 아직 없으면 None.
     """
     ccsi_id = get_indicator_id_or_none(client, CCSI_SLUG)
     if ccsi_id is None:
@@ -163,7 +164,7 @@ def ccsi_real_strength(client) -> float | None:
         return None
     # 80→0, 120→100 선형(평균 100→50). cap_progress가 0~100으로 조인다.
     strength = (current - CCSI_STRENGTH_LOW) / (CCSI_STRENGTH_HIGH - CCSI_STRENGTH_LOW) * 100
-    return cap_progress(strength)
+    return cap_progress(strength), current
 
 
 def get_window_values(client, indicator_id: str, window_days: int) -> list[float]:
@@ -329,14 +330,15 @@ def main() -> None:
     by_slug = {r["slug"]: r for r in results}
     sb = by_slug.get("small_business_crisis_index")
     hg = by_slug.get("kospi_high_gap")
-    real_strength = ccsi_real_strength(client)
-    if sb and hg and not sb["no_value"] and not hg["no_value"] and real_strength is not None:
+    ccsi = ccsi_real_strength(client)
+    if sb and hg and not sb["no_value"] and not hg["no_value"] and ccsi is not None:
+        real_strength, ccsi_value = ccsi
         market_strength = hg["capped_progress"]  # 신고가 근접 = 증시 강세
         divergence = max(0.0, market_strength - real_strength)  # 증시가 실물을 앞지른 폭
         sb["progress"] = divergence
         sb["capped_progress"] = cap_progress(divergence)
         sb["hit"] = sb["capped_progress"] >= HIT_ZONE  # 괴리 초고온(≥75)일 때 Hit
-        # 카드 인포그래픽용: 두 축(실물강도/증시강세) progress를 details에 남긴다.
+        # 카드 인포그래픽용: 두 축(실물강도/증시강세) progress + CCSI 원값(툴팁용)을 남긴다.
         # fetch 쪽(common/details.py)이 같은 컬럼에 vs_avg/avg_index를 쓰므로 병합한다 —
         # 통째로 갈아끼우면 아래 update가 그 키들을 지운다(반대 방향의 같은 사고).
         sb["details"] = {
@@ -344,6 +346,7 @@ def main() -> None:
             "real_strength": round(real_strength, 1),
             "market_strength": round(market_strength, 1),
             "divergence": round(cap_progress(divergence), 1),
+            "ccsi_value": round(ccsi_value, 1),
         }
 
     hit_count = sum(1 for r in results if r["hit"])

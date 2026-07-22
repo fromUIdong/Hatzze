@@ -1240,11 +1240,18 @@ function VsAvg({ ratio, size = 26 }: { ratio: number; size?: number }) {
 
 // 실물–증시 괴리 — 두 축(실물 스트레스/증시 강세)을 나란히 보여준다. 둘 다 높을수록
 // 괴리도(둘의 곱)가 커진다 = "실물 없는 랠리".
-function DivergenceBar({ label, hint, value, color }: { label: string; hint: string; value: number; color: string }) {
+function DivergenceBar({ label, hint, value, color, tip }: { label: string; hint: string; value: number; color: string; tip?: string }) {
   const level = value >= 66 ? "높음" : value >= 33 ? "보통" : "낮음";
   return (
     <div style={{ flex: 1 }}>
-      <div style={{ fontSize: 12, fontWeight: 800, color: C.ink, marginBottom: 2 }}>{label}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
+        <span style={{ fontSize: 12, fontWeight: 800, color: C.ink }}>{label}</span>
+        {tip && (
+          <span className="hz-tip hz-tip-wide" data-tip={tip} style={{ display: "inline-flex", cursor: "help" }}>
+            <Icon name="help" style={{ fontSize: 13, color: C.sub }} />
+          </span>
+        )}
+      </div>
       <div style={{ fontSize: 10, fontWeight: 600, color: C.sub, marginBottom: 6 }}>{hint}</div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, fontWeight: 800, marginBottom: 4 }}>
         <span style={{ color: C.sub }}>{level}</span>
@@ -1268,6 +1275,12 @@ function CardDivergence({ v }: { v: Pick }) {
   const market = dt?.market_strength ?? 0;
   const div = dt?.divergence ?? v.capped ?? 0;
   const c = overheatColor(div);
+  // 실물 강도 툴팁 — 실제 CCSI 지수와 0~100 변환 근거를 밝힌다.
+  const ccsi = dt?.ccsi_value;
+  const realTip =
+    ccsi != null
+      ? `한국은행 소비자심리지수(CCSI) 최신값은 ${ccsi}예요. 100이 장기 평균이라, CCSI 80을 실물 강도 0, 120을 100으로 놓고 100(평균)을 50에 맞춰 환산했어요. 그래서 ${ccsi} → ${Math.round(real)}/100이 돼요.`
+      : undefined;
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
       <TitleRow desc={v.headline}
@@ -1286,7 +1299,7 @@ function CardDivergence({ v }: { v: Pick }) {
           56px 로 벌어졌다. 박스에도 auto 를 줘 남는 공간을 위아래가 나눠 갖게 한다
           (auto 마진 두 개면 균등 분배). 고정값이 아니라 행 높이가 달라져도 유지된다. */}
       <div style={{ background: C.bg, borderRadius: 10, padding: 16, marginTop: "auto", display: "flex", gap: 22 }}>
-        <DivergenceBar label="실물 강도" hint="소비심리(CCSI)" value={real} color={C.blue} />
+        <DivergenceBar label="실물 강도" hint="소비심리(CCSI)" value={real} color={C.blue} tip={realTip} />
         <DivergenceBar label="증시 강세" hint="신고가 근접도" value={market} color={C.hot} />
       </div>
       <Foot text={v.desc} />
