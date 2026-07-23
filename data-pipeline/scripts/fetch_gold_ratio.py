@@ -38,7 +38,9 @@ INDICATOR_META = {
     "name": "금 대비 코스피 상대강도",
     "headline": "안전자산 금과 견준 코스피 강도",
     "category": "시장",
-    "description_beginner": "이 비율이 높아질수록 다들 위험을 두려워하지 않고 주식에 베팅하고 있다는 과열 신호일 수 있습니다",
+    # 1칸 카드로 줄면서(2026-07-23 코스닥 칸 제거) 설명이 혼자 한 줄 더 길어졌다 —
+    # 같은 행 카드들이 35~51자인데 이것만 54자였다. 뜻은 그대로 두고 길이만 맞춘다.
+    "description_beginner": "이 비율이 높아질수록 안전자산보다 주식에 돈이 몰렸다는 신호입니다",
     "unit": "배",
 }
 
@@ -85,30 +87,33 @@ def main() -> None:
     kospi_prices = get_indicator_values(client, kospi_indicator_id, start)
     print(f"[Supabase] {KOSPI_RAW_SLUG} {len(kospi_prices)}건 조회")
 
-    existing_ratio_dates = set(get_indicator_values(client, indicator_id, start).keys())
-
     common_dates = sorted(set(gold_prices) & set(kospi_prices))
-    missing_dates = [d for d in common_dates if d not in existing_ratio_dates]
 
     if not common_dates:
         print("[kospi_gold_ratio] 금/코스피 시계열의 공통 날짜가 없습니다")
         return
 
-    if not missing_dates:
-        print("[kospi_gold_ratio] 백필할 신규 날짜 없음 (이미 최신 상태)")
-    else:
-        rows = [
-            {
-                "indicator_id": indicator_id,
-                "date": d,
-                "raw_value": kospi_prices[d] / gold_prices[d],
-            }
-            for d in missing_dates
-        ]
-        client.table("indicator_values").upsert(
-            rows, on_conflict="indicator_id,date"
-        ).execute()
-        print(f"[Supabase] indicator_values upsert 완료: {len(rows)}건")
+    # 계산 가능한 날짜 전체를 매번 다시 쓴다(fetch_kosdaq_ratio·fetch_upbit_speculation과
+    # 같은 이유) — 파생값이라 공식이나 details 스키마가 바뀌면 옛 행이 낡은 채로 남는다.
+    # 실제로 2026-07-23 카드에 "코스피 6,798 ÷ 금 4,147"을 띄우려고 details를 새로 넣을 때,
+    # '없는 날짜만 채우기' 방식이라 과거 행에 details가 안 들어가는 문제가 있었다.
+    rows = [
+        {
+            "indicator_id": indicator_id,
+            "date": d,
+            "raw_value": kospi_prices[d] / gold_prices[d],
+            # 카드가 "1.65배"의 근거를 그대로 보여줄 수 있게 두 원값을 남긴다.
+            "details": {
+                "kospi_close": round(kospi_prices[d], 2),
+                "gold_close": round(gold_prices[d], 2),
+            },
+        }
+        for d in common_dates
+    ]
+    client.table("indicator_values").upsert(
+        rows, on_conflict="indicator_id,date"
+    ).execute()
+    print(f"[Supabase] indicator_values upsert 완료: {len(rows)}건 (전량 재계산)")
 
     latest_date = common_dates[-1]
     latest_ratio = kospi_prices[latest_date] / gold_prices[latest_date]

@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import type { DailyScore } from "@/lib/data";
-import { formatIndicatorValue } from "@/lib/format";
 import { C, Icon, MONO, stageForScore } from "./ui";
 import { LogoLockup } from "./Logo";
 import Footer from "./Footer";
@@ -183,7 +182,9 @@ function TopBar({ dailyScore, theme }: { dailyScore: DailyScore | null; theme: "
   const hatzze: Quote = dailyScore
     ? {
         label: "햇쩨 지수",
-        value: `${formatIndicatorValue(dailyScore.score, "%").display}℃ · ${stageLabel}`,
+        // 히어로와 같은 정수 반올림을 써야 한다 — formatIndicatorValue 는 30.86 을 "30"으로
+        // 잘라서 히어로의 31℃ 와 한 화면에서 1도 어긋났다.
+        value: `${Math.round(dailyScore.score)}℃ · ${stageLabel}`,
         change: null,
         color: STAGE_COLOR[stageLabel] ?? C.ink,
       }

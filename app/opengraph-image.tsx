@@ -44,7 +44,7 @@ export default async function Image() {
         </div>
         <div style={{ marginTop: 40, fontSize: 48, fontWeight: 800, color: "#25262f" }}>데이터와 감성으로 읽는 시장</div>
         <div style={{ marginTop: 20, fontSize: 30, fontWeight: 500, color: "#5b6474" }}>
-          코스피 과열도를 매일 0~100 점수로 · 시장·감성 26개 지표
+          코스피 과열도를 매일 0~100 점수로 · 시장·감성 25개 지표
         </div>
       </div>
     ),

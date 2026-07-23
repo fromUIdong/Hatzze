@@ -26,6 +26,8 @@ KRX_URL = "http://data-dbg.krx.co.kr/svc/apis/idx/kospi_dd_trd"
 BACKFILL_DAYS = 365
 REQUEST_DELAY_SEC = 0.05
 VOLUME_AVG_WINDOW = 30  # 급증도 비교 기준: 직전 30영업일 평균 거래대금
+LEVEL_WINDOW = 250      # 절대 수준 비교 기준: 직전 1년(250영업일) 분포에서의 백분위
+LEVEL_MIN_SAMPLE = 60   # 백분위가 널뛰지 않을 최소 표본
 TARGET_INDEX_NAME = "코스피"
 TRADING_VALUE_KEY = "ACC_TRDVAL"
 WON_PER_EOK = 100_000_000  # 1억원 = 1e8원
@@ -113,10 +115,17 @@ def get_values(client, indicator_id: str, start: date) -> dict[str, float]:
 
 
 def store_rolling_average_details(client, indicator_id: str) -> None:
-    """각 날짜의 직전 VOLUME_AVG_WINDOW 영업일 평균 거래대금과 급증율(%)을 계산해
-    details에 채운다 — 카드가 '30일 평균 vs 오늘'을 보여줄 수 있게 한다. raw_value는
-    그대로 두고(같은 값 재설정) details만 갱신하며, normalized_score는 payload에
-    없어 보존된다."""
+    """각 날짜의 직전 30영업일 평균 대비 급증율(%)과 직전 250영업일 대비 절대 수준
+    백분위를 계산해 details에 채운다. raw_value는 그대로 두고(같은 값 재설정) details만
+    갱신하며, normalized_score는 payload에 없어 보존된다.
+
+    **level_pct 를 넣는 이유**(2026-07-23, docs/indicator-audit-2026-07-23.md §3-1·§4-2):
+    30일 상대만 보면 서서히 몇 배가 되는 흐름이 원리상 안 보인다. 1년간 절대 거래대금은
+    9.4조 → 50.8조(5.4배)로 코스피와 상관 +0.922 였는데, 같은 기간 surge_pct 와 코스피의
+    상관은 **-0.019** 였다. 2026-06-22 사상 최고점 당일 거래대금이 41.9조인데 급증율이
+    +2.3%라 과열도가 25.6(저온 근처)으로 찍혔다. 급증율은 '단기 발작'을, 절대 백분위는
+    '국면'을 잡으므로 calculate_score 가 7:3으로 섞는다.
+    """
     today = date.today()
     start = today - timedelta(days=BACKFILL_DAYS)
     values = get_values(client, indicator_id, start)
@@ -129,15 +138,24 @@ def store_rolling_average_details(client, indicator_id: str) -> None:
         if avg <= 0:
             continue
         d = dates_sorted[i]
+        detail = {
+            "avg_30d": round(avg, 0),
+            "surge_pct": round(values[d] / avg * 100 - 100, 1),
+        }
+        # 절대 수준: 직전 LEVEL_WINDOW 영업일 중 오늘보다 낮았던 날의 비율(0~100).
+        # 오늘을 뺀 과거만 보므로 미래 정보가 섞이지 않는다. 표본이 얇으면 백분위가
+        # 널뛰므로 최소 LEVEL_MIN_SAMPLE 일이 쌓인 뒤부터 넣는다.
+        hist = [values[dates_sorted[j]] for j in range(max(0, i - LEVEL_WINDOW), i)]
+        if len(hist) >= LEVEL_MIN_SAMPLE:
+            detail["level_pct"] = round(
+                sum(1 for v in hist if v < values[d]) / len(hist) * 100, 1
+            )
         rows.append(
             {
                 "indicator_id": indicator_id,
                 "date": d,
                 "raw_value": values[d],
-                "details": {
-                    "avg_30d": round(avg, 0),
-                    "surge_pct": round(values[d] / avg * 100 - 100, 1),
-                },
+                "details": detail,
             }
         )
 
