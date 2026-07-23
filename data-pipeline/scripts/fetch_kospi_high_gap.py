@@ -44,11 +44,12 @@ GAP_META = {
     "category": "시장",
     # 카드가 2칸으로 넓어져 설명 자리가 늘었다 — 기존 39자를 70자 안팎으로 늘려
     # "왜 이 숫자가 과열 신호인지"까지 한 문장 더 담는다.
-    # 카드가 속도 지표와 설명 줄을 나눠 쓰게 되면서(CardHighGap) 3줄 안에 둘이 같이
-    # 들어가야 해 기존 70자를 절반으로 줄였다.
+    # 2칸 카드의 설명 칸은 폭 528px · 11px 기준 **한 줄에 약 47자**라, 두 줄이면 94자가
+    # 한계선이다(재보려면 브라우저에서 그 <p> 폭을 nowrap 실측폭으로 나누면 된다).
+    # 한 줄로 끝내면 카드 아래가 허전해 옆의 1칸 카드들과 무게가 안 맞는다.
     "description_beginner": (
-        "코스피가 최근 1년 최고점에서 얼마나 떨어져 있는지 봅니다. "
-        "0%에 가까울수록 신고가를 새로 쓰는 중입니다"
+        "코스피가 최근 1년 최고점에서 얼마나 떨어져 있는지를 봅니다. "
+        "0%에 가까울수록 신고가를 새로 쓰는 중이라 기대가 몰리기 쉬운 구간입니다"
     ),
     "unit": "%",
 }
@@ -218,7 +219,13 @@ def main() -> None:
             # 아직 안 냈으면 며칠 전 종가로 오늘 행을 써서 화면상 최신값처럼 보인다.
             # 실제 종가 기준일을 남겨 카드가 "기준 07-16"을 표시할 수 있게 한다
             # (details 는 숫자 맵이라 YYYYMMDD 정수로 넣는다).
-            "details": {"source_date": int(latest_date.replace("-", ""))},
+            # close/prior_high 는 카드가 "-25%"의 근거(6,798 vs 전고점 9,115)를 그대로
+            # 보여주기 위한 값이다.
+            "details": {
+                "source_date": int(latest_date.replace("-", "")),
+                "close": round(latest_close, 2),
+                "prior_high": round(high, 2),
+            },
         },
         on_conflict="indicator_id,date",
     ).execute()
@@ -232,7 +239,14 @@ def main() -> None:
                     "indicator_id": speed_id,
                     "date": r["date"],
                     "raw_value": r["raw_value"],
-                    "details": {"from_close": r["from_close"], "to_close": r["to_close"]},
+                    # source_date 는 이 행이 어느 거래일 종가 기준인지 — 카드 배지가
+                    # 신고가 괴리율 카드와 같은 형식("7/22 기준")으로 쓴다. 여기선 행의
+                    # date 자체가 자료의 날이라 그대로 넣는다.
+                    "details": {
+                        "source_date": int(r["date"].replace("-", "")),
+                        "from_close": r["from_close"],
+                        "to_close": r["to_close"],
+                    },
                 }
                 for r in speed_rows
             ],
