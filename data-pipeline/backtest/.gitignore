@@ -1,0 +1,3 @@
+# DB 덤프·중간 산출물 — dump_data.py 를 다시 돌리면 재생성된다
+*.json
+*.pkl

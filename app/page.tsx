@@ -477,7 +477,9 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
   // 저장된 stage 문자열 대신 점수에서 직접 구간을 계산해, 라벨 변경/과거 데이터에도 견고.
   const stageLabel = stageForScore(dailyScore.score);
   const stage = STAGE_META[stageLabel] ?? { emoji: "📊", color: C.neutral, zone: stageLabel };
-  const scoreDisplay = formatIndicatorValue(dailyScore.score, "%").display;
+  // 도수는 정수로 — 소수점 둘째 자리(6.16℃)는 없는 정밀도를 있는 것처럼 보이게 한다.
+  // 지수는 25개 지표의 가중평균을 다시 앵커로 매핑한 값이라 0.01 단위에 의미가 없다.
+  const scoreDisplay = Math.round(dailyScore.score).toString();
   return (
     <section
       className="hz-hero"
@@ -994,6 +996,39 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
   );
 }
 
+// 코스피 상승 속도 — '얼마나 높이 왔나'(위 신고가 카드)와 짝을 이루는 '얼마나 빨리 왔나'.
+// 둘은 같은 종가에서 나오지만 실측 상관이 +0.13으로 거의 직교한다: 같은 전고점 근처라도
+// 두 달 만에 온 것과 1년에 걸쳐 온 것은 다르다. details 에 기간 양끝 종가가 들어 있어
+// "6,418 → 6,798" 처럼 근거를 그대로 보여준다.
+function CardSpeed({ v }: { v: Pick }) {
+  const from = v.details?.from_close;
+  const to = v.details?.to_close;
+  const spd = v.raw;
+  const num = (n: number) => n.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
+  return (
+    <Shell hit={v.isHit} minH={210}>
+      <TitleRow desc={v.headline} icon="trending_up" name={v.name} />
+      <div>
+        <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>
+          {spd !== null && spd > 0 ? "+" : ""}{v.disp}{v.unit}
+        </span>
+        {typeof from === "number" && typeof to === "number" && (
+          // 두 숫자만 적으면 무엇에서 무엇으로 간 건지 안 읽힌다 — 양끝에 이름을 붙인다.
+          <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: C.sub, marginTop: 6 }}>
+            60거래일 전 {num(from)} → 지금 {num(to)}
+          </span>
+        )}
+      </div>
+      {/* paddingTop 으로 과열도 박스와의 최소 간격을 보장한다 — flex-end 만으로는 카드가
+          짧을 때 근거 줄에 바로 붙어 두 덩어리가 한 블록처럼 보인다. */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", paddingTop: 18 }}>
+        <HeatBar v={v} />
+      </div>
+      <Foot text={v.desc} />
+    </Shell>
+  );
+}
+
 // 6. VKOSPI — 반원 게이지 (과열도 + 실제 값)
 /**
  * VKOSPI — 숫자를 하나만 쓴다.
@@ -1092,50 +1127,6 @@ function CardAsia({ v }: { v: Pick }) {
   );
 }
 
-// 9. 위험자산 vs 안전자산 — 금/코스닥 두 지표 결합 (둘 다 실제 값)
-function SubRatio({
-  v,
-  icon,
-  label,
-  signed = false,
-  note,
-}: {
-  v: Pick;
-  icon: string;
-  label: string;
-  signed?: boolean;
-  /** 큰 수치 밑 한 줄 — 그 숫자가 무엇과 무엇을 견준 건지 밝힌다. */
-  note?: string;
-}) {
-  // 초과수익률처럼 0을 기준으로 위아래가 다 의미 있는 값은 부호를 밝힌다 —
-  // "1.39%"만 적으면 앞선 건지 뒤처진 건지 안 읽힌다. 배수(금 대비)는 부호가 없다.
-  const sign = signed && (v.raw ?? 0) > 0 ? "+" : "";
-  return (
-    <div style={{ flex: 1 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-        <Icon name={icon} style={{ fontSize: 20, color: C.sub }} />
-        <span style={{ fontSize: 13, fontWeight: 800, wordBreak: "keep-all" }}>{label}</span>
-      </div>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: note ? 5 : 14 }}>
-        <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color, whiteSpace: "nowrap" }}>{sign}{v.disp}{v.unit}</span>
-        {v.hotDisp && <span style={{ fontSize: 10, fontWeight: 700, color: C.sub, whiteSpace: "nowrap" }}>초고온 {v.hotDisp}</span>}
-      </div>
-      {/* 두 칸의 높이를 맞춰야 아래 과열도 바가 같은 줄에 온다 — 한쪽만 있으면 어긋난다. */}
-      {note && (
-        <div style={{ fontSize: 10, fontWeight: 600, color: "var(--c-muted)", marginBottom: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {note}
-        </div>
-      )}
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, fontWeight: 800, marginBottom: 6 }}>
-        <span style={{ color: C.sub }}>과열도</span>
-        <span style={{ color: overheatColor(v.capped) }}>{v.capped !== null ? Math.round(v.capped) : "-"} / 100</span>
-      </div>
-      <div style={{ position: "relative", height: 10, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
-        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${v.capped ?? 0}%`, background: `linear-gradient(90deg,${C.hot},${C.mania})`, borderRadius: 999 }} />
-      </div>
-    </div>
-  );
-}
 
 // 결합 카드는 두 서브값을 위쪽 행에, 두 간단 설명을 아래쪽 행에 나눠 담고, 그 사이에
 // 카드 전체 폭 divider를 둔다 — 다른 카드들과 divider 가로 위치를 맞추기 위해서다.
@@ -1145,38 +1136,32 @@ function SubNote({ text }: { text: string }) {
   );
 }
 
-function CardRiskAssets({ gold, kosdaq }: { gold: Pick; kosdaq: Pick }) {
-  // 코스닥 칸은 '최근 한 달 초과수익률'이라(2026-07-23 측정 교체) 숫자만으론 안 읽힌다.
-  // 견준 두 수익률을 그대로 밑에 적어 "+1.39%"가 어디서 나온 값인지 스스로 드러나게 한다.
-  const kq = kosdaq.details?.kosdaq_return;
-  const kp = kosdaq.details?.kospi_return;
-  const pct = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(1)}%`;
-  const kosdaqNote =
-    typeof kq === "number" && typeof kp === "number"
-      ? `코스닥 ${pct(kq)} · 코스피 ${pct(kp)}`
-      : "최근 한 달 수익률 차이";
+// 2026-07-23 코스닥 칸을 뺐다 — 지표 자체를 점수에서 내렸기 때문이다(카드 한 칸을
+// kospi_speed_60d 에 내줬다. data-pipeline/config/indicator_thresholds.py 참고).
+// 남은 금 비율 하나뿐이라 2칸 → 1칸으로 줄이고 이름도 실제 내용에 맞춘다.
+function CardGoldRatio({ v }: { v: Pick }) {
+  // "1.65배"가 어디서 나온 값인지 두 원값으로 바로 드러낸다 — 공식만 적어 두면
+  // (예전의 "코스피 지수 ÷ 금 시세") 배수가 큰지 작은지 가늠할 근거가 없다.
+  const k = v.details?.kospi_close;
+  const g = v.details?.gold_close;
+  const num = (n: number) => n.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
+  const note =
+    typeof k === "number" && typeof g === "number"
+      ? `코스피 ${num(k)} ÷ 금 ${num(g)}`
+      : "코스피 지수 ÷ 금 시세";
   return (
-    <Shell span={2} hit={gold.isHit || kosdaq.isHit} minH={230}>
-      <TitleRow icon="balance" name="위험자산 VS 안전자산" desc="금·코스피를 기준으로 본 위험 선호도" />
-      <div style={{ display: "flex", gap: 32, flex: 1 }}>
-        <SubRatio v={gold} icon="balance" label="코스피 강도 (vs 금)" note="코스피 지수 ÷ 금 시세" />
-        <div style={{ width: 1, background: C.line }} />
-        {/* 라벨을 '강도'에서 '초과 상승'으로 바꿨다. 왼쪽 칸이 배수(1.65배)라 '코스닥 강도
-            (vs 코스피)'가 나란히 놓이면 이 숫자도 배수로 읽힌다 — 실제로는 두 수익률의
-            차이(코스닥 +5.2% − 코스피 +3.9%)라 뜻이 완전히 다르다. */}
-        <SubRatio v={kosdaq} icon="celebration" label="코스닥 초과 상승 (vs 코스피)" signed note={kosdaqNote} />
+    <Shell hit={v.isHit} minH={210}>
+      <TitleRow icon="balance" name={v.name} desc={v.headline} />
+      <div>
+        <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}{v.unit}</span>
+        <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: C.sub, marginTop: 6 }}>{note}</span>
       </div>
-      {/* 지표가 둘인 카드의 설명 줄. Foot 과 박스 모델을 똑같이 맞춰야 같은 행에 놓인
-          카드끼리 divider 가 같은 높이에 온다 — marginTop:auto 로 바닥에 붙이고,
-          바깥 paddingTop 20 + 안쪽 minHeight 53/paddingTop 16 까지 Foot 과 동일하게 둔다.
-          (예전엔 marginTop:16 에 minHeight 가 없어 안전장치 카드와 3px 어긋났다.) */}
-      <div style={{ marginTop: "auto", paddingTop: 20 }}>
-        <div style={{ display: "flex", gap: 32, boxSizing: "border-box", minHeight: 53, paddingTop: 16, borderTop: "1px solid var(--c-divider)" }}>
-          <SubNote text={gold.desc} />
-          <div style={{ width: 1 }} />
-          <SubNote text={kosdaq.desc} />
-        </div>
+      {/* paddingTop 으로 과열도 박스와의 최소 간격을 보장한다 — flex-end 만으로는 카드가
+          짧을 때 근거 줄에 바로 붙어 두 덩어리가 한 블록처럼 보인다. */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", paddingTop: 18 }}>
+        <HeatBar v={v} />
       </div>
+      <Foot text={v.desc} />
     </Shell>
   );
 }
@@ -1804,8 +1789,8 @@ function SectionHeading({ title }: { title: string }) {
 // 공개 지표는 각 섹션 끝에 일반 카드로 덧붙여 자동 노출을 유지한다.
 const LAID_OUT = new Set([
   "buffett_index", "leverage_etf_volume", "market_actions_30d", "turnover_concentration",
-  "kospi_high_gap", "vkospi", "kospi_asia_relative_strength",
-  "kospi_gold_ratio", "kosdaq_kospi_ratio", "kospi_volume_surge", "usdkrw_volatility",
+  "kospi_high_gap", "kospi_speed_60d", "vkospi", "kospi_asia_relative_strength",
+  "kospi_gold_ratio", "kospi_volume_surge", "usdkrw_volatility",
   "individual_net_buy", "put_call_ratio", "investor_deposit",
   "naver_search_trend", "dcinside_post_count", "news_sentiment", "bestseller_finance_ratio",
   "youtube_finance_search_views", "luxury_consumption_index", "fine_dining_search_index",
@@ -1870,12 +1855,13 @@ export default async function Home() {
                 <CardHighGap v={p("kospi_high_gap")} tops={topGaps} />
                 <CardVolume v={p("kospi_volume_surge")} />
                 <CardDeposit v={p("investor_deposit")} />
-                <CardVkospi v={p("vkospi")} />
+                <CardSpeed v={p("kospi_speed_60d")} />
                 <CardNetBuy v={p("individual_net_buy")} />
                 <CardPutCall v={p("put_call_ratio")} />
                 <CardTurnover v={p("turnover_concentration")} />
                 <CardMarketActions v={p("market_actions_30d")} />
-                <CardRiskAssets gold={p("kospi_gold_ratio")} kosdaq={p("kosdaq_kospi_ratio")} />
+                <CardVkospi v={p("vkospi")} />
+                <CardGoldRatio v={p("kospi_gold_ratio")} />
                 <CardBuffett v={p("buffett_index")} />
                 <CardLeverage v={p("leverage_etf_volume")} />
                 <CardFx v={p("usdkrw_volatility")} />

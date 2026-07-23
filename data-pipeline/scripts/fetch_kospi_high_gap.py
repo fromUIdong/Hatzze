@@ -44,10 +44,29 @@ GAP_META = {
     "category": "시장",
     # 카드가 2칸으로 넓어져 설명 자리가 늘었다 — 기존 39자를 70자 안팎으로 늘려
     # "왜 이 숫자가 과열 신호인지"까지 한 문장 더 담는다.
+    # 카드가 속도 지표와 설명 줄을 나눠 쓰게 되면서(CardHighGap) 3줄 안에 둘이 같이
+    # 들어가야 해 기존 70자를 절반으로 줄였다.
     "description_beginner": (
-        "코스피가 최근 1년 최고점에서 얼마나 떨어져 있는지를 보여줍니다. "
-        "0%에 가까울수록 신고가를 새로 쓰는 중이라 기대가 몰리기 쉽고, "
-        "그만큼 더 오를 자리가 남았나 싶은 부담도 커지는 구간입니다"
+        "코스피가 최근 1년 최고점에서 얼마나 떨어져 있는지 봅니다. "
+        "0%에 가까울수록 신고가를 새로 쓰는 중입니다"
+    ),
+    "unit": "%",
+}
+
+# 같은 종가 캐시에서 파생되는 두 번째 지표. '얼마나 높이 왔나'(GAP)와 '얼마나 빨리
+# 왔나'(SPEED)는 실측 상관이 +0.13으로 거의 직교한다 — 2025-08(코스피 3,186, 정체)과
+# 2026-05(8,476, 두 달 만에 +28%)를 가르는 게 정확히 이 축인데 지금까지 지수에 없었다.
+# 1년 백테스트에서 향후 최대낙폭과의 순위상관이 -0.79(블록 부트스트랩 95% CI
+# [-0.89, -0.66])로 전체 지표 중 가장 강했다. docs/indicator-audit-2026-07-23.md §9 참고.
+SPEED_SLUG = "kospi_speed_60d"
+SPEED_WINDOW = 60  # 거래일. 120일이 수치는 더 좋지만 '최근 석 달'이 froth 의미에 맞다
+SPEED_META = {
+    "slug": SPEED_SLUG,
+    "name": "코스피 상승 속도",
+    "headline": "최근 석 달 동안 오른 폭",
+    "category": "시장",
+    "description_beginner": (
+        "같은 고점이라도 천천히 오른 것과 두 달 만에 급하게 온 것은 다릅니다"
     ),
     "unit": "%",
 }
@@ -116,6 +135,33 @@ def backfill_raw_prices(client, raw_indicator_id: str) -> None:
     print(f"[KRX] 백필 완료: {len(new_rows)}건 저장 (휴장일 등 {skipped}건 제외)")
 
 
+def compute_speed(client, raw_indicator_id: str) -> list[dict]:
+    """60거래일 수익률을 계산 가능한 **모든 날짜**에 대해 돌려준다.
+
+    gap 과 달리 오늘 한 행만 쓰지 않고 전량 재계산하는 이유는 fetch_kosdaq_ratio·
+    fetch_upbit_speculation 과 같다 — 공식이 바뀔 수 있는 파생값이라 "이미 있는 날짜는
+    건너뛰기"로 두면 과거 값이 낡은 채 남는다. 카드의 추세선도 이 히스토리를 쓴다.
+    """
+    rows = (
+        client.table("indicator_values")
+        .select("date,raw_value")
+        .eq("indicator_id", raw_indicator_id)
+        .order("date")
+        .execute()
+    ).data
+    prices = {r["date"]: float(r["raw_value"]) for r in rows}
+    dates = sorted(prices)
+    return [
+        {
+            "date": dates[i],
+            "raw_value": round((prices[dates[i]] / prices[dates[i - SPEED_WINDOW]] - 1) * 100, 2),
+            "from_close": prices[dates[i - SPEED_WINDOW]],
+            "to_close": prices[dates[i]],
+        }
+        for i in range(SPEED_WINDOW, len(dates))
+    ]
+
+
 def compute_gap(client, raw_indicator_id: str) -> tuple[str, float, float, float]:
     # 지표 이름 그대로 '52주' 창으로 자른다. 예전엔 날짜 필터가 없어 저장된 종가 전부에서
     # 전고점을 잡았는데, 백필이 옛 행을 지우지 않아 표가 계속 자라므로 실제로는 '전체 기간
@@ -148,8 +194,10 @@ def main() -> None:
 
     raw_id = ensure_indicator(client, RAW_META)
     gap_id = ensure_indicator(client, GAP_META)
+    speed_id = ensure_indicator(client, SPEED_META)
     print(f"[Supabase] indicator '{RAW_SLUG}' id: {raw_id}")
     print(f"[Supabase] indicator '{GAP_SLUG}' id: {gap_id}")
+    print(f"[Supabase] indicator '{SPEED_SLUG}' id: {speed_id}")
 
     backfill_raw_prices(client, raw_id)
 
@@ -175,6 +223,29 @@ def main() -> None:
         on_conflict="indicator_id,date",
     ).execute()
     print(f"[Supabase] indicator_values upsert 완료: date={today}, raw_value={rounded_gap}")
+
+    speed_rows = compute_speed(client, raw_id)
+    if speed_rows:
+        client.table("indicator_values").upsert(
+            [
+                {
+                    "indicator_id": speed_id,
+                    "date": r["date"],
+                    "raw_value": r["raw_value"],
+                    "details": {"from_close": r["from_close"], "to_close": r["to_close"]},
+                }
+                for r in speed_rows
+            ],
+            on_conflict="indicator_id,date",
+        ).execute()
+        last = speed_rows[-1]
+        print(
+            f"[Supabase] '{SPEED_SLUG}' upsert 완료: {len(speed_rows)}건 (전량 재계산). "
+            f"최신 {last['date']} {last['from_close']:.0f} → {last['to_close']:.0f} "
+            f"= {last['raw_value']:+.2f}%"
+        )
+    else:
+        print(f"[{SPEED_SLUG}] 종가가 {SPEED_WINDOW}거래일치보다 적어 아직 계산 불가")
 
 
 if __name__ == "__main__":

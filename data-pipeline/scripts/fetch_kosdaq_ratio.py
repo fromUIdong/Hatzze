@@ -1,22 +1,30 @@
 """KRX Open API(코스닥 지수 시세, idx/kosdaq_dd_trd)로 코스닥 종가를 받아
-"코스피 대비 코스닥 상대강도"(코스닥 20거래일 수익률 − 코스피 20거래일 수익률)를
-계산해 Supabase에 upsert.
+"코스닥 신고가 대비 괴리율"(코스닥 종가 vs 자기 52주 전고점)을 계산해 Supabase에 upsert.
 
-**2026-07-23 측정 방식 교체.** 예전엔 raw_value가 코스닥 종가 ÷ 코스피 종가, 즉 두 지수의
-'레벨 비율'이었다. 그런데 코스피(1980=100)와 코스닥(1996=1000)은 기준일이 달라 이 비율의
-절대 크기 자체엔 의미가 없고, 더 큰 문제는 **한쪽 지수가 오르면 다른 쪽이 그대로여도 비율이
-움직인다**는 점이다. 실제로 1년간 코스피가 +113.5%, 코스닥이 -5.8%였고 비율은
-0.2506 → 0.1105 로 반토막 났다 — 코스닥이 투기적으로 식어서가 아니라 코스피가 두 배가 된
-결과다. 시간과의 상관계수가 -0.928(평균회귀 없는 순수 추세)이라 고정 눈금을 어디에 두든
-"코스닥이 유독 앞서가나"가 아니라 "두 지수가 기준일 이후 얼마나 벌어졌나"를 재게 된다.
-그 결과 1년의 85%가 과열도 100 에 붙어 정보를 못 냈다.
+**2026-07-23 측정 방식 두 번째 교체.** 이 지표는 한 해에 두 번 갈아엎었다.
+1) 원래는 코스닥 종가 ÷ 코스피 종가, 즉 두 지수의 '레벨 비율'이었다. 코스피(1980=100)와
+   코스닥(1996=1000)은 기준일이 달라 비율의 절대 크기에 의미가 없고, 한쪽이 오르면 다른
+   쪽이 그대로여도 값이 움직였다. 시간과의 상관이 -0.928인 순수 추세라 1년의 85%가 과열도
+   100에 붙었다.
+2) 그래서 '코스피 대비 20거래일 초과수익률'로 바꿨는데, 1년 백테스트에서 **froth와 정확히
+   반대로 도는 것**이 드러났다(docs/indicator-audit-2026-07-23.md §3-3). 이번 상승장이
+   대형주 주도였던 탓에 코스닥 초과수익 중앙값이 2026-05 -24.9%p, 06 -27.7%p로 **최고점
+   근처에서 최악**이었고 폭락기에 -3.8%p로 회복했다. 전고점 괴리와의 순위상관 -0.224,
+   고점창-저점창 스프레드 -35.0 으로 25개 지표 중 최악이었다 — 폭락 바닥에서 이 지표
+   혼자 과열도 85.2를 찍었다.
 
-지표 설명("코스닥이 유독 앞서가면 투기성 자금이…")이 원래 묻고 싶은 건 **상대 모멘텀**이라,
-fetch_asia_relative_strength.py와 똑같은 방식(20거래일 초과수익률)으로 바꾼다. 레벨이 아니라
-수익률 차이라 기준일 문제도, 장기 드리프트도 사라진다.
+**원인은 눈금이 아니라 측정 대상이었다.** "코스닥이 코스피보다 잘 갔나"는 대형주 장세에서
+froth와 무관하다. 지표 설명이 원래 묻고 싶은 건 "잡주에 투기적 자금이 몰렸나"이므로,
+코스피와 견주는 대신 **코스닥 자체가 신고가를 쓰고 있나**를 본다(kospi_high_gap과 같은 방식).
+교체 후 전고점 괴리와의 상관이 -0.224 → **+0.678** 로 부호가 뒤집혔고, 가중치를 깎지 않고
+2.0을 그대로 쓸 수 있게 됐다.
+
+※ slug 는 `kosdaq_kospi_ratio` 그대로 둔다. 측정이 두 번 바뀌는 동안 이름이 실제 계산과
+   어긋나 있지만, slug 를 바꾸면 지표 행이 새로 생기면서 1년치 히스토리·가중치 설정·
+   프론트 참조가 전부 끊긴다. 화면에 보이는 name/description 만 실제 계산에 맞춘다.
 
 코스닥 종가는 kospi_close_raw 와 같은 층의 내부용 지표(kosdaq_close_raw, is_public=false)에
-쌓아 두고, 상대강도는 매 실행마다 계산 가능한 날짜 전체를 다시 계산해 upsert한다 — 공식이
+쌓아 두고, 괴리율은 매 실행마다 계산 가능한 날짜 전체를 다시 계산해 upsert한다 — 공식이
 바뀔 수 있는 파생값이라 "이미 있는 날짜는 건너뛰기" 방식이면 과거 값이 낡은 채로 남는다
 (fetch_upbit_speculation.py와 같은 이유).
 
@@ -44,45 +52,32 @@ REQUEST_DELAY_SEC = 0.05
 CLOSE_PRICE_KEY = "CLSPRC_IDX"
 # kospi_dd_trd처럼 여러 계열 지수(코스닥, 코스닥 150 등)가 함께 내려온다.
 TARGET_INDEX_NAME = "코스닥"
-RETURN_WINDOW = 20  # 상대강도를 재는 거래일 수 — 아시아 상대강도와 동일하게 맞춘다
-
-KOSPI_RAW_SLUG = "kospi_close_raw"
+HIGH_WINDOW_DAYS = 365  # 전고점을 잡는 창(52주) — kospi_high_gap 과 동일
 
 RAW_SLUG = "kosdaq_close_raw"
 RAW_META = {
     "slug": RAW_SLUG,
     "name": "코스닥 지수 종가 (내부용 원본)",
     "category": "시장",
-    "description_beginner": "상대강도 계산에 쓰는 원본 데이터입니다",
+    "description_beginner": "신고가 대비 괴리율 계산에 쓰는 원본 데이터입니다",
     "unit": "pt",
     "is_public": False,
 }
 
-INDICATOR_SLUG = "kosdaq_kospi_ratio"
+INDICATOR_SLUG = "kosdaq_kospi_ratio"  # 이름은 옛 측정 방식의 잔재 — 위 docstring 참고
 INDICATOR_META = {
     "slug": INDICATOR_SLUG,
-    "name": "코스피 대비 코스닥 상대강도",
-    "headline": "코스피와 견준 코스닥 강도",
+    "name": "코스닥 신고가 대비 괴리율",
+    "headline": "코스닥이 자기 최고점에서 떨어진 거리",
     "category": "시장",
-    # 카드 설명은 2줄 안에 들어가야 한다 — 3줄이 되면 그 칸만 높아져 푸터 divider가
-    # 같은 행의 옆 카드와 어긋난다(칼럼 폭 222px · 11px 기준 약 50자가 2줄 한계선).
-    # 앞의 정의 문장("최근 한 달 …얼마나 더 올랐는지")은 카드가 이미 숫자로 보여주므로
-    # ("코스닥 -15.8% · 코스피 -17.1%") 뺐다.
-    "description_beginner": "코스닥이 코스피보다 더 오를수록 위험을 무릅쓴 돈이 많이 몰렸다는 신호일 수 있습니다",
-    # 엄밀히는 두 수익률의 차이라 '%p'가 맞지만, 카드에서 옆 칸의 '1.65배'와 나란히
-    # 놓이면 혼자 기술 용어를 쓰는 꼴이라 안 읽힌다. '%'로 두고 대신 카드가 비교 대상
-    # 두 수익률(코스닥 +5.2% / 코스피 +3.8%)을 같이 보여줘 뜻이 스스로 드러나게 한다.
+    "description_beginner": "코스닥이 신고가에 가까울수록 작은 종목에도 투기적인 돈이 몰렸다는 신호일 수 있습니다",
     "unit": "%",
+    # 2026-07-23 점수·화면에서 내렸다. 타당성이 문제가 아니라(동행성 +0.678) 결국
+    # kospi_high_gap 과 같은 것을 시장만 바꿔 재는 지표여서, 카드 한 칸을 kospi_speed_60d
+    # 에 내줬다. 값 계산은 그대로 남겨 둔다 — 되돌리려면 is_public 과 두 config 만 되살리면
+    # 된다. **is_public 을 안 내리면 프론트가 '미배치 공개 지표'로 자동 노출한다.**
+    "is_public": False,
 }
-
-
-def get_indicator_id(client, slug: str) -> str:
-    result = client.table("indicators").select("id").eq("slug", slug).execute()
-    if not result.data:
-        raise RuntimeError(
-            f"indicator '{slug}'가 존재하지 않습니다. 해당 fetch 스크립트를 먼저 실행하세요."
-        )
-    return result.data[0]["id"]
 
 
 def get_indicator_values(client, indicator_id: str, start: date) -> dict[str, float]:
@@ -148,20 +143,28 @@ def backfill_kosdaq_closes(client, raw_indicator_id: str) -> None:
     print(f"[KRX] 백필 완료: {len(rows)}건 저장 (휴장일 등 {len(missing_days) - len(rows)}건 제외)")
 
 
-def compute_20d_return(prices: dict[str, float]) -> dict[str, float]:
-    """날짜순 정렬 기준 자기 자신의 20번째 이전 거래일 대비 수익률(%)."""
+def compute_high_gaps(prices: dict[str, float]) -> dict[str, tuple[float, float]]:
+    """날짜별 (전고점 대비 괴리율 %, 그날 기준 전고점)을 돌려준다.
+
+    fetch_kospi_high_gap.compute_gap 과 같은 규칙 — **그날을 제외한** 직전 365일 최고가를
+    쓴다. 오늘을 포함해 max 를 잡으면 신고가를 쓴 날에도 괴리가 0에 캡돼 초과분이 안 보인다.
+    """
     dates = sorted(prices)
-    return {
-        dates[i]: (prices[dates[i]] / prices[dates[i - RETURN_WINDOW]] - 1) * 100
-        for i in range(RETURN_WINDOW, len(dates))
-    }
+    out: dict[str, tuple[float, float]] = {}
+    for i, d in enumerate(dates):
+        cutoff = (date.fromisoformat(d) - timedelta(days=HIGH_WINDOW_DAYS)).isoformat()
+        window = [prices[x] for x in dates[:i] if x >= cutoff]
+        if len(window) < 20:  # 창이 너무 짧으면 '전고점'이라 부를 수 없다
+            continue
+        prior_high = max(window)
+        out[d] = ((prices[d] - prior_high) / prior_high * 100, prior_high)
+    return out
 
 
 def main() -> None:
     client = get_client()
     raw_id = ensure_indicator(client, RAW_META)
     indicator_id = ensure_indicator(client, INDICATOR_META)
-    kospi_raw_id = get_indicator_id(client, KOSPI_RAW_SLUG)
     print(f"[Supabase] indicator '{RAW_SLUG}' id: {raw_id}")
     print(f"[Supabase] indicator '{INDICATOR_SLUG}' id: {indicator_id}")
 
@@ -169,41 +172,34 @@ def main() -> None:
 
     today = date.today()
     start = today - timedelta(days=BACKFILL_DAYS)
-    kospi_prices = get_indicator_values(client, kospi_raw_id, start)
     kosdaq_prices = get_indicator_values(client, raw_id, start)
-    print(f"[Supabase] 코스피 종가 {len(kospi_prices)}건 · 코스닥 종가 {len(kosdaq_prices)}건 조회")
+    print(f"[Supabase] 코스닥 종가 {len(kosdaq_prices)}건 조회")
 
-    kospi_returns = compute_20d_return(kospi_prices)
-    kosdaq_returns = compute_20d_return(kosdaq_prices)
-    common_dates = sorted(set(kospi_returns) & set(kosdaq_returns))
-    if not common_dates:
-        print(f"[{INDICATOR_SLUG}] 두 시계열의 공통 날짜가 없어 계산할 수 없습니다")
+    gaps = compute_high_gaps(kosdaq_prices)
+    if not gaps:
+        print(f"[{INDICATOR_SLUG}] 전고점을 잡을 만큼 종가가 쌓이지 않았습니다")
         return
 
     rows = [
         {
             "indicator_id": indicator_id,
             "date": d,
-            "raw_value": round(kosdaq_returns[d] - kospi_returns[d], 2),
-            # 카드가 두 수익률을 나란히 보여줄 수 있게 세부값도 남긴다.
-            "details": {
-                "kosdaq_return": round(kosdaq_returns[d], 2),
-                "kospi_return": round(kospi_returns[d], 2),
-            },
+            "raw_value": round(gap, 2),
+            # 카드가 "코스닥 751 · 전고점 1,229" 처럼 근거를 같이 보여줄 수 있게 남긴다.
+            "details": {"close": kosdaq_prices[d], "prior_high": round(high, 2)},
         }
-        for d in common_dates
+        for d, (gap, high) in sorted(gaps.items())
     ]
     client.table("indicator_values").upsert(
         rows, on_conflict="indicator_id,date"
     ).execute()
     print(f"[Supabase] indicator_values upsert 완료: {len(rows)}건 (전량 재계산)")
 
-    last = common_dates[-1]
+    last = max(gaps)
+    gap, high = gaps[last]
     print(
         f"[{INDICATOR_SLUG}] 최신값 ({last} 기준): "
-        f"코스닥 {RETURN_WINDOW}일 수익률 {kosdaq_returns[last]:.2f}%, "
-        f"코스피 {kospi_returns[last]:.2f}% "
-        f"-> 초과 수익률 {kosdaq_returns[last] - kospi_returns[last]:.2f}%p"
+        f"코스닥 {kosdaq_prices[last]:.2f} / 52주 전고점 {high:.2f} -> 괴리율 {gap:.2f}%"
     )
 
 

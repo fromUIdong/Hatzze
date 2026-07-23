@@ -62,7 +62,7 @@ export default function Footer() {
           <p style={{ margin: "14px 0 0", fontSize: 13, lineHeight: 1.75, color: C.sub }}>
             <b style={{ color: C.ink }}>hatzze(햇쩨)</b>는 코스피 시장의 <b style={{ color: C.ink }}>과열도</b>를
             시장 지표와 감성 지표로 종합해 매일 0~100 점수로 보여주는 대시보드입니다.
-            버핏지수, VKOSPI, 레버리지 ETF, 공포·탐욕 심리 등 26개 지표를 한눈에 볼 수 있습니다.
+            버핏지수, VKOSPI, 레버리지 ETF, 공포·탐욕 심리 등 25개 지표를 한눈에 볼 수 있습니다.
           </p>
         </div>
 
