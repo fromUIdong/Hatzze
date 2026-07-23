@@ -12,6 +12,7 @@ import Footer from "./Footer";
 const NAV = [
   { href: "/", label: "시장 브리핑", icon: "monitoring" },
   { href: "/kadera", label: "카더라 리포트", icon: "forum" },
+  { href: "/mdd", label: "MDD 정밀분석", icon: "trending_down" },
 ];
 
 const STAGE_COLOR: Record<string, string> = {

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import {
   getChannelRanking,
@@ -52,6 +53,18 @@ function timeAgo(iso: string): string {
   const hr = Math.floor(min / 60);
   if (hr < 24) return `${hr}시간 전`;
   return `${Math.floor(hr / 24)}일 전`;
+}
+
+/** 종목 카드 → 그 종목의 MDD 정밀분석으로 잇는 작은 링크. 이름은 MDD 페이지가 code 로
+   찾으므로 URL 엔 code·market 만 실어 깔끔하게 둔다(코스닥은 market 으로 .KQ 심볼이 된다). */
+function MddLink({ code, market }: { code: string; market: string | null }) {
+  const href = `/mdd?code=${code}${market ? `&market=${market}` : ""}`;
+  return (
+    <Link href={href} className="hz-mdd-link">
+      MDD 정밀분석
+      <Icon name="arrow_outward" style={{ fontSize: 13 }} />
+    </Link>
+  );
 }
 
 function Sparkline({ data, height = 20, width = 3 }: { data: number[]; height?: number; width?: number }) {
@@ -541,6 +554,10 @@ export default async function KaderaPage() {
                     <div style={{ marginTop: 7, fontSize: 11, fontFamily: MONO, color: C.sub }}>
                       최근 {s.recentMentions}회 언급 · {s.channelCount}개 채널
                     </div>
+                    {/* MDD 링크는 통계 아래 우측에 은근히 — 타일이 좁아 한 줄에 같이 두면 넘친다. */}
+                    <div style={{ marginTop: 8, textAlign: "right" }}>
+                      <MddLink code={s.code} market={s.market} />
+                    </div>
                   </div>
                 </div>
               ))}
@@ -679,12 +696,11 @@ export default async function KaderaPage() {
                         {narratives[r.code]}
                       </p>
                     )}
-                    <div style={{ display: "flex", gap: 12, fontSize: 11, fontFamily: MONO, color: C.sub, marginBottom: 12 }}>
-                      <span>언급 {r.totalMentions}회</span>
-                      <span>·</span>
-                      <span>{r.channelCount}개 채널</span>
+                    {/* 언급/채널은 하단 좌측, MDD 링크는 하단 우측에 은근히 같은 줄로. */}
+                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, fontSize: 11, fontFamily: MONO, color: C.sub }}>
+                      <span>언급 {r.totalMentions}회 · {r.channelCount}개 채널</span>
+                      <MddLink code={r.code} market={r.market} />
                     </div>
-
                   </div>
                 );
               })}

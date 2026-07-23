@@ -144,6 +144,21 @@ body {
   .hz-topbar-date { display: none; }
 }
 
+/* MDD 정밀분석 — 카드 2열 배치. 컴팩트한 카드는 가로로 둘씩 묶고, 넓어야 하는
+   카드(헤드라인 차트·테마 막대)는 mdd-full 로 두 칸을 다 쓴다. align-items:stretch(기본)
+   로 같은 줄의 두 카드 높이를 맞춘다 — 짧은 카드는 아래 여백이 생기더라도 세로 길이를
+   맞추는 게 낫다. 카드가 좁아 답답해지는 폭에서는 1열로 접는다. */
+.mdd-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: stretch;
+}
+.mdd-grid .mdd-full { grid-column: 1 / -1; }
+@media (max-width: 1024px) {
+  .mdd-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
 .hz-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
 .hz-scroll::-webkit-scrollbar-thumb {
   background: var(--c-scrollbar);
@@ -265,6 +280,24 @@ body {
    눌리는 요소라는 신호가 없다 — 호버 배경으로만 알린다. */
 .hz-nav-external:hover {
   background: var(--c-bg);
+}
+
+/* 카더라 종목 카드 → MDD 정밀분석 링크. 카드 하단에 은근히 붙는 작은 텍스트 링크다
+   (버튼처럼 크게 두면 카드마다 반복돼 너무 튄다). 평소엔 옅은 회색, 호버에만 파랗게.
+   서버 컴포넌트라 인라인 호버를 못 줘서 여기 클래스로 둔다. */
+.hz-mdd-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--c-sub);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.12s ease;
+}
+.hz-mdd-link:hover {
+  color: var(--c-blue);
 }
 
 /* 사이드바 로고 → 홈 링크. 워드마크 색을 건드리면 브랜드가 흐트러지므로

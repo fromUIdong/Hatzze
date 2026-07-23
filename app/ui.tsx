@@ -8,11 +8,13 @@ export const C = {
   mania: "var(--c-mania)", // 초고온
   ink: "var(--c-ink)",
   sub: "var(--c-sub)",
+  faint: "var(--c-faint)",
   card: "var(--c-card)",
   bg: "var(--c-bg)",
   line: "var(--c-line)",
   track: "var(--c-track)",
   blue: "var(--c-blue)",
+  shadow: "var(--c-shadow)",
 } as const;
 
 // 햇쩨 지수(0~100)를 4구간 라벨로 매핑 — 파이프라인 calculate_score.py의

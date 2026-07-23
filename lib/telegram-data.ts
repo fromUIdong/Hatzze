@@ -491,6 +491,7 @@ export async function getTrendingMessages(
 export type StockReport = {
   code: string;
   name: string;
+  market: string | null; // KOSPI | KOSDAQ — MDD 링크가 야후 심볼(.KS/.KQ)을 만들 때 쓴다
   totalMentions: number;
   series: { date: string; mentions: number }[];
   channelCount: number; // 이 종목을 다룬 서로 다른 채널 수(관심의 폭)
@@ -574,6 +575,7 @@ export async function getStockReport(code: string): Promise<StockReport | null> 
   return {
     code,
     name: stock.name as string,
+    market: (stock.market as string) ?? null,
     totalMentions,
     series,
     channelCount,
