@@ -77,13 +77,14 @@ export function MddExplorer({ stocks, initial }: { stocks: StockOption[]; initia
     };
   }, [selected, years]);
 
+  // 폭·헤더 모양을 시장 브리핑·카더라와 맞춘다(둘 다 maxWidth 1180 + 제목 옆 가로줄).
   return (
-    <div style={{ maxWidth: 980, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
+    <div style={{ maxWidth: 1180, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
       <header>
-        <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: C.ink, display: "flex", alignItems: "center", gap: 10 }}>
-          <Icon name="trending_down" style={{ fontSize: 28, color: C.cold }} />
-          MDD 정밀분석
-        </h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: C.ink }}>MDD 정밀분석</h1>
+          <div style={{ height: 1, flex: 1, background: C.line }} />
+        </div>
         <p style={{ margin: "8px 0 0", color: C.sub, fontSize: 14, lineHeight: 1.6 }}>
           종목이 고점에서 <b style={{ color: C.ink }}>얼마나 빠졌는지</b>, 이만큼 빠진 적이 <b style={{ color: C.ink }}>얼마나 드문지</b>, 과거엔 회복까지 <b style={{ color: C.ink }}>얼마나 걸렸는지</b>를 봅니다.
         </p>
@@ -95,9 +96,11 @@ export function MddExplorer({ stocks, initial }: { stocks: StockOption[]; initia
       {!loading && error && <ErrorCard message={error} />}
       {!loading && !error && data && <Results data={data} />}
 
-      <p style={{ margin: 0, color: C.faint, fontSize: 12, lineHeight: 1.7 }}>
+      {/* 면책("재미·참고용이며 매수·매도 신호가 아닙니다")은 푸터가 전역으로 이미 말하므로 빼고,
+          여기선 이 페이지에만 해당하는 데이터 기준만 밝힌다. */}
+      <p style={{ margin: 0, color: C.muted, fontSize: 12, lineHeight: 1.7 }}>
         모든 수치는 <b style={{ color: C.sub }}>종가</b> 기준이며 액면분할·감자를 반영한 수정주가입니다. 시세 출처는 Yahoo Finance이고,
-        표본이 한 사이클 남짓이라 회복 기간은 <b style={{ color: C.sub }}>범위</b>로만 참고하십시오. 과거 통계는 재미·참고용이며 매수·매도 신호가 아닙니다.
+        표본이 한 사이클 남짓이라 회복 기간은 <b style={{ color: C.sub }}>범위</b>로만 참고하십시오.
       </p>
     </div>
   );
@@ -278,7 +281,7 @@ function Headline({ data }: { data: MddResult }) {
             </span>
           )}
         </div>
-        <div style={{ fontSize: 13, color: C.faint, marginTop: 10 }}>
+        <div style={{ fontSize: 13, color: C.muted, marginTop: 10 }}>
           {fmtWon(a.price)} · 최고 {fmtWon(a.ath)} ({a.athDate})
         </div>
       </div>
@@ -299,9 +302,12 @@ function Headline({ data }: { data: MddResult }) {
 function Underwater({ series, mdd }: { series: DrawdownPoint[]; mdd: number }) {
   const W = 720;
   const H = 176;
+  // 왼쪽 여백 — y축 라벨(0%·−23%·−45%)을 이 안에 두어 곡선과 겹치지 않게 한다.
+  // 예전엔 라벨을 플롯 안(x=3)에 그려 0% 가 곡선과 겹쳐 읽기 어려웠다.
+  const PAD_L = 48;
   const floor = Math.min(mdd, -1); // 0 나눗셈·완전 평평 방지
   const n = series.length;
-  const x = (i: number) => (n <= 1 ? 0 : (i / (n - 1)) * W);
+  const x = (i: number) => (n <= 1 ? PAD_L : PAD_L + (i / (n - 1)) * (W - PAD_L));
   const y = (dd: number) => (dd / floor) * H;
 
   const line = series.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(p.dd).toFixed(1)}`).join(" ");
@@ -321,15 +327,15 @@ function Underwater({ series, mdd }: { series: DrawdownPoint[]; mdd: number }) {
   return (
     <div style={{ position: "relative" }}>
       <svg viewBox={`0 -6 ${W} ${H + 26}`} width="100%" role="img" aria-label={`고점 대비 낙폭 곡선. 현재 ${fmtPct(series[n - 1].dd)}, 기간 최저 ${fmtPct(mdd)}`}>
-        <line x1="0" y1="0" x2={W} y2="0" stroke={C.line} strokeWidth="1" />
+        <line x1={PAD_L} y1="0" x2={W} y2="0" stroke={C.line} strokeWidth="1" />
         {rows.slice(1).map((dd, i) => (
-          <line key={i} x1="0" y1={y(dd)} x2={W} y2={y(dd)} stroke={C.line} strokeWidth="1" strokeDasharray="2 5" />
+          <line key={i} x1={PAD_L} y1={y(dd)} x2={W} y2={y(dd)} stroke={C.line} strokeWidth="1" strokeDasharray="2 5" />
         ))}
         <path d={area} fill={C.cold} fillOpacity="0.14" />
         <path d={line} fill="none" stroke={C.cold} strokeWidth="1.6" strokeLinejoin="round" />
         <circle cx={W} cy={y(series[n - 1].dd)} r="4.5" fill={C.cold} stroke={C.card} strokeWidth="2" />
         {rows.map((dd, i) => (
-          <text key={i} x="3" y={y(dd) + (i === 0 ? 12 : -4)} fontSize="11" fill={C.faint}>
+          <text key={i} x={PAD_L - 8} y={y(dd) + 4} fontSize="11" fill={C.faint} textAnchor="end">
             {Math.round(dd)}%
           </text>
         ))}
@@ -341,7 +347,7 @@ function Underwater({ series, mdd }: { series: DrawdownPoint[]; mdd: number }) {
       </svg>
       {/* 시장 브리핑 지표 카드와 같은 크로스헤어 — 보이지 않는 세로 띠가 hover 시 기준선(hz-vline)과
           툴팁(hz-tip)을 낸다. 연도 라벨 높이(≈26px)만큼 아래로 남는 띠는 무시할 수준이다. */}
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 26, display: "flex" }}>
+      <div style={{ position: "absolute", top: 0, left: `${(PAD_L / W) * 100}%`, right: 0, bottom: 26, display: "flex" }}>
         {series.map((p, i) => (
           <div key={i} className="hz-tip hz-vline" data-tip={`${p.date} · ${fmtWon(p.close)} · 고점 대비 ${fmtPct(p.dd)}`} style={{ flex: 1, position: "relative" }} />
         ))}
@@ -390,7 +396,7 @@ function Attribution({
     <section style={card}>
       <SectionTitle icon="call_split" title="이 하락, 시장 탓일까 종목 탓일까" />
       <p style={{ margin: "0 0 4px", color: C.ink, fontSize: 15, fontWeight: 700, lineHeight: 1.6 }}>{verdict}</p>
-      <p style={{ margin: "0 0 16px", color: C.faint, fontSize: 12 }}>
+      <p style={{ margin: "0 0 16px", color: C.muted, fontSize: 12 }}>
         고점({athDate}) 이후 {attr.sincePeakDays.toLocaleString("ko-KR")}일, 같은 기간을 나란히 놓고 비교합니다.
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -459,9 +465,11 @@ function Recovery({ a }: { a: MddAnalysis }) {
         과거 이만큼(<b style={{ color: C.ink }}>{fmtPct(a.currentDd)}</b> 이상) 빠졌던 건 <b style={{ color: C.ink }}>{r.similarCount}번</b>이고,
         그중 <b style={{ color: C.ink }}>{r.recoveredCount}번</b>은 고점을 되찾았습니다.
       </p>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+      {/* 2열 고정 그리드 — flex-wrap 이면 한 줄에 3개가 들어가고 남은 하나('아직 회복 못 함')가
+          혼자 전체 폭으로 늘어나 어색했다. 4칸이면 2×2, 3칸이면 2+1 로 타일 크기가 일정하다. */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
         {tiles.map((t, i) => (
-          <div key={i} style={{ flex: "1 1 160px", minWidth: 150, background: C.bg, borderRadius: 12, padding: "12px 14px" }}>
+          <div key={i} style={{ background: C.bg, borderRadius: 12, padding: "12px 14px" }}>
             <div style={{ fontSize: 12, color: C.sub, marginBottom: 4 }}>{t.label}</div>
             <div style={{ fontSize: 17, fontWeight: 700, color: t.accent ? C.mania : C.ink }}>{t.value}</div>
           </div>
@@ -493,7 +501,7 @@ function Character({ ch }: { ch: DrawdownCharacter }) {
       </p>
       {hasBuckets ? (
         <>
-          <p style={{ margin: "0 0 14px", color: C.faint, fontSize: 12 }}>과거 −15% 이상 하락을 속도로 나눈 회복 기간(중앙값)입니다.</p>
+          <p style={{ margin: "0 0 14px", color: C.muted, fontSize: 12 }}>과거 −15% 이상 하락을 속도로 나눈 회복 기간(중앙값)입니다.</p>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             {tiles.map((t) =>
               t.b ? (
@@ -509,7 +517,7 @@ function Character({ ch }: { ch: DrawdownCharacter }) {
           </div>
         </>
       ) : (
-        <p style={{ margin: 0, color: C.faint, fontSize: 12, lineHeight: 1.6 }}>
+        <p style={{ margin: 0, color: C.muted, fontSize: 12, lineHeight: 1.6 }}>
           <Icon name="info" style={{ fontSize: 14, verticalAlign: -2, marginRight: 4 }} />
           이 기간엔 비교할 과거 하락이 부족합니다. 기간을 넓히면 급락형·완만형 회복을 비교할 수 있습니다.
         </p>

@@ -8,6 +8,9 @@ export const C = {
   mania: "var(--c-mania)", // 초고온
   ink: "var(--c-ink)",
   sub: "var(--c-sub)",
+  // faint 와 sub 사이. faint 로는 흐려서 안 읽히는 보조 문구에 쓴다
+  // (라이트에선 faint 보다 어둡고, 다크에선 더 밝아 양쪽 다 대비가 오른다).
+  muted: "var(--c-muted)",
   faint: "var(--c-faint)",
   card: "var(--c-card)",
   bg: "var(--c-bg)",

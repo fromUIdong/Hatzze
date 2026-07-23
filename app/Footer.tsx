@@ -72,6 +72,7 @@ export default function Footer() {
             <GroupLabel>바로가기</GroupLabel>
             <FooterLink href="/">시장 브리핑</FooterLink>
             <FooterLink href="/kadera">카더라 리포트</FooterLink>
+            <FooterLink href="/mdd">MDD 정밀분석</FooterLink>
             {/* 사이드바가 모바일에서 숨겨져 커뮤니티 링크가 사라진다 — 내부 내비게이션과
                 같은 방식으로 푸터에 두어 좁은 화면에서도 닿게 한다. */}
             <FooterExternalLink href="https://t.me/hatzze_kr">커뮤니티 합류</FooterExternalLink>

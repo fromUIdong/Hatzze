@@ -318,10 +318,8 @@ export default async function KaderaPage() {
     <div style={{ maxWidth: 1180, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
       {/* 헤더 */}
       <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+        {/* 베타 배지는 사이드바 로고 옆으로 옮겼다 — 서비스 전체가 베타라 페이지마다 붙일 일이 아니다. */}
         <h2 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: C.ink }}>카더라 리포트</h2>
-        <span style={{ fontSize: 11, fontWeight: 800, color: C.blue, background: "var(--c-blue-tint)", padding: "4px 12px", borderRadius: 999 }}>
-          베타
-        </span>
         <div style={{ height: 1, flex: 1, background: C.line }} />
       </div>
       <p style={{ margin: 0, fontSize: 14, lineHeight: 1.7, color: C.sub }}>
