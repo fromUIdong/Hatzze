@@ -5,7 +5,7 @@ import { join } from "node:path";
 // 카톡·X·슬랙 등에서 hatzze.fun 링크를 공유할 때 뜨는 미리보기 이미지(1200×630).
 // 한글 렌더를 위해 로컬 Pretendard OTF를 폰트로 넘긴다(Satori는 woff2 미지원, otf 지원).
 export const runtime = "nodejs";
-export const alt = "hatzze — 데이터와 감성으로 읽는 시장";
+export const alt = "hatzze | 데이터와 감성으로 읽는 시장";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
