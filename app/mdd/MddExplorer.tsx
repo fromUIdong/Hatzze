@@ -307,11 +307,13 @@ function Underwater({ series, mdd }: { series: DrawdownPoint[]; mdd: number }) {
   const line = series.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(p.dd).toFixed(1)}`).join(" ");
   const area = `${line} L${W},0 Z`;
 
-  // 연도 경계(1월로 처음 넘어가는 지점)를 눈금으로.
+  // 연도 경계(1월로 처음 넘어가는 지점)를 눈금으로. 첫 데이터 지점은 연중(예: 2016-07)에
+  // 시작해 완전한 연도가 아니고, x=0 이라 라벨이 왼쪽으로 잘린다("2016"→"16"). 그래서
+  // i=0 은 건너뛰고 실제 1월 경계부터만 찍는다.
   const ticks: { x: number; year: number }[] = [];
-  for (let i = 0; i < n; i++) {
+  for (let i = 1; i < n; i++) {
     const yr = Number(series[i].date.slice(0, 4));
-    if (i === 0 || Number(series[i - 1].date.slice(0, 4)) !== yr) ticks.push({ x: x(i), year: yr });
+    if (Number(series[i - 1].date.slice(0, 4)) !== yr) ticks.push({ x: x(i), year: yr });
   }
   // 그리드 라인(0/절반/바닥) 라벨.
   const rows = [0, floor / 2, floor];
