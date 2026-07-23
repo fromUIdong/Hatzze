@@ -533,7 +533,21 @@ export async function getStockReport(code: string): Promise<StockReport | null> 
     .gte("date", daysAgoISO(REPORT_WINDOW_DAYS).slice(0, 10))
     .order("date");
   const today = todayKstDate();
-  const series = (daily ?? []).filter((d) => d.date < today).map((d) => ({ date: d.date, mentions: d.mention_count || 0 }));
+  // 언급이 0인 날은 집계 표에 행 자체가 없다. 있는 행만 그리면 종목마다 막대 개수가
+  // 달라져, 나란히 놓인 두 차트가 서로 다른 기간을 그리게 된다(실측: 삼성전자 8칸,
+  // 현대차 7칸 — 07-18이 통째로 빠졌다). "최근 이틀 급증" 같은 문장도 눌린 축 위에서
+  // 읽히고, "최근 7일"이라는 라벨과도 안 맞는다.
+  //
+  // 그래서 창 전체의 날짜를 먼저 만들고 없는 날은 0으로 채운다 — 같은 파일의
+  // getTopStocksWithTrend 가 이미 쓰는 방식이라 그쪽과도 축이 맞는다.
+  const byDate = new Map((daily ?? []).map((d) => [d.date, d.mention_count || 0]));
+  const series: { date: string; mentions: number }[] = [];
+  for (let i = REPORT_WINDOW_DAYS - 1; i >= 0; i -= 1) {
+    const d = new Date(`${today}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - i - 1); // 오늘은 아직 하루가 덜 차서 제외
+    const iso = d.toISOString().slice(0, 10);
+    series.push({ date: iso, mentions: byDate.get(iso) ?? 0 });
+  }
   const totalMentions = series.reduce((s, d) => s + d.mentions, 0);
 
   // 채널 수도 같은 창으로 자른다 — 전체 기간으로 세면 모니터링 채널이 12개뿐이라
@@ -936,7 +950,14 @@ export async function getEcosystemSentiment(): Promise<EcosystemSentiment | null
 export type IssueKeyword = {
   word: string;
   count: number; // 최근 7일 언급 수(화면에 그대로 표시)
-  up: boolean | null; // 관심 점유율 증감. 비교할 과거가 없으면 null
+  /**
+   * 관심 점유율의 방향. 비교할 과거가 없으면 null.
+   *
+   * 예전엔 boolean 이라 '변화 없음'을 담을 자리가 없었다 — `recentAvg >= priorAvg` 라
+   * 두 값이 같으면 ▲가 붙었고, 최근 3일에 한 번도 안 나온 화제어(둘 다 0)까지 ▲로
+   * 표시됐다. "관심이 늘었다"는 화살표가 관심이 사라진 말에 붙는 셈이었다.
+   */
+  trend: "up" | "flat" | "down" | null;
 };
 
 /**
@@ -1005,7 +1026,17 @@ export async function getIssueKeywords(limit = 10): Promise<IssueKeyword[]> {
       // 그날 등장하지 않은 화제어는 점유율 0으로 치므로 창 전체 일수로 나눈다.
       const recentAvg = (recentShare.get(word) ?? 0) / Math.max(recentDates.size, 1);
       const priorAvg = (priorShare.get(word) ?? 0) / Math.max(priorDates.size, 1);
-      return { word, count, up: canCompare ? recentAvg >= priorAvg : null };
+      // 부동소수 비교라 정확히 같은 경우는 드물다 — 점유율 차이가 무시할 수준이면
+      // 'flat' 으로 본다. 둘 다 0인 경우(최근 창에 한 번도 안 나온 말)도 여기 걸린다.
+      const FLAT = 1e-6;
+      const trend: IssueKeyword["trend"] = !canCompare
+        ? null
+        : Math.abs(recentAvg - priorAvg) < FLAT
+          ? "flat"
+          : recentAvg > priorAvg
+            ? "up"
+            : "down";
+      return { word, count, trend };
     });
 }
 

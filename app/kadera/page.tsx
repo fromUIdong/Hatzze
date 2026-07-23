@@ -781,8 +781,11 @@ export default async function KaderaPage() {
                       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6 }}>
                         <span style={{ fontWeight: 700, fontSize: 13, color: C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{k.word}</span>
                         {/* 비교할 과거가 아직 없으면 화살표를 숨긴다 — ▲▼ 아무거나 붙이면 거짓말이 된다 */}
-                        <span style={{ fontFamily: MONO, fontSize: 11, color: k.up == null ? C.sub : k.up ? C.hot : C.cold, flexShrink: 0 }}>
-                          {k.up == null ? "" : k.up ? "▲ " : "▼ "}{k.count}회
+                        {/* 화살표는 '관심 점유율이 움직였을 때'만 — 변화 없음(flat)과
+                            비교할 과거가 없을 때(null)는 숫자만 둔다. 예전엔 boolean 이라
+                            동률과 '최근 창에 안 나온 말'까지 ▲가 붙었다. */}
+                        <span style={{ fontFamily: MONO, fontSize: 11, color: k.trend === "up" ? C.hot : k.trend === "down" ? C.cold : C.sub, flexShrink: 0 }}>
+                          {k.trend === "up" ? "▲ " : k.trend === "down" ? "▼ " : ""}{k.count}회
                         </span>
                       </div>
                       <div style={{ marginTop: 5, height: 5, background: C.track, borderRadius: 999, overflow: "hidden" }}>

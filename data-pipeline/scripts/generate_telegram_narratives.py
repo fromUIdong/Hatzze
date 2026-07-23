@@ -102,7 +102,8 @@ BRIEF_CONTRAST_SYSTEM = COMMON + """
 [이번 문장 — 테마별 온도차]
 테마별 낙관도를 비교해, 관심이나 분위기가 어느 테마로 쏠리고 어느 쪽이 식었는지를
 한 문장으로 쓰세요. 테마 이름을 최소 2개 언급해 대비가 드러나게 하세요.
-표본(메시지 수)이 너무 적은 테마는 언급하지 마세요.
+digest 에 실린 테마만 쓰세요 — 표본이 얇은 테마는 이미 걸러 뒀습니다.
+**낙관도를 '우세/높다/낮다'로 옮길 땐 옆에 적힌 구간 라벨을 따르세요** (예: 43% · 중립 → '우세'라고 쓰지 않습니다).
 **숫자를 쓸 거면 digest에 적힌 '낙관도' 값만 쓰세요.** 중립까지 포함한 비율을 따로
 계산해 말하지 마세요 — 화면의 테마 막대가 낙관도 기준이라 다른 숫자를 말하면 어긋납니다."""
 
@@ -130,6 +131,24 @@ def optimism(positive: int, negative: int) -> int | None:
     if decided == 0:
         return None
     return round(positive / decided * 100)
+
+
+# 낙관+비관이 이만큼은 돼야 비율에 의미가 있다. 카드(getEcosystemSentiment)와 같은 값 —
+# 두 곳이 다르면 총평이 화면에 없는 테마를 인용하게 된다.
+MIN_DECIDED = 8
+
+
+def tone_label(optimism_pct: int) -> str:
+    """낙관도 → 구간 라벨. lib/format.ts sentimentTone 과 같은 경계(40/60)를 쓴다.
+
+    총평 digest 에 숫자만 넘기면 모델이 방향을 뒤집어 읽는다(43%를 '우세'라고 쓰는 식).
+    화면이 붙이는 것과 같은 말을 함께 줘서 해석이 갈리지 않게 한다.
+    """
+    if optimism_pct >= 60:
+        return "낙관 우세"
+    if optimism_pct >= 41:
+        return "중립"
+    return "비관 우세"
 
 
 def build_brief_digest(db, latest: str) -> str | None:
@@ -167,7 +186,8 @@ def build_brief_digest(db, latest: str) -> str | None:
         return None
     lines = [
         f"[전체] 최근 {WINDOW_DAYS}일 분석 메시지 {n}건 · "
-        f"낙관도 {overall_opt}% (낙관 : 비관 = {overall_opt} : {100 - overall_opt})",
+        f"낙관도 {overall_opt}% · {tone_label(overall_opt)} "
+        f"(낙관 : 비관 = {overall_opt} : {100 - overall_opt})",
         f"  ※ 낙관도는 중립을 뺀 값입니다. 전체의 {overall['neutral'] * 100 // n}%가 중립이라 제외했습니다.",
     ]
 
@@ -181,9 +201,20 @@ def build_brief_digest(db, latest: str) -> str | None:
         lines.append(f"[낙관도 추이] {' → '.join(trail)}")
 
     lines.append("")
-    lines.append("[테마별] 낙관도 (중립 제외 / 메시지 수가 적은 테마는 참고만)")
+    lines.append(f"[테마별] 낙관도 (중립 제외 · 낙관+비관 {MIN_DECIDED}건 이상만)")
+    # 카드(lib/telegram-data.getEcosystemSentiment)와 **같은 하한**으로 거른다.
+    # 카드는 낙관+비관이 MIN_DECIDED 미만인 테마를 "한두 건에 100:0이 찍혀 실제보다
+    # 단정적으로 보인다"는 이유로 숨기는데, 총평에는 그 필터가 없어서 모델이 표본
+    # 서너 건짜리 테마의 "100% 긍정"을 그대로 인용했다 — 화면에 없는 숫자를 총평이
+    # 말하니 사용자가 확인할 방법이 없었다(2026-07-22 "방산 93%, 조선 100%").
+    # 프롬프트로 "표본 적은 테마는 빼라"고 시켜도 모델에게 표본 수를 안 줬으니
+    # 판단할 근거가 없었다. 아예 안 보여주는 게 확실하다.
     themes = sorted(
-        ((s, c) for s, c in window.items() if s != "overall" and c["total"]),
+        (
+            (s, c)
+            for s, c in window.items()
+            if s != "overall" and c["total"] and (c["positive"] + c["negative"]) >= MIN_DECIDED
+        ),
         key=lambda kv: kv[1]["total"],
         reverse=True,
     )[:6]
@@ -191,7 +222,15 @@ def build_brief_digest(db, latest: str) -> str | None:
         o = optimism(c["positive"], c["negative"])
         if o is None:
             continue
-        lines.append(f"- {scope}: {c['total']}건 · 낙관도 {o}% (낙관 {c['positive']}건 · 비관 {c['negative']}건)")
+        # 숫자만 주면 모델이 방향을 뒤집어 읽는다 — "낙관이 43%로 우세"(2026-07-20),
+        # "38%로 상대적으로 높은"(07-19) 처럼. 화면 카드가 쓰는 것과 같은 구간 라벨을
+        # 함께 줘서 해석을 고정한다(lib/format.sentimentTone 과 같은 경계).
+        lines.append(
+            f"- {scope}: {c['total']}건 · 낙관도 {o}% · {tone_label(o)} "
+            f"(낙관 {c['positive']}건 · 비관 {c['negative']}건)"
+        )
+    if not themes:
+        lines.append(f"- (표본 {MIN_DECIDED}건 이상인 테마가 없습니다 — 테마 언급은 생략하세요)")
 
     kws = load_all(db, "telegram_keyword_daily", "date,keyword,mention_count")
     recent = Counter()
