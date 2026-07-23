@@ -185,6 +185,8 @@ export type StockHighGap = {
   price: number;
   high52: number;
   gapPct: number; // 음수 = 고점 아래
+  /** 현재가의 기준일(KRX 종가일). 카드가 지수 쪽 배지와 같은 날짜인지 확인하는 데 쓴다. */
+  priceDate: string | null;
 };
 
 /**
@@ -198,13 +200,19 @@ export type StockHighGap = {
  * 재사용한다 — 같은 자료를 두 번 긁지 않기 위해서다. 다만 거기엔 종목명만 있어
  * stocks 에서 코드를 찾아 야후 심볼로 바꾼다.
  *
- * **여기만 야후 실시간인 이유.** 왼쪽 지수 괴리율은 KRX 종가 기준이라 한 카드에서
- * 잣대가 갈리는 건 사실이다. 그래도 KRX로 옮기지 않는다 — KRX 일별매매정보에는 52주
- * 고점 필드가 없어서, 같은 값을 얻으려면 1년치를 종목 단위로 훑어야 하고 실측 80분이
- * 걸린다(응답 하나가 KOSPI 943행 + KOSDAQ 1,821행). 야후는 fiftyTwoWeekHigh 를
- * 한 번의 호출로 준다. 3개 숫자를 1~2% 바꾸자고 치를 값이 아니다.
+ * **현재가는 KRX 종가, 52주 고점만 야후.** 왼쪽 지수 괴리율이 KRX 종가 기준이라
+ * 예전엔 오른쪽만 야후 실시간이어서 한 카드에서 날짜가 갈렸다 — 배지에 "7/22 기준"이라
+ * 적어도 이 숫자는 그날 값이 아니었다. 이제 현재가를 stocks.close_price(KRX 종가)로
+ * 맞춰 **카드 전체가 같은 거래일**을 가리킨다.
  *
- * 대신 카드가 이 칸을 "실시간"이라고 밝혀 두 잣대를 구분한다(app/page.tsx CardHighGap).
+ * 52주 고점만 야후로 남긴 이유: KRX 일별매매정보에는 52주 고점 필드가 없어서, 같은 값을
+ * 얻으려면 1년치를 훑어야 하고 실측 80분이 걸린다(응답 하나가 KOSPI 943행 + KOSDAQ
+ * 1,821행). 야후는 fiftyTwoWeekHigh 를 한 번의 호출로 준다. 지수 쪽은 이미 일별 종가를
+ * 쌓고 있어 최고 종가를 공짜로 구하지만(kospi_close_raw), 종목은 그 저장소가 없다.
+ *
+ * 남는 차이: 야후 고점은 **장중 고가**라 종가 기준보다 3%쯤 높다. 그만큼 종목 괴리율이
+ * 깊게 나온다(SK하이닉스 -35.8% → -38.7%). 세 종목에 똑같이 걸리는 편향이고 점수에는
+ * 들어가지 않아, 날짜를 맞추는 이득이 더 크다고 봤다.
  */
 export async function getTopStockHighGaps(limit = 3): Promise<StockHighGap[]> {
   const { data: rows } = await getSupabaseServer()
@@ -219,7 +227,10 @@ export async function getTopStockHighGaps(limit = 3): Promise<StockHighGap[]> {
   const names = (details?.top5 ?? []).map((s) => s.name).slice(0, limit);
   if (!names.length) return [];
 
-  const { data: stocks } = await getSupabaseServer().from("stocks").select("code,name,market").in("name", names);
+  const { data: stocks } = await getSupabaseServer()
+    .from("stocks")
+    .select("code,name,market,close_price,price_date")
+    .in("name", names);
   const infoOf = new Map((stocks ?? []).map((s) => [s.name as string, s]));
 
   const results = await Promise.all(
@@ -230,12 +241,18 @@ export async function getTopStockHighGaps(limit = 3): Promise<StockHighGap[]> {
         next: { revalidate: 600 },
       });
       if (!q || q.fiftyTwoWeekHigh === null || q.fiftyTwoWeekHigh <= 0) return null;
+
+      // 현재가는 KRX 종가를 우선한다 — 지수 쪽 배지와 같은 거래일을 가리키게.
+      // KRX 종가가 아직 없는 종목(신규 상장 등)만 야후 현재가로 채운다.
+      const krxClose = info.close_price as number | null;
+      const price = krxClose && krxClose > 0 ? krxClose : Math.round(q.price);
       return {
         name,
         code: info.code as string,
-        price: Math.round(q.price),
+        price,
         high52: Math.round(q.fiftyTwoWeekHigh),
-        gapPct: (q.price / q.fiftyTwoWeekHigh - 1) * 100,
+        gapPct: (price / q.fiftyTwoWeekHigh - 1) * 100,
+        priceDate: krxClose && krxClose > 0 ? ((info.price_date as string) ?? null) : null,
       };
     }),
   );
