@@ -465,9 +465,11 @@ function Recovery({ a }: { a: MddAnalysis }) {
         과거 이만큼(<b style={{ color: C.ink }}>{fmtPct(a.currentDd)}</b> 이상) 빠졌던 건 <b style={{ color: C.ink }}>{r.similarCount}번</b>이고,
         그중 <b style={{ color: C.ink }}>{r.recoveredCount}번</b>은 고점을 되찾았습니다.
       </p>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+      {/* 2열 고정 그리드 — flex-wrap 이면 한 줄에 3개가 들어가고 남은 하나('아직 회복 못 함')가
+          혼자 전체 폭으로 늘어나 어색했다. 4칸이면 2×2, 3칸이면 2+1 로 타일 크기가 일정하다. */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
         {tiles.map((t, i) => (
-          <div key={i} style={{ flex: "1 1 160px", minWidth: 150, background: C.bg, borderRadius: 12, padding: "12px 14px" }}>
+          <div key={i} style={{ background: C.bg, borderRadius: 12, padding: "12px 14px" }}>
             <div style={{ fontSize: 12, color: C.sub, marginBottom: 4 }}>{t.label}</div>
             <div style={{ fontSize: 17, fontWeight: 700, color: t.accent ? C.mania : C.ink }}>{t.value}</div>
           </div>
