@@ -989,7 +989,13 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
         </div>
         {tops.length > 0 && (
           <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center", gap: 10, borderLeft: `1px solid ${C.line}`, paddingLeft: 24 }}>
-            <span style={{ fontSize: 10, fontWeight: 800, color: C.sub }}>거래대금 상위 종목의 52주 고점 대비</span>
+            {/* 이 칸만 야후 실시간이다(왼쪽 지수는 KRX 종가). KRX에는 52주 고점 필드가
+                없어 같은 값을 얻으려면 1년치를 훑어야 하고 실측 80분이 걸린다 —
+                3개 숫자를 1~2% 바꾸자고 치를 값이 아니라, 대신 잣대를 밝힌다. */}
+            <span style={{ fontSize: 10, fontWeight: 800, color: C.sub }}>
+              거래대금 상위 종목의 52주 고점 대비
+              <span style={{ color: "var(--c-muted)", fontWeight: 700 }}> · 실시간</span>
+            </span>
             {tops.map((s) => {
               // 고점 대비 낙폭이 클수록 막대가 짧다 — 지수 게이지와 같은 읽기 방향.
               const pct = Math.max(0, Math.min(100, 100 + s.gapPct));

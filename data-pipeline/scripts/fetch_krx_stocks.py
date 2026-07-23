@@ -22,7 +22,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.krx_client import krx_get  # noqa: E402
-from common.supabase_client import get_client, load_all  # noqa: E402
+from common.supabase_client import get_client  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 
 KOSPI_URL = "http://data-dbg.krx.co.kr/svc/apis/sto/stk_bydd_trd"
@@ -67,28 +67,6 @@ def latest_available_date() -> str | None:
     return None
 
 
-def _bump_high52(stocks: dict[str, dict], price_date: str) -> None:
-    """오늘 종가가 저장된 52주 고점보다 높은 종목만 고점을 올린다.
-
-    stocks 에 high_52w 컬럼이 없는 환경(마이그레이션 019 전)에서는 조용히 넘어간다 —
-    이 스크립트의 본래 일(종목 마스터 갱신)까지 막을 이유가 없다.
-    """
-    db = get_client()
-    try:
-        current = load_all(db, "stocks", "code,high_52w")
-    except Exception as e:
-        print(f"[안내] high_52w 컬럼이 없어 52주 고점 갱신을 건너뜁니다 (마이그레이션 019): {e}")
-        return
-
-    stored = {r["code"]: r.get("high_52w") for r in current}
-    for code, s in stocks.items():
-        close = s.get("close_price")
-        prev = stored.get(code)
-        if close and (prev is None or close > prev):
-            s["high_52w"] = close
-            s["high_52w_date"] = price_date
-
-
 def main() -> None:
     bas_dd = latest_available_date()
     if not bas_dd:
@@ -112,12 +90,6 @@ def main() -> None:
                 "change_rate": _to_float(d.get("FLUC_RT")),
                 "price_date": f"{bas_dd[:4]}-{bas_dd[4:6]}-{bas_dd[6:]}",
             }
-
-    # 52주 최고 종가 증분 갱신 — 오늘 종가가 저장된 고점을 넘으면 그날로 올린다.
-    # 고점은 위로만 움직이므로 이 증분은 항상 옳다. 반대로 옛 고점이 52주 창을
-    # 벗어나 내려가야 하는 경우는 여기서 알 수 없어서, fetch_stock_high52.py 가
-    # 주기적으로 전체를 다시 훑어 바로잡는다.
-    _bump_high52(stocks, f"{bas_dd[:4]}-{bas_dd[4:6]}-{bas_dd[6:]}")
 
     if not stocks:
         print(f"[오류] {bas_dd} 종목이 0개입니다. 중단합니다.")

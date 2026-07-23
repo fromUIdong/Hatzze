@@ -195,15 +195,16 @@ export type StockHighGap = {
  * 개별 괴리율을 같이 두면 지수 숫자가 어디서 온 건지 읽힌다.
  *
  * 종목 선정은 turnover_concentration 지표가 이미 저장해 둔 details.top5(거래대금 순)를
- * 재사용한다 — 같은 자료를 두 번 긁지 않기 위해서다.
+ * 재사용한다 — 같은 자료를 두 번 긁지 않기 위해서다. 다만 거기엔 종목명만 있어
+ * stocks 에서 코드를 찾아 야후 심볼로 바꾼다.
  *
- * **KRX 종가 기준을 쓴다.** 예전엔 야후 실시간이었는데, 같은 카드 왼쪽의 지수 괴리율은
- * KRX 종가라 한 카드에서 잣대가 갈렸다 — 배지에 "7/22 기준"이라 적어도 이 숫자는 그
- * 날짜의 값이 아니었고, 야후의 52주 고점은 장중 고가 기준이라 종가 기준인 지수 쪽보다
- * 구조적으로 높게 나온다. 지금은 stocks.close_price / high_52w(둘 다 KRX 종가)를 쓴다.
+ * **여기만 야후 실시간인 이유.** 왼쪽 지수 괴리율은 KRX 종가 기준이라 한 카드에서
+ * 잣대가 갈리는 건 사실이다. 그래도 KRX로 옮기지 않는다 — KRX 일별매매정보에는 52주
+ * 고점 필드가 없어서, 같은 값을 얻으려면 1년치를 종목 단위로 훑어야 하고 실측 80분이
+ * 걸린다(응답 하나가 KOSPI 943행 + KOSDAQ 1,821행). 야후는 fiftyTwoWeekHigh 를
+ * 한 번의 호출로 준다. 3개 숫자를 1~2% 바꾸자고 치를 값이 아니다.
  *
- * high_52w 가 아직 없는 환경(마이그레이션 019 전이거나 fetch_stock_high52.py 미실행)에서는
- * 야후로 폴백해 칸이 비지 않게 한다.
+ * 대신 카드가 이 칸을 "실시간"이라고 밝혀 두 잣대를 구분한다(app/page.tsx CardHighGap).
  */
 export async function getTopStockHighGaps(limit = 3): Promise<StockHighGap[]> {
   const { data: rows } = await getSupabaseServer()
@@ -218,39 +219,20 @@ export async function getTopStockHighGaps(limit = 3): Promise<StockHighGap[]> {
   const names = (details?.top5 ?? []).map((s) => s.name).slice(0, limit);
   if (!names.length) return [];
 
-  type Row = { code: string; name: string; market: string | null; close_price: number | null; high_52w?: number | null };
-  // high_52w 컬럼이 없는 환경(마이그레이션 019 전)에서도 죽지 않도록, 실패하면 그 컬럼
-  // 없이 다시 조회한다 — getPublicIndicators 의 details 폴백과 같은 패턴.
-  const pick = (cols: string) => getSupabaseServer().from("stocks").select(cols).in("name", names);
-  // eslint-disable-next-line prefer-const -- stocks 는 폴백 조회에서 재대입된다
-  let { data: stocks, error } = await pick("code,name,market,close_price,high_52w");
-  if (error) ({ data: stocks } = await pick("code,name,market,close_price"));
-  const infoOf = new Map((stocks ?? []).map((s) => [(s as unknown as Row).name, s as unknown as Row]));
+  const { data: stocks } = await getSupabaseServer().from("stocks").select("code,name,market").in("name", names);
+  const infoOf = new Map((stocks ?? []).map((s) => [s.name as string, s]));
 
   const results = await Promise.all(
     names.map(async (name) => {
       const info = infoOf.get(name);
       if (!info) return null;
-
-      // KRX 종가 기준 — 지수 괴리율과 같은 잣대.
-      if (info.close_price && info.high_52w && info.high_52w > 0) {
-        return {
-          name,
-          code: info.code,
-          price: info.close_price,
-          high52: info.high_52w,
-          gapPct: (info.close_price / info.high_52w - 1) * 100,
-        };
-      }
-
-      // 폴백: 52주 고점이 아직 없으면 야후로 채운다(잣대가 달라지지만 칸이 비는 것보단 낫다).
       const q = await fetchYahooQuote(`${info.code}.${info.market === "KOSDAQ" ? "KQ" : "KS"}`, {
         next: { revalidate: 600 },
       });
       if (!q || q.fiftyTwoWeekHigh === null || q.fiftyTwoWeekHigh <= 0) return null;
       return {
         name,
-        code: info.code,
+        code: info.code as string,
         price: Math.round(q.price),
         high52: Math.round(q.fiftyTwoWeekHigh),
         gapPct: (q.price / q.fiftyTwoWeekHigh - 1) * 100,
