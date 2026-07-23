@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from common.krx_client import krx_get  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
-from common.timeutil import business_days  # noqa: E402
+from common.timeutil import days_to_backfill  # noqa: E402
 
 KRX_URL = "http://data-dbg.krx.co.kr/svc/apis/idx/drvprod_dd_trd"
 BACKFILL_DAYS = 365
@@ -87,9 +87,8 @@ def backfill(client, indicator_id: str) -> None:
     )
     existing_dates = {row["date"] for row in existing.data}
 
-    missing_days = [
-        d for d in business_days(start, today) if d.isoformat() not in existing_dates
-    ]
+    # 옛 공휴일을 매 실행 다시 물어보지 않도록 최근 창만 훑는다(common/timeutil 참고).
+    missing_days = days_to_backfill(existing_dates, today, bootstrap_days=BACKFILL_DAYS)
     if not missing_days:
         print("[KRX] 백필할 신규 날짜 없음 (이미 최신 상태)")
         return

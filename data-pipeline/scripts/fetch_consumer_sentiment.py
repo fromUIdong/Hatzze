@@ -27,7 +27,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.ecos_client import statistic_search  # noqa: E402
+from common.ecos_client import EcosUnavailableError, statistic_search  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
 from common.supabase_client import get_client  # noqa: E402
 
@@ -79,7 +79,21 @@ def main() -> None:
     indicator_id = ensure_indicator(client, INDICATOR_META)
     print(f"[Supabase] indicator '{INDICATOR_SLUG}' id: {indicator_id}")
 
-    series = fetch_ccsi()
+    try:
+        series = fetch_ccsi()
+    except EcosUnavailableError as e:
+        # 해외 러너에서 ECOS 로 나가는 경로가 가끔 통째로 막힌다(2026-07-23 실행에서
+        # 6회 재시도 전부 connect timeout). 같은 ECOS 를 쓰는 fetch_buffett_index.py 는
+        # 이미 이걸 잡아 넘어가는데 여기만 그대로 터져서, 네트워크 문제 하나가
+        # **워크플로 전체를 실패로** 만들고 있었다.
+        #
+        # CCSI 는 월 1회 공표라 하루 못 받아도 값이 낡지 않는다. 조용히 넘어가되,
+        # 진짜로 오래 멈추면 check_freshness.py 가 잡는다(그쪽이 감시 담당).
+        print(f"[WARNING] {e}")
+        print("[WARNING] ECOS 접속 문제로 판단해 오늘 CCSI 갱신을 건너뜁니다. "
+              "월 1회 공표 지표라 기존 값이 그대로 쓰이며, 다른 지표는 영향받지 않습니다.")
+        return
+
     if not series:
         print("[ECOS] CCSI 데이터를 받지 못했습니다.")
         sys.exit(1)

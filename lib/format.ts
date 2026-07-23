@@ -50,11 +50,22 @@ const KST_UPDATE_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
   hourCycle: "h23",
 });
 
+/** 정기 실행 예정 시각(KST) — .github/workflows/daily-update.yml 의 cron 과 맞춘다. */
+const SCHEDULED_HOURS_KST = [9, 17];
+/** 예정 시각에서 이만큼 안에 끝났으면 "예정대로 돌았다"고 보고 정각으로 스냅한다. */
+const SCHEDULE_SLACK_HOURS = 3;
+
 /**
- * "최종 업데이트" 라벨. 파이프라인은 KST 09:00(주 실행)·17:00(재실행)에만 도는데,
- * 실제 완료 시각은 몇 분~몇십 분 늦어질 수 있어(예: 18:19) 그대로 쓰면 헷갈린다.
- * 그래서 updated_at의 KST 시(hour)로 오전/오후 실행을 판별해 "오전 9:00" 또는
- * "오후 5:00"으로 스냅해 표시한다. → "YYYY-MM-DD(요일) 오전 9:00 기준"
+ * "최종 업데이트" 라벨.
+ *
+ * 파이프라인은 KST 09:00·17:00 예약인데 실제 완료는 늘 늦다. 두 가지가 겹친다 —
+ * GitHub Actions 가 예약 실행을 미루고(실측 1~2시간), 파이프라인 자체가 20분 안팎
+ * 걸린다. 그 지연을 감추려고 무조건 09:00/17:00 으로 스냅했는데, 그러면 예정과
+ * 무관한 시각에 돈 실행(수동 실행·재시도)까지 정각으로 적혀 거짓말이 된다 —
+ * 실제로 KST 23:28 에 끝난 실행이 "오후 5:00 기준"으로 표시됐다.
+ *
+ * 이제 예정 시각 ±3시간 안이면 그 정각으로 스냅하고(정기 실행의 깔끔함 유지),
+ * 벗어나면 실제 시각을 그대로 적는다(거짓말 방지).
  */
 export function formatKstUpdate(isoString: string): string {
   const parts = KST_UPDATE_FORMATTER.formatToParts(new Date(isoString));
@@ -62,10 +73,15 @@ export function formatKstUpdate(isoString: string): string {
     parts.find((p) => p.type === type)?.value ?? "";
 
   const weekday = get("weekday").replace("요일", "");
-  // 9시와 17시의 중간(13시)을 경계로 오전/오후 실행을 가른다.
-  const slot = Number(get("hour")) < 13 ? "오전 9:00" : "오후 5:00";
+  const hour = Number(get("hour"));
 
-  return `${get("year")}-${get("month")}-${get("day")}(${weekday}) ${slot} 기준`;
+  const scheduled = SCHEDULED_HOURS_KST.find((h) => Math.abs(hour - h) <= SCHEDULE_SLACK_HOURS);
+  const time =
+    scheduled !== undefined
+      ? `${scheduled < 12 ? "오전" : "오후"} ${scheduled % 12 || 12}:00`
+      : `${hour < 12 ? "오전" : "오후"} ${hour % 12 || 12}시경`;
+
+  return `${get("year")}-${get("month")}-${get("day")}(${weekday}) ${time} 기준`;
 }
 
 /**

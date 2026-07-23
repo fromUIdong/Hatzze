@@ -11,14 +11,20 @@ KRX 요청에 자체 재시도 로직(_get_with_retry)을 갖고 있었다. 이 
 fetch_vkospi.py, fetch_market_cap_concentration.py, fetch_buffett_index.py의
 시가총액 조회)에도 동일하게 적용하기 위해 공통 헬퍼로 뽑아냈다.
 
-재시도 대상은 두 가지다: (1) 연결 자체가 실패하는 경우(타임아웃, 연결 거부 등,
+재시도 대상은 세 가지다: (1) 연결 자체가 실패하는 경우(타임아웃, 연결 거부 등,
 requests.exceptions.RequestException), (2) 서버가 5xx(500/503 등 일시적 서버
-오류)를 반환하는 경우. 둘 다 KRX 쪽의 일시적 문제일 가능성이 높아 몇 초 간격으로
-재시도하고, 끝까지 안 되면 None을 반환해 호출자가 그 날짜만 건너뛰게 한다.
+오류)를 반환하는 경우, (3) **403 Forbidden**. 전부 KRX 쪽의 일시적 문제일 가능성이
+높아 몇 초 간격으로 재시도하고, 끝까지 안 되면 None을 반환해 호출자가 그 날짜만
+건너뛰게 한다.
 
-반면 401 같은 4xx는 재시도하지 않고 그대로 반환한다 — 인증/권한 문제처럼
-재시도해도 결과가 안 바뀌는 상황이라, 호출자가 상태 코드를 보고 명확한 안내
-메시지를 내도록 넘긴다.
+403을 재시도에 넣은 이유(2026-07-23 추가): 2026-07-22 오후 실행에서 KRX 호출이
+전부 403을 받아 8개 스크립트가 한꺼번에 죽었다(신고가·버핏·쏠림·거래대금·VKOSPI·
+풋콜·레버리지·안전장치). 그런데 **같은 키로 같은 날 아침 실행은 성공**했고 국내에서
+연속 호출해도 전부 200이라, 승인 문제가 아니라 해외 러너 IP에 대한 일시적 차단으로
+보인다. 재시도해도 안 바뀌는 4xx로 분류해 즉시 포기하던 게 문제였다.
+
+반면 401은 그대로 반환한다 — 그건 KRX가 "개별 서비스 미승인"에 쓰는 코드라
+재시도해도 결과가 안 바뀌고, 호출자가 승인 안내 메시지를 내야 한다.
 """
 
 from __future__ import annotations
@@ -60,8 +66,10 @@ def krx_get(url: str, bas_dd: str) -> requests.Response | None:
                 time.sleep(backoff_delay(attempt, KRX_RETRY_BASE_DELAY_SEC, KRX_RETRY_MAX_DELAY_SEC))
             continue
 
-        if resp.status_code >= 500:
-            last_error = f"서버 오류 {resp.status_code}"
+        if resp.status_code >= 500 or resp.status_code == 403:
+            last_error = (
+                f"일시 차단 403" if resp.status_code == 403 else f"서버 오류 {resp.status_code}"
+            )
             print(f"[KRX] {bas_dd} {last_error} ({attempt}/{KRX_MAX_RETRIES})")
             if attempt < KRX_MAX_RETRIES:
                 time.sleep(backoff_delay(attempt, KRX_RETRY_BASE_DELAY_SEC, KRX_RETRY_MAX_DELAY_SEC))
