@@ -95,9 +95,11 @@ export function MddExplorer({ stocks, initial }: { stocks: StockOption[]; initia
       {!loading && error && <ErrorCard message={error} />}
       {!loading && !error && data && <Results data={data} />}
 
-      <p style={{ margin: 0, color: C.faint, fontSize: 12, lineHeight: 1.7 }}>
+      {/* 면책("재미·참고용이며 매수·매도 신호가 아닙니다")은 푸터가 전역으로 이미 말하므로 빼고,
+          여기선 이 페이지에만 해당하는 데이터 기준만 밝힌다. */}
+      <p style={{ margin: 0, color: C.muted, fontSize: 12, lineHeight: 1.7 }}>
         모든 수치는 <b style={{ color: C.sub }}>종가</b> 기준이며 액면분할·감자를 반영한 수정주가입니다. 시세 출처는 Yahoo Finance이고,
-        표본이 한 사이클 남짓이라 회복 기간은 <b style={{ color: C.sub }}>범위</b>로만 참고하십시오. 과거 통계는 재미·참고용이며 매수·매도 신호가 아닙니다.
+        표본이 한 사이클 남짓이라 회복 기간은 <b style={{ color: C.sub }}>범위</b>로만 참고하십시오.
       </p>
     </div>
   );
@@ -278,7 +280,7 @@ function Headline({ data }: { data: MddResult }) {
             </span>
           )}
         </div>
-        <div style={{ fontSize: 13, color: C.faint, marginTop: 10 }}>
+        <div style={{ fontSize: 13, color: C.muted, marginTop: 10 }}>
           {fmtWon(a.price)} · 최고 {fmtWon(a.ath)} ({a.athDate})
         </div>
       </div>
@@ -390,7 +392,7 @@ function Attribution({
     <section style={card}>
       <SectionTitle icon="call_split" title="이 하락, 시장 탓일까 종목 탓일까" />
       <p style={{ margin: "0 0 4px", color: C.ink, fontSize: 15, fontWeight: 700, lineHeight: 1.6 }}>{verdict}</p>
-      <p style={{ margin: "0 0 16px", color: C.faint, fontSize: 12 }}>
+      <p style={{ margin: "0 0 16px", color: C.muted, fontSize: 12 }}>
         고점({athDate}) 이후 {attr.sincePeakDays.toLocaleString("ko-KR")}일, 같은 기간을 나란히 놓고 비교합니다.
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -493,7 +495,7 @@ function Character({ ch }: { ch: DrawdownCharacter }) {
       </p>
       {hasBuckets ? (
         <>
-          <p style={{ margin: "0 0 14px", color: C.faint, fontSize: 12 }}>과거 −15% 이상 하락을 속도로 나눈 회복 기간(중앙값)입니다.</p>
+          <p style={{ margin: "0 0 14px", color: C.muted, fontSize: 12 }}>과거 −15% 이상 하락을 속도로 나눈 회복 기간(중앙값)입니다.</p>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             {tiles.map((t) =>
               t.b ? (
@@ -509,7 +511,7 @@ function Character({ ch }: { ch: DrawdownCharacter }) {
           </div>
         </>
       ) : (
-        <p style={{ margin: 0, color: C.faint, fontSize: 12, lineHeight: 1.6 }}>
+        <p style={{ margin: 0, color: C.muted, fontSize: 12, lineHeight: 1.6 }}>
           <Icon name="info" style={{ fontSize: 14, verticalAlign: -2, marginRight: 4 }} />
           이 기간엔 비교할 과거 하락이 부족합니다. 기간을 넓히면 급락형·완만형 회복을 비교할 수 있습니다.
         </p>
