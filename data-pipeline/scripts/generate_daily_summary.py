@@ -27,8 +27,9 @@ from common.supabase_client import get_client  # noqa: E402
 # 사실상 무시 가능. (thinking/effort 파라미터는 Haiku 4.5에서 불필요/미지원이라 안 쓴다.)
 MODEL = "claude-haiku-4-5"
 
-# Hit(초고온 진입) 판정선 = 진행률 ≥ 75. calculate_score.py의 HIT_ZONE과 동일하게 맞춘다.
-HIT_ZONE = 75.0
+# 초고온 진입선 = 진행률 ≥ 75. calculate_score.py의 HOT_ZONE과 동일하게 맞춘다.
+# 이 지점이 곧 카드에 "기준선"으로 적히는 값이라, 화면·요약·배지가 한 지점을 가리킨다.
+HOT_ZONE = 75.0
 
 
 def cap_progress(progress: float) -> float:
@@ -100,7 +101,7 @@ DESC_TOP_N = 5
 def build_digest(
     score: float,
     stage: str,
-    hit_count: int,
+    hot_count: int,
     rows: list[dict],
     recent_scores: list[float],
 ) -> str:
@@ -118,18 +119,18 @@ def build_digest(
     - [지표별]의 '뜻:' : 1번째 문단(주인공 뜻풀이)용. 상위 DESC_TOP_N개에만 설명문을 붙여,
       모델이 지표 의미를 지어내지 않고 근거 있게 풀도록 한다."""
     lines = [
-        f"[전체] 햇쩨 지수 {score:.0f}℃ · {stage} 구간 · 기준선 초과(Hit) 지표 {hit_count}개",
+        f"[전체] 햇쩨 지수 {score:.0f}℃ · {stage} 구간 · 초고온 구간에 든 지표 {hot_count}개",
     ]
     if recent_scores:
         trend = " → ".join(f"{s:.0f}" for s in recent_scores)
         lines.append(f"[최근 추세] 최근 {len(recent_scores)}일 햇쩨 지수(℃, 오래된→오늘): {trend}")
     lines += [
         "",
-        "[지표별] 과열도 높은 순 (0=저온 ~ 100=초고온, 'Hit'=기준선 초과)",
+        "[지표별] 과열도 높은 순 (0=저온 ~ 100=초고온, '초고온'=과열도 75 이상)",
     ]
     for i, r in enumerate(rows):
-        hit_mark = " · Hit" if r["hit"] else ""
-        lines.append(f"- {r['name']} ({r['category']}): 과열도 {r['capped']:.0f}%{hit_mark}")
+        hot_mark = " · 초고온" if r["hot"] else ""
+        lines.append(f"- {r['name']} ({r['category']}): 과열도 {r['capped']:.0f}%{hot_mark}")
         if i < DESC_TOP_N and r.get("desc"):
             lines.append(f"    뜻: {r['desc']}")
     return "\n".join(lines)
@@ -194,7 +195,7 @@ def main() -> None:
                 "category": ind["category"],
                 "desc": ind.get("description_beginner"),
                 "capped": capped,
-                "hit": capped >= HIT_ZONE,
+                "hot": capped >= HOT_ZONE,
             }
         )
 
@@ -203,8 +204,8 @@ def main() -> None:
         return
 
     rows.sort(key=lambda r: r["capped"], reverse=True)
-    hit_count = sum(1 for r in rows if r["hit"])
-    digest = build_digest(score, stage, hit_count, rows, recent_scores)
+    hot_count = sum(1 for r in rows if r["hot"])
+    digest = build_digest(score, stage, hot_count, rows, recent_scores)
 
     print("─" * 60)
     print(digest)

@@ -118,10 +118,16 @@ def backfill_raw_prices(client, raw_indicator_id: str) -> None:
 
 
 def compute_gap(client, raw_indicator_id: str) -> tuple[str, float, float, float]:
+    # 지표 이름 그대로 '52주' 창으로 자른다. 예전엔 날짜 필터가 없어 저장된 종가 전부에서
+    # 전고점을 잡았는데, 백필이 옛 행을 지우지 않아 표가 계속 자라므로 실제로는 '전체 기간
+    # 최고가'였다(이미 365일 밖 행이 9개 있었다). 지금은 최고점이 1년 안이라 값이 우연히
+    # 같지만, 고점이 1년보다 오래되는 순간 "52주 괴리율"이 조용히 틀려진다.
+    window_start = (date.today() - timedelta(days=BACKFILL_DAYS)).isoformat()
     rows = (
         client.table("indicator_values")
         .select("date,raw_value")
         .eq("indicator_id", raw_indicator_id)
+        .gte("date", window_start)
         .order("date", desc=True)
         .execute()
     ).data

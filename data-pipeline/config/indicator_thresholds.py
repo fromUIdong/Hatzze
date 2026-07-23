@@ -42,13 +42,23 @@ INDICATOR_THRESHOLDS = {
     #  30일 창이 굴러가며 자연히 LLM 값만 남는다.)
     "dcinside_post_count": {"kind": "fixed", "threshold": 25.0},
     # kospi_volume_surge: 절대 거래대금이 아니라 "30일 평균 대비 %"(details.surge_pct)로 판단.
-    # 평소(0%)=상온, +20%↑=초고온. floor surge −20%=0%, ceiling surge +33.3%=100%
-    # (→ 0%→37.5%, +20%→75%). 절대값은 baseline drift로 낡아서 상대로 전환.
-    "kospi_volume_surge": {"kind": "fixed", "threshold": 500_000.0, "relative_surge": {"floor": -20.0, "ceil": 33.33, "hit": 20.0}},
+    # 2026-07-23 재보정: 옛 눈금(−20~+33.3)은 실측 분포(−43.6% ~ +107.4%)보다 훨씬 좁아
+    # **219일 중 45%가 양끝에 포화**됐다(바닥 19% · 천장 26%). 가중치 2위(4.0) 지표가
+    # 그 절반의 날에 해상도를 잃은 셈이고, 실제로 오늘도 −43.6%로 floor 밖이라 거래대금이
+    # 더 줄어도 점수가 안 움직였다. 분포가 오른쪽으로 길어(p75 +34%, p95 +72%) 눈금도
+    # 비대칭으로 잡는다 → 바닥 0% · 천장 3% · 초고온 16%.
+    # 초고온 진입은 급증 +47.5%(= floor + 0.75×(ceil−floor)).
+    "kospi_volume_surge": {"kind": "fixed", "threshold": 500_000.0, "relative_surge": {"floor": -50.0, "ceil": 80.0}},
     "vkospi": {"kind": "fixed", "threshold": 20.0, "direction": "low"},
     "news_sentiment": {"kind": "fixed", "threshold": 35.0},
     "kospi_gold_ratio": {"kind": "fixed", "threshold": 2.2},
-    "kosdaq_kospi_ratio": {"kind": "fixed", "threshold": 0.14},
+    # kosdaq_kospi_ratio: 2026-07-23 측정 방식 자체를 바꿨다(fetch_kosdaq_ratio.py 참고).
+    # 옛 raw_value는 코스닥/코스피 '레벨 비율'이라, 코스피가 오르면 코스닥이 그대로여도
+    # 값이 떨어졌다 — 1년간 시간과의 상관이 -0.928인 순수 추세라 고정 눈금을 어디 둬도
+    # 1년의 85%가 천장에 붙었다. 이제 raw는 **코스닥 20거래일 초과수익률(%p)**이다.
+    # floor -20 ~ ceiling +10: 코스닥이 코스피와 같으면(0%p) 과열도 51로 상온 한가운데,
+    # 초고온 진입은 +2.5%p. 실측 232일에서 바닥 14% · 천장 0% · 초고온 12%.
+    "kosdaq_kospi_ratio": {"kind": "fixed", "threshold": 10.0, "floor": -20.0},
     "usdkrw_volatility": {"kind": "fixed", "threshold": 0.25, "direction": "low"},
     # put_call_ratio: 풋 거래량 / 콜 거래량. 콜(상승 베팅)이 많을수록 값이 작아지므로
     # direction="low" — 낮을수록 탐욕(과열)이다. ※ direction 은 여기와 fetch 스크립트의
@@ -73,15 +83,20 @@ INDICATOR_THRESHOLDS = {
     # 급증(%)"을 과열도로 매핑한다 — 평균(급증 0%)=진행률 50(상온), +25%=75(초고온 진입/Hit),
     # +50%=100. 카드의 "평소 대비 X배"는 threshold(=평균) 그대로라 안 깨진다.
     "youtube_finance_search_views": {"kind": "cumulative_average", "surge_map": {"floor": -50.0, "ceil": 50.0}},
-    # kospi_asia_relative_strength: threshold=10(%p)은 "코스피 20거래일
-    # 수익률이 일본·홍콩·대만 평균보다 10%p 이상 앞선다"를 뚜렷한 쏠림으로
-    # 보는 논리적 추정치다 — 실측 분포(예: 최근 1~2년 이 지표의 실제
-    # 최댓값·분산)를 아직 확인 못 했으니, 데이터가 쌓이면 재조정이 필요할
-    # 수 있다.
-    "kospi_asia_relative_strength": {"kind": "fixed", "threshold": 10.0},
-    # naver_search_trend와 동일한 논리: 조회 기간 내 최고치의 70% 수준을
-    # "이례적으로 관심이 쏠린" 구간으로 본다.
-    "luxury_consumption_index": {"kind": "fixed", "threshold": 70.0},
+    # kospi_asia_relative_strength: 코스피 20거래일 수익률이 일본·홍콩·대만 평균보다
+    # 몇 %p 앞섰나. 2026-07-23 재보정: 옛 설정은 threshold 10 하나뿐이고 floor가 없어
+    # 0 아래가 전부 뭉개졌다 — "5%p 뒤처진 날"과 "23%p 뒤처진 날"이 똑같이 0.
+    # 그 결과 198일 중 25%가 바닥, 25%가 천장인 **사실상 이진 신호**였다(중간이 없음).
+    # floor를 줘서 뒤처지는 정도도 눈금 안에 들어오게 한다 → 바닥 2% · 천장 2% · 초고온 17%.
+    # 초고온 진입은 +13.75%p(= -20 + 0.75×45).
+    "kospi_asia_relative_strength": {"kind": "fixed", "threshold": 25.0, "floor": -20.0},
+    # luxury_consumption_index: 2026-07-23 재보정. "최고치의 70% = 과열"이라는 규칙을
+    # 네이버 검색 지표 3개에 똑같이 적용했는데, 이 지표만 값이 늘 44~76 대역에 머물러
+    # **377일 중 93%가 초고온**이었다(카드가 늘 '과열'로 읽혔다). 게다가 카드는
+    # '평소 대비 0.9배↓'라고 말하는데 점수는 67% 과열로 들어가 방향이 어긋났다.
+    # floor 40 ~ ceiling 78: 중앙값이 54로 상온 한가운데 오고 초고온은 17%.
+    # 초고온 진입은 68.5pt.
+    "luxury_consumption_index": {"kind": "fixed", "threshold": 78.0, "floor": 40.0},
     # 아래 둘도 naver_search_trend와 동일한 논리(조회 기간 내 최고치의 70%
     # 수준을 과열로 봄). small_business_crisis_index는 검색량이 높을수록
     # "실물경제 위기 신호가 뚜렷하다"는 뜻이라 direction은 그대로 high다 —
@@ -124,9 +139,12 @@ INDICATOR_THRESHOLDS = {
     # 매수 사이드카가 차지한 비중(0~1). 2026-07-20에 차이값(매수-매도-CB×4, 0클램프)에서
     # 교체했다 — 옛 공식은 1년 370일 중 318일(86%)이 0으로 뭉개져 정보를 못 냈다(안전장치가
     # 아예 없던 날은 46%뿐이라 40%p는 실제 이벤트가 있었는데도 버려졌다).
-    # threshold=0.50은 1년 370일 중 16일(4.3%)만 도달해 **옛 임계값 2.0의 엄격도(16일,
-    # 4.4%)를 그대로 재현**한다 — 공식을 바꾸되 지표가 종합점수에 기여하는 강도는
-    # 유지하려는 의도다. 참고 분위수: p75=0.31, p90=0.43, p95=0.46, 최대=0.56.
+    # ※ 2026-07-23 주석 정정: 예전엔 "0.50은 370일 중 16일(4.3%)만 도달해 옛 임계값의
+    #    엄격도를 재현한다"고 적혀 있었는데, 그 4.3%는 **진행률 100(완전 도달)** 기준이었다.
+    #    실제 배지는 진행률 75(= raw 0.375)에서 켜지고, 그 기준의 실측 도달률은 **15%**다
+    #    — 같은 파일의 put_call(5%)보다 3배 헐겁다. 공식을 바꾼 지 얼마 안 됐으니 눈금은
+    #    데이터가 더 쌓인 뒤 판단하고, 지금은 사실만 바로잡는다.
+    # 참고 분위수: p75=0.31, p90=0.43, p95=0.46, 최대=0.56.
     "market_actions_30d": {"kind": "fixed", "threshold": 0.50},
 }
 
