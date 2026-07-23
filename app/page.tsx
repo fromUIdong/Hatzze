@@ -572,22 +572,6 @@ function Donut({ pct, color }: { pct: number; color: string }) {
   );
 }
 
-// 반원 게이지 (과열도 0~100 → 바늘 각도).
-function HalfGauge({ score, color }: { score: number; color: string }) {
-  const s = Math.max(0, Math.min(100, score));
-  const theta = ((180 - (s / 100) * 180) * Math.PI) / 180;
-  const L = 78;
-  const x2 = 96 + L * Math.cos(theta);
-  const y2 = 90 - L * Math.sin(theta);
-  return (
-    <svg viewBox="0 0 196 100" style={{ width: 196, height: 86, overflow: "visible" }}>
-      <path d="M 14 90 A 82 82 0 0 1 178 90" fill="none" stroke="#bfe0f2" strokeWidth="13" strokeLinecap="round" />
-      <path d="M 96 8 A 82 82 0 0 1 178 90" fill="none" stroke="#ffd3ab" strokeWidth="13" strokeLinecap="round" />
-      <line x1="96" y1="90" x2={x2} y2={y2} stroke={color} strokeWidth="3" strokeLinecap="round" />
-      <circle cx="96" cy="90" r="6" fill={C.ink} />
-    </svg>
-  );
-}
 
 // 우상향/우하향 추세를 암시하는 장식용 라인 (실제 시계열이 아님).
 // 최근 값들의 실제 추세 스파크라인. data는 시간순(오래된→최신). 차트는 위 영역을
@@ -757,18 +741,6 @@ function UpbitKimchiBar({ premium }: { premium: number }) {
 }
 
 // VIX/VKOSPI 카드의 백분위 바. 각 지수를 자기 1년 분포 내 백분위(0~100)로 바꾸면
-// VIX와 VKOSPI를 같은 축에서 정직하게 비교할 수 있다(절대값 78 vs 15 오해 해소).
-function VixPctRow({ flag, label, pct, color }: { flag: string; label: string; pct: number; color: string }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <span style={{ width: 74, fontSize: 10, fontWeight: 800, color, textAlign: "right" }}>{flag} {label}</span>
-      <div style={{ flex: 1, height: 9, background: C.bg, borderRadius: 999, overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${Math.max(0, Math.min(100, pct))}%`, background: color, borderRadius: 999 }} />
-      </div>
-      <span style={{ fontFamily: MONO, fontSize: 10, fontWeight: 800, color: C.sub, width: 46, textAlign: "right" }}>{Math.round(pct)}점</span>
-    </div>
-  );
-}
 
 // ── 시장 지표 카드들 (목업 순서대로) ──────────────────────────────
 
@@ -1323,8 +1295,9 @@ function VsAvg({ ratio, size = 26 }: { ratio: number; size?: number }) {
   );
 }
 
-// 실물–증시 괴리 — 두 축(실물 스트레스/증시 강세)을 나란히 보여준다. 둘 다 높을수록
-// 괴리도(둘의 곱)가 커진다 = "실물 없는 랠리".
+// 실물–증시 괴리 — 두 축(실물 강도 / 증시 강세)을 각자 역대 백분위로 매겨 나란히 둔다.
+// 괴리는 둘의 '곱'이 아니라 '차이'(lead = 증시%ile − 실물%ile)다 — 2026-07-22 PR #69 에서
+// 양방향 게이지로 바꿨는데 이 주석만 옛 설계(곱·실물 스트레스)에 머물러 있었다.
 function DivergenceBar({ label, hint, value, color, tip }: { label: string; hint: string; value: number; color: string; tip?: string }) {
   const level = value >= 66 ? "높음" : value >= 33 ? "보통" : "낮음";
   return (

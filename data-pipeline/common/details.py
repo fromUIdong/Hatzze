@@ -97,6 +97,10 @@ def merge_details(client, indicator_id: str, day: str, new_keys: dict) -> dict:
 
     details는 여러 writer가 공유하는 칸이라 통째로 대입하면 남의 키가 날아간다
     (모듈 docstring 참고). 여기서 기존 값을 먼저 읽어 병합해 준다.
+
+    **새 details 키를 쓸 땐 이 함수(또는 upsert_details)를 거칠 것.** 지금은 통째로
+    대입해도 충돌이 안 나는 지표가 대부분이지만, 그건 우연히 writer가 하나뿐이기
+    때문이지 안전해서가 아니다.
     """
     existing = (
         client.table("indicator_values")
@@ -107,6 +111,46 @@ def merge_details(client, indicator_id: str, day: str, new_keys: dict) -> dict:
     )
     current = (existing.data[0].get("details") or {}) if existing.data else {}
     return {**current, **new_keys}
+
+
+def upsert_details(client, indicator_id: str, rows: list[dict]) -> int:
+    """날짜별 details를 **기존 키를 보존하며** 한 번에 upsert한다.
+
+    rows 형태: [{"date": "YYYY-MM-DD", "raw_value": <필수>, "details": {...내 키만...}}]
+
+    통째 대입을 막는 기본 경로다. fetch 스크립트들이 각자 dict를 새로 만들어 넣는 바람에
+    2026-07-20 실물–증시 괴리 카드의 두 축이 0으로 표시된 적이 있다(calculate_score가
+    같은 행에 쓴 키가 날아갔다). 그때는 3개 함수만 병합형으로 고쳤는데, 남은 스크립트도
+    새 키를 추가할 땐 이걸 쓰면 같은 실수를 반복하지 않는다.
+
+    반환: 저장한 행 수.
+    """
+    if not rows:
+        return 0
+
+    dates = [r["date"] for r in rows]
+    existing = (
+        client.table("indicator_values")
+        .select("date,details")
+        .eq("indicator_id", indicator_id)
+        .in_("date", dates)
+        .execute()
+    )
+    prior = {r["date"]: (r.get("details") or {}) for r in existing.data}
+
+    payload = [
+        {
+            "indicator_id": indicator_id,
+            "date": r["date"],
+            "raw_value": r["raw_value"],
+            "details": {**prior.get(r["date"], {}), **(r.get("details") or {})},
+        }
+        for r in rows
+    ]
+    client.table("indicator_values").upsert(
+        payload, on_conflict="indicator_id,date"
+    ).execute()
+    return len(payload)
 
 
 DEFAULT_SCALE_WINDOW = 60

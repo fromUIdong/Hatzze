@@ -1,6 +1,12 @@
 """yfinance의 VIX(^VIX) 종가와 이미 저장된 vkospi 값을 날짜로 매칭해
 "VIX 대비 VKOSPI 스프레드"를 계산해 Supabase에 upsert.
 
+⚠️ **2026-07-23 현재 이 스크립트는 일일 워크플로에서 빠져 있다(수동 실행 전용).**
+2026-07-20 에 지표를 화면·점수에서 내렸는데(is_public=false, 임계값·가중치 표에도 없음)
+수집만 계속 돌고 있었다 — 매일 yfinance 를 호출하고 실패 집계까지 차지하면서 산출물은
+어디에도 안 쓰였다. 되살릴 때 워크플로에 다시 넣으면 된다(그때 VKOSPI 카드와 겹치지
+않게 무엇을 보여줄지부터 정할 것).
+
 VKOSPI는 fetch_vkospi.py가 이미 매일 수집해 indicator_values에 쌓고 있으므로
 여기서 다시 받지 않고 Supabase에서 읽기만 한다 — VIX만 새로 yfinance에서 받는다.
 
@@ -56,7 +62,6 @@ INDICATOR_META = {
     # direction은 high(기본). VIX·VKOSPI는 산출식/스케일이 달라 절대값 뺄셈이 무의미했는데,
     # 각자 자기 1년 분포 내 백분위로 바꾸면 스케일과 무관하게 비교할 수 있다.
     "direction": "high",
-    "weight": 2,
 }
 
 

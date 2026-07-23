@@ -1,4 +1,4 @@
-"""26개 지표의 현재값을 기준선과 비교해 과열도 스코어를 계산하고 daily_score/indicator_values에 저장.
+"""25개 지표의 현재값을 기준선과 비교해 과열도 스코어를 계산하고 daily_score/indicator_values에 저장.
 
 기준선(threshold)은 이제 전부 리서치/논리 기반의 고정값이다
 (config/indicator_thresholds.py의 INDICATOR_THRESHOLDS). 원래는 과거 데이터의
@@ -117,6 +117,14 @@ def get_indicator(client, slug: str) -> tuple[str, str, float]:
     # 가중치는 코드(config/indicator_weights.py)가 소스 오브 트루스 — DB weight는 폴백.
     db_weight = float(row["weight"]) if row.get("weight") is not None else 1.0
     weight = INDICATOR_WEIGHTS.get(slug, db_weight)
+
+    # DB 값이 코드와 다르면 코드값으로 맞춰 둔다. 점수 계산에는 이미 코드값을 쓰므로
+    # 결과가 달라지진 않지만, SQL로 직접 들여다볼 때 낡은 숫자를 보고 판단하는 걸 막는다
+    # (2026-07-23 기준 25개 중 13개가 어긋나 있었다 — 예탁금 DB 1.0 vs 코드 3.0 등).
+    if slug in INDICATOR_WEIGHTS and abs(db_weight - weight) > 1e-9:
+        client.table("indicators").update({"weight": weight}).eq("id", row["id"]).execute()
+        print(f"[동기화] '{slug}' weight {db_weight:g} → {weight:g} (코드 기준)")
+
     return row["id"], row["name"], weight
 
 

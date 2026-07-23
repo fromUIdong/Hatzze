@@ -76,7 +76,6 @@ INDICATOR_META = {
     # 코스피 과열과는 같은 심리를 공유할 뿐이다.
     "description_beginner": "김프·거래대금이 같이 뛰면, 위험한 자산까지 돈이 몰릴 만큼 투자 심리가 달아올랐다는 신호입니다",
     "unit": "pt",
-    "weight": 2,
 }
 
 

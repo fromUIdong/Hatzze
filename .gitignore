@@ -22,6 +22,8 @@ data-pipeline/*.session-journal
 
 # claude code local settings
 .claude/settings.local.json
+# 에이전트 작업용 워크트리(용량이 크고 레포 내용의 사본이다)
+.claude/worktrees/
 
 # local dev-only description/details overlay (never deployed; see dev-overrides.example.json)
 dev-overrides.json

@@ -68,7 +68,10 @@ create policy "indicator_values_public_read"
 create table if not exists public.daily_score (
   date date primary key,
   score numeric not null,
-  stage text not null check (stage in ('냉정', '보통', '과열', '광기')),
+  -- 구간 라벨은 calculate_score.stage_for_score 가 25/50/75 경계로 정한다.
+  -- 이 목록과 코드가 어긋나면 파이프라인이 제약 위반으로 죽으므로 같이 고쳐야 한다
+  -- (2026-07-16 라벨 교체 때 여기만 안 고쳐서 새 환경 구성이 불가능했다 — migration_019).
+  stage text not null check (stage in ('저온', '상온', '고온', '초고온')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

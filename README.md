@@ -56,7 +56,7 @@
 
 ```mermaid
 flowchart LR
-    A["27개 fetch 스크립트<br/>KRX · ECOS · NAVER API HUB · 유튜브 · GitHub …"] --> B["calculate_score.py<br/>25개 지표 → 과열도 가중평균"]
+    A["26개 fetch 스크립트<br/>KRX · ECOS · NAVER API HUB · 유튜브 · GitHub …"] --> B["calculate_score.py<br/>25개 지표 → 과열도 가중평균"]
     B --> C["generate_daily_summary.py<br/>Claude Haiku · 오늘의 요약"]
     C --> D[("Supabase<br/>PostgreSQL")]
     T1["fetch_telegram.py<br/>Telethon · 채널 메시지"] --> T2["종목 추출 · 일별 집계<br/>종목 · 테마"]

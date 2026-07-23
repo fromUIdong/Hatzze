@@ -50,7 +50,6 @@ INDICATOR_META = {
     "unit": "%p",
     # kospi_volume_surge/vkospi와 비슷한 급의 보조-시장 지표라 기본값(1)보다
     # 높게 잡는다. 지정하지 않으면 다른 새 지표들처럼 안전하게 1로 들어간다.
-    "weight": 3,
 }
 
 
