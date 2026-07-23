@@ -1191,19 +1191,20 @@ function CardVolume({ v }: { v: Pick }) {
   const surge = dt?.surge_pct ?? null;
   return (
     <Shell hit={v.isHit} minH={230}>
-      <TitleRow desc={v.headline}
-        icon="groups"
-        name={v.name}
-        right={
-          surge !== null ? (
-            <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 800, color: surge >= 0 ? C.hot : C.cold }}>
-              {surge >= 0 ? "+" : ""}
-              {surge}%
-            </span>
-          ) : undefined
-        }
-      />
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 12, height: 120, flex: 1 }}>
+      <TitleRow desc={v.headline} icon="groups" name={v.name} />
+      {/* 급증률은 제목 행의 right 자리에 있었는데, 거기는 초고온 배지가 뜨는 자리라
+          이 카드가 초고온에 들면 둘이 겹친다(괴리 카드와 같은 이유로 본문으로 내렸다).
+          내려놓고 보니 이 숫자가 카드의 결론이라 다른 1칸 카드처럼 큰 수치로 두는 게 맞다. */}
+      {surge !== null && (
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "2px 0 10px" }}>
+          <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 800, color: surge >= 0 ? C.hot : C.cold, letterSpacing: "-0.03em", lineHeight: 1 }}>
+            {surge >= 0 ? "+" : ""}
+            {surge}%
+          </span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: C.sub }}>평소 대비</span>
+        </div>
+      )}
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 12, flex: 1, minHeight: 88 }}>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, height: "100%" }}>
           <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 800, color: C.neutral }}>
             {avgFmt ? `${avgFmt.display}${avgFmt.displayUnit}` : v.thDisp ?? "-"}
