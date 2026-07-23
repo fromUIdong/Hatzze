@@ -43,7 +43,10 @@ type Pick = {
   color: string;
   disp: string;
   unit: string;
+  /** 진행률 100 지점(매핑 상한). 유튜브 '평소 대비 N배'처럼 이 값이 필요한 카드만 쓴다. */
   thDisp: string | null;
+  /** 카드에 "기준선"으로 적는 값 = 초고온 진입선. 이걸 넘으면 배지가 켜진다. */
+  hotDisp: string | null;
   dirLabel: string;
   details: Record<string, number> | null;
   history: number[];
@@ -91,12 +94,22 @@ function pick(ind: Ind | undefined): Pick {
   const score = ind?.latest?.normalized_score ?? null;
   const capped = score === null ? null : Math.min(Math.max(score, 0), 100);
   const threshold = ind?.latest?.threshold ?? null;
+  // 카드에 "기준선"으로 적는 값은 진행률 100 지점이 아니라 **초고온 진입선**(진행률 75)이다.
+  // 파이프라인이 details.hot_threshold에 넣어준다(calculate_score.raw_at_progress).
+  // 이 값을 넘는 순간 초고온 배지가 켜지므로 표시와 판정이 같은 지점을 가리킨다.
+  //
+  // 없으면 threshold로 폴백하지 **않는다** — 그게 정확히 고치려던 그 문제이기 때문이다.
+  // (threshold는 진행률 100 지점이라, 그걸 기준선이라 적으면 "기준선에 못 미쳤는데
+  //  초고온" 표시가 그대로 남는다.) 새 코드로 파이프라인이 한 번 돌기 전까지는
+  //  기준선 줄을 아예 숨겨서 틀린 숫자를 보여주지 않는다.
+  const hotThreshold = ind?.latest?.details?.hot_threshold ?? null;
   const unit = ind?.unit ?? "";
   const f =
     raw !== null
       ? formatIndicatorValue(raw, unit)
       : { display: "-", displayUnit: unit };
   const tf = threshold !== null ? formatIndicatorValue(threshold, unit) : null;
+  const hf = hotThreshold !== null ? formatIndicatorValue(hotThreshold, unit) : null;
   return {
     ind,
     name: ind?.name ?? "",
@@ -106,13 +119,15 @@ function pick(ind: Ind | undefined): Pick {
     score,
     capped,
     threshold,
-    // Hit = 초고온 구간(진행률 ≥ 75) 진입 — 모든 지표의 진행률이 '과열도(0~100)'로 통일돼
-    // 있어(youtube는 surge_map으로 평균 대비 급증을 매핑) 예외 없이 동일 기준.
+    // 초고온 = 진행률 ≥ 75. 모든 지표의 진행률이 '과열도(0~100)'로 통일돼 있어
+    // (youtube는 surge_map으로 평균 대비 급증을 매핑) 예외 없이 동일 기준이고,
+    // 이 지점이 곧 카드에 적히는 기준선(hotDisp)이다.
     isHit: (capped ?? 0) >= 75,
     color: heatColor(score),
     disp: f.display,
     unit: f.displayUnit,
     thDisp: tf ? `${tf.display}${tf.displayUnit}` : null,
+    hotDisp: hf ? `${hf.display}${hf.displayUnit}` : null,
     dirLabel: ind?.direction === "low" ? "이하" : "이상",
     details: ind?.latest?.details ?? null,
     history: ind?.history ?? [],
@@ -169,7 +184,11 @@ function Shell({
   );
 }
 
-function HitBadge({ label = "🎯 HIT", small = false }: { label?: string; small?: boolean }) {
+// 초고온 배지 — 진행률 75(= 카드에 적힌 기준선)를 넘은 지표에 붙는다.
+// 예전엔 "🎯 HIT"이었는데, 그 이름이 "기준선에 도달했다"로 읽히는 게 문제였다.
+// 실제 판정선은 초고온 진입이고, 서비스의 나머지 언어(저온·상온·고온·초고온)와도
+// 어긋나 있었다. 이름을 구간 이름으로 맞춰 배지와 히어로·요약이 한 말을 쓰게 한다.
+function HitBadge({ label = "🌋 초고온", small = false }: { label?: string; small?: boolean }) {
   return (
     <span
       style={{
@@ -349,9 +368,9 @@ function HeatBar({ v }: { v: Pick }) {
         <span>안심</span>
         <span style={{ color: C.hot }}>과열 100</span>
       </div>
-      {v.thDisp && (
+      {v.hotDisp && (
         <p style={{ margin: "8px 0 0", textAlign: "center", fontSize: 10, fontWeight: 700, color: C.sub, fontFamily: MONO }}>
-          기준선 {v.thDisp} {v.dirLabel}
+          초고온 기준선 {v.hotDisp} {v.dirLabel}
         </p>
       )}
     </div>
@@ -487,7 +506,11 @@ function Hero({ dailyScore, tradHits, socialHits }: { dailyScore: DailyScore; tr
           <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 15, lineHeight: 1.6, color: "var(--c-ink-soft)", fontWeight: 500 }}>
             {/* 고정 오프너 — 두 문장을 한 문단으로. 이 아래 LLM 문장들이 각각 한 문단씩
                 붙어 전체가 3문단 정도가 된다. */}
-            <p style={{ margin: 0 }}>오늘은 시장 지표 <b style={{ color: C.ink }}>{tradHits}개</b>, 감성 지표 <b style={{ color: C.ink }}>{socialHits}개</b>가 기준선을 넘었습니다. 지표들이 가리키는 현재 시장 온도는 <b style={{ color: stage.color }}>{stageLabel}</b> 구간입니다.</p>
+            {/* "기준선을 넘었습니다"였는데, 배지가 켜지는 지점(진행률 75)과 카드에 적힌
+                기준선(진행률 100)이 서로 달라서 기준선에 못 미친 지표까지 세고 있었다.
+                이제 카드의 기준선 자체가 초고온 진입선이라 두 문장이 같은 뜻이지만,
+                구간 이름으로 말하는 쪽이 저온·상온·고온·초고온 언어와도 맞는다. */}
+            <p style={{ margin: 0 }}>오늘은 시장 지표 <b style={{ color: C.ink }}>{tradHits}개</b>, 감성 지표 <b style={{ color: C.ink }}>{socialHits}개</b>가 초고온 구간에 들었습니다. 지표들이 가리키는 현재 시장 온도는 <b style={{ color: stage.color }}>{stageLabel}</b> 구간입니다.</p>
             {/* LLM(generate_daily_summary.py) 상세 요약을 문장별로 줄바꿈해 이어붙인다.
                 없으면(마이그레이션 전이거나 생성 실패) 오프너만 보여준다. */}
             {dailyScore.ai_summary
@@ -1070,7 +1093,10 @@ function CardAsia({ v }: { v: Pick }) {
 }
 
 // 9. 위험자산 vs 안전자산 — 금/코스닥 두 지표 결합 (둘 다 실제 값)
-function SubRatio({ v, icon, label }: { v: Pick; icon: string; label: string }) {
+function SubRatio({ v, icon, label, signed = false }: { v: Pick; icon: string; label: string; signed?: boolean }) {
+  // 초과수익률처럼 0을 기준으로 위아래가 다 의미 있는 값은 부호를 밝힌다 —
+  // "1.39%p"만 적으면 앞선 건지 뒤처진 건지 안 읽힌다. 배수(금 대비)는 부호가 없다.
+  const sign = signed && (v.raw ?? 0) > 0 ? "+" : "";
   return (
     <div style={{ flex: 1 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
@@ -1078,8 +1104,8 @@ function SubRatio({ v, icon, label }: { v: Pick; icon: string; label: string }) 
         <span style={{ fontSize: 13, fontWeight: 800, wordBreak: "keep-all" }}>{label}</span>
       </div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 14 }}>
-        <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color }}>{v.disp}{v.unit}</span>
-        {v.thDisp && <span style={{ fontSize: 10, fontWeight: 700, color: C.sub }}>기준 {v.thDisp}</span>}
+        <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color }}>{sign}{v.disp}{v.unit}</span>
+        {v.hotDisp && <span style={{ fontSize: 10, fontWeight: 700, color: C.sub }}>초고온 {v.hotDisp}</span>}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, fontWeight: 800, marginBottom: 6 }}>
         <span style={{ color: C.sub }}>과열도</span>
@@ -1107,7 +1133,8 @@ function CardRiskAssets({ gold, kosdaq }: { gold: Pick; kosdaq: Pick }) {
       <div style={{ display: "flex", gap: 32, flex: 1 }}>
         <SubRatio v={gold} icon="balance" label="코스피 강도 (vs 금)" />
         <div style={{ width: 1, background: C.line }} />
-        <SubRatio v={kosdaq} icon="celebration" label="코스닥 강도 (vs 코스피)" />
+        {/* 코스닥은 '최근 한 달 초과수익률(%p)'이라 부호가 뜻을 가른다(2026-07-23 측정 교체). */}
+        <SubRatio v={kosdaq} icon="celebration" label="코스닥 강도 (vs 코스피)" signed />
       </div>
       {/* 지표가 둘인 카드의 설명 줄. Foot 과 박스 모델을 똑같이 맞춰야 같은 행에 놓인
           카드끼리 divider 가 같은 높이에 온다 — marginTop:auto 로 바닥에 붙이고,
@@ -1329,7 +1356,7 @@ function CardTrend({ v, icon, span }: { v: Pick; icon: string; span?: 1 | 2 }) {
         <>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
             <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{v.disp}{v.unit}</span>
-            {v.thDisp && <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 800, color: C.hot }}>과열 기준 {v.thDisp}</span>}
+            {v.hotDisp && <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 800, color: C.hot }}>초고온 기준 {v.hotDisp}</span>}
           </div>
           <div style={{ flex: 1, position: "relative", minHeight: 52 }}>
             <Sparkline data={v.history} color={v.color} />

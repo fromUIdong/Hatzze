@@ -6,13 +6,11 @@
 표본 수가 쌓일 때까지 기준선 자체가 계속 흔들리는 문제가 있었다. 기준값을
 조정하고 싶으면 이 파일이 아니라 indicator_thresholds.py만 고치면 된다.
 
-kospi_high_gap만 예외로, 기준선(threshold=0)은 고정이지만 progress 계산에
-쓰는 "0% 진행" 기준점(floor)은 지금도 동적으로 계산한다. kospi_high_gap은
-0 이하 값만 가지는 지표라 (현재값/기준선)*100 공식을 그대로 쓸 수 없어서,
-floor를 두고 0%(기준선)를 "100% 진행"으로 선형 보간한다. 이 floor는
-kospi_close_raw(1년치 종가 히스토리)의 연중 최저/최고가로 "지난 1년간
-실제로 관측된 최대 낙폭"을 계산한다(compute_kospi_high_gap_floor) — 히스토리가
-부족하면 고정 대체값(-20%)을 쓴다.
+kospi_high_gap은 0 이하 값만 가지는 지표라 (현재값/기준선)*100 공식을 그대로
+쓸 수 없어서, floor(-35%)와 kink(-3%)를 둔 피스와이즈로 매핑한다. floor·kink는
+둘 다 indicator_thresholds.py의 고정값이다 — 예전엔 floor를 kospi_close_raw
+히스토리에서 매일 다시 계산했지만, 지금은 다른 지표들과 같은 고정 임계값 철학을
+따른다.
 
 vkospi/usdkrw_volatility는 다른 지표와 반대 방향이다 — 값이 낮을수록(시장이
 방심할수록) 과열 신호다. INDICATOR_THRESHOLDS에 "direction": "low"가 있으면
@@ -53,8 +51,15 @@ daily_score.score("햇쩨 지수")는 지표별 capped_progress의 가중 평균
 던지는 no_value 케이스가 이 경우다.
 
 stage(저온/상온/고온/초고온)는 이 가중 평균 점수 자체를 4구간으로 나눠 정한다
-(stage_for_score) — hit_count 비율로 정하지 않는다. hit_count는 화면의 Hit
-배지 표시용으로 계속 계산하지만, stage 산정에는 관여하지 않는다.
+(stage_for_score) — 초고온 지표 개수로 정하지 않는다. 개수는 화면의 배지·히어로
+문장용으로 계속 세지만, stage 산정에는 관여하지 않는다.
+
+**화면에 적는 "기준선"은 진행률 100이 아니라 초고온 진입선(진행률 75)이다.**
+INDICATOR_THRESHOLDS의 threshold는 진행률 100을 맞추는 매핑 상한이고, 카드가
+보여줄 기준선은 raw_at_progress(slug, HOT_ZONE, ...)로 되돌려 details.hot_threshold에
+저장한다. 이렇게 해야 "기준선을 넘었다"와 "초고온 배지가 켜졌다"가 같은 뜻이 된다 —
+예전엔 배지가 75에서 켜지는데 카드엔 100 지점을 기준선으로 적어서, 기준선에 못 미친
+지표에 배지가 붙었다(2026-07-22 기준 3개).
 """
 
 from __future__ import annotations
@@ -73,8 +78,6 @@ from config.indicator_thresholds import (  # noqa: E402
 )
 from config.indicator_weights import INDICATOR_WEIGHTS  # noqa: E402
 
-KOSPI_HIGH_GAP_FALLBACK_FLOOR = -20.0  # kospi_close_raw 히스토리가 부족할 때의 대체값
-KOSPI_CLOSE_RAW_SLUG = "kospi_close_raw"
 # 실물–증시 괴리 = "실물 경제와 증시 중 누가 더 강한가"(양방향 게이지). 두 축을 각자
 # '역대 백분위'(0~100, 자기 역사에서 어느 지점만큼 강한가)로 만들어 공정하게 비교한다.
 # 서로 다른 척도(심리지수 vs 낙폭%)를 그냥 빼면 불공정해서, 백분위로 통일했다.
@@ -86,9 +89,14 @@ CCSI_SLUG = "consumer_sentiment_index"
 CCSI_PCTILE_ANCHORS = [(90.0, 10), (98.0, 25), (102.0, 50), (107.0, 75), (112.0, 90)]
 # 코스피 전고점 대비 낙폭(%) 역대 분위수(10년 실측). 낙폭이 얕을수록(0에 가까울수록) 증시 강함.
 KOSPI_DD_PCTILE_ANCHORS = [(-25.9, 10), (-21.6, 25), (-15.1, 50), (-3.4, 75), (-0.4, 90)]
-MIN_FLOOR_HISTORY_SAMPLES = 5  # kospi_high_gap floor 계산에 필요한 최소 과거 데이터 개수
 NEUTRAL_PROGRESS = 50.0  # 값이 아예 없는 지표(no_value)를 표에 표시할 때 쓰는 자리표시자
-HIT_ZONE = 75.0  # Hit 기준 = 초고온 진입선(진행률 ≥ 75). stage 밴드(25/50/75)의 초고온 경계와 동일.
+# 초고온 진입선(진행률 75) = 화면이 "기준선"으로 부르는 지점.
+#
+# 예전엔 진행률 100 지점을 기준선으로 표시하면서 배지는 75에서 켰다. 그래서 "기준선
+# 0.14배 이상"이라고 적힌 카드가 0.11배에서 HIT 배지를 달았다 — 세 지표가 동시에
+# 그랬다. 이제 카드에 적는 기준선 자체를 초고온 진입선으로 바꿔(raw_at_progress),
+# "기준선을 넘었다 = 초고온 배지가 켜졌다"가 항상 같은 뜻이 되게 한다.
+HOT_ZONE = 75.0
 
 INDICATOR_ORDER = list(INDICATOR_THRESHOLDS.keys())
 
@@ -112,10 +120,15 @@ def get_indicator(client, slug: str) -> tuple[str, str, float]:
     return row["id"], row["name"], weight
 
 
-def get_latest_value(client, indicator_id: str) -> tuple[str, float]:
+def get_latest_value(client, indicator_id: str) -> tuple[str, float, dict]:
+    """최신 행의 (날짜, 원값, details)를 돌려준다.
+
+    details 를 같이 받아오는 이유: 뒤에서 relative_surge(거래대금)와 hot_threshold 병합에
+    모두 필요한데, 따로 조회하면 지표마다 쿼리가 두 번씩 나간다.
+    """
     result = (
         client.table("indicator_values")
-        .select("date,raw_value")
+        .select("date,raw_value,details")
         .eq("indicator_id", indicator_id)
         .order("date", desc=True)
         .limit(1)
@@ -124,7 +137,7 @@ def get_latest_value(client, indicator_id: str) -> tuple[str, float]:
     if not result.data:
         raise InsufficientHistoryError(f"indicator_id={indicator_id}에 값이 아직 없습니다")
     row = result.data[0]
-    return row["date"], float(row["raw_value"])
+    return row["date"], float(row["raw_value"]), (row.get("details") or {})
 
 
 def get_indicator_id_or_none(client, slug: str) -> str | None:
@@ -132,23 +145,6 @@ def get_indicator_id_or_none(client, slug: str) -> str | None:
     if not result.data:
         return None
     return result.data[0]["id"]
-
-
-def compute_kospi_high_gap_floor(client) -> float:
-    """kospi_close_raw의 지난 1년 최고/최저 종가로 "실제 관측된 최대 낙폭"을
-    구해 kospi_high_gap의 floor로 쓴다. 히스토리가 부족하면 대체값을 쓴다.
-    """
-    raw_id = get_indicator_id_or_none(client, KOSPI_CLOSE_RAW_SLUG)
-    if raw_id is None:
-        return KOSPI_HIGH_GAP_FALLBACK_FLOOR
-
-    values = get_window_values(client, raw_id, 365)
-    if len(values) < MIN_FLOOR_HISTORY_SAMPLES:
-        return KOSPI_HIGH_GAP_FALLBACK_FLOOR
-
-    year_high = max(values)
-    year_low = min(values)
-    return round((year_low - year_high) / year_high * 100, 2)
 
 
 def percentile_from_anchors(value: float, anchors: list[tuple[float, int]]) -> float:
@@ -178,7 +174,7 @@ def ccsi_real_strength(client) -> tuple[float, float] | None:
     if ccsi_id is None:
         return None
     try:
-        _, current = get_latest_value(client, ccsi_id)
+        _, current, _ = get_latest_value(client, ccsi_id)
     except InsufficientHistoryError:
         return None
     return percentile_from_anchors(current, CCSI_PCTILE_ANCHORS), current
@@ -195,22 +191,10 @@ def kospi_market_strength(client) -> tuple[float, float] | None:
     if hg_id is None:
         return None
     try:
-        _, gap = get_latest_value(client, hg_id)  # 전고점 대비 % (음수)
+        _, gap, _ = get_latest_value(client, hg_id)  # 전고점 대비 % (음수)
     except InsufficientHistoryError:
         return None
     return percentile_from_anchors(gap, KOSPI_DD_PCTILE_ANCHORS), gap
-
-
-def get_window_values(client, indicator_id: str, window_days: int) -> list[float]:
-    cutoff = (date.today() - timedelta(days=window_days)).isoformat()
-    result = (
-        client.table("indicator_values")
-        .select("raw_value")
-        .eq("indicator_id", indicator_id)
-        .gte("date", cutoff)
-        .execute()
-    )
-    return [float(r["raw_value"]) for r in result.data]
 
 
 def get_all_values(client, indicator_id: str) -> list[float]:
@@ -221,19 +205,6 @@ def get_all_values(client, indicator_id: str) -> list[float]:
         .execute()
     )
     return [float(r["raw_value"]) for r in result.data]
-
-
-def get_latest_details(client, indicator_id: str) -> dict | None:
-    """최신 행의 details(JSONB) — kospi_volume_surge의 surge_pct/avg_30d를 읽는 데 쓴다."""
-    result = (
-        client.table("indicator_values")
-        .select("details")
-        .eq("indicator_id", indicator_id)
-        .order("date", desc=True)
-        .limit(1)
-        .execute()
-    )
-    return result.data[0].get("details") if result.data else None
 
 
 def compute_threshold(client, indicator_id: str, config: dict) -> float:
@@ -279,6 +250,40 @@ def compute_progress(slug: str, current: float, threshold: float, config: dict) 
     return current / threshold * 100
 
 
+def raw_at_progress(
+    slug: str, target: float, threshold: float, config: dict, avg_30d: float | None = None
+) -> float | None:
+    """progress가 target이 되는 원값(raw_value)을 거꾸로 구한다 — compute_progress의 역함수.
+
+    카드에 적는 "기준선"을 초고온 진입선(target=HOT_ZONE)으로 바꾸기 위해 쓴다. 각 분기는
+    compute_progress와 **같은 순서**여야 한다(특히 relative_surge는 main에서 나중에
+    덮어쓰므로 여기서도 가장 먼저 본다).
+
+    threshold가 매일 바뀌는 지표(youtube·예탁금의 누적평균, 거래대금의 30일 평균)도
+    그날의 값으로 계산되므로 기준선이 자연히 같이 움직인다.
+    """
+    rs = config.get("relative_surge")
+    if rs is not None:
+        if not avg_30d:
+            return None
+        surge = rs["floor"] + target / 100.0 * (rs["ceil"] - rs["floor"])
+        return avg_30d * (1 + surge / 100.0)
+    if slug == "kospi_high_gap":
+        floor, kink = config["floor"], config["kink"]
+        if target >= 75.0:
+            return kink + (target - 75.0) / 25.0 * (threshold - kink)
+        return floor + target / 75.0 * (kink - floor)
+    if "floor" in config:
+        return config["floor"] + target / 100.0 * (threshold - config["floor"])
+    if "surge_map" in config:
+        sm = config["surge_map"]
+        surge = sm["floor"] + target / 100.0 * (sm["ceil"] - sm["floor"])
+        return threshold * (1 + surge / 100.0)
+    if config.get("direction") == "low":
+        return threshold / (target / 100.0) if target else None
+    return threshold * (target / 100.0)
+
+
 def cap_progress(progress: float) -> float:
     return min(max(progress, 0.0), 100.0)
 
@@ -302,12 +307,14 @@ def main() -> None:
         indicator_id, name, weight = get_indicator(client, slug)
 
         try:
-            latest_date, current = get_latest_value(client, indicator_id)
+            latest_date, current, latest_details = get_latest_value(client, indicator_id)
         except InsufficientHistoryError as e:
             print(f"[WARNING] '{slug}' 값이 아직 없어 가중 평균에서 제외됨: {e}")
             latest_date = date.today().isoformat()
+            latest_details = {}
             current = None
             threshold = None
+            hot_threshold = None
             hit = False
             progress = NEUTRAL_PROGRESS
             capped_progress = NEUTRAL_PROGRESS
@@ -318,22 +325,23 @@ def main() -> None:
             progress = compute_progress(slug, current, threshold, config)
             capped_progress = cap_progress(progress)
 
+            avg_30d = None
             rs = config.get("relative_surge")
             if rs is not None:
                 # 절대 거래대금 대신 "30일 평균 대비 %"(fetch가 details.surge_pct에 저장)로.
-                details = get_latest_details(client, indicator_id)
-                surge = details.get("surge_pct") if details else None
+                surge = latest_details.get("surge_pct")
                 if surge is not None:
                     progress = (surge - rs["floor"]) / (rs["ceil"] - rs["floor"]) * 100
                     capped_progress = cap_progress(progress)
-                    avg = details.get("avg_30d")
-                    if avg:
-                        threshold = round(avg * (1 + rs["hit"] / 100), 2)  # 표시용: 평균+20%
+                    avg_30d = latest_details.get("avg_30d")
 
-            # Hit = 초고온 진입(capped_progress ≥ HIT_ZONE). 임계값(=진행률 100) 완전 도달이
-            # 아니라 초고온 구간에 들어서면 켜진다. progress가 이미 방향(direction)을 반영하므로
-            # low/high 구분 없이 동일 기준.
-            hit = capped_progress >= HIT_ZONE
+            # 카드에 적을 기준선 = 초고온 진입선. 이 값을 넘으면(direction=low면 밑돌면)
+            # 정확히 그때 초고온 배지가 켜진다 — 표시와 판정이 같은 지점을 가리킨다.
+            hot_threshold = raw_at_progress(slug, HOT_ZONE, threshold, config, avg_30d)
+            if avg_30d and hot_threshold is not None:
+                threshold = round(hot_threshold, 2)  # 거래대금은 표시용 절대값도 이 선으로
+
+            hit = capped_progress >= HOT_ZONE
 
         results.append(
             {
@@ -344,6 +352,8 @@ def main() -> None:
                 "date": latest_date,
                 "current": current,
                 "threshold": threshold,
+                "hot_threshold": hot_threshold,
+                "base_details": latest_details,
                 "hit": hit,
                 "progress": progress,
                 "capped_progress": capped_progress,
@@ -369,10 +379,11 @@ def main() -> None:
         lead = market_strength - real_strength  # +면 증시 앞섬, −면 실물 앞섬
         sb["progress"] = max(0.0, lead)  # 과열도는 증시가 앞설 때만
         sb["capped_progress"] = cap_progress(max(0.0, lead))
-        sb["hit"] = sb["capped_progress"] >= HIT_ZONE
+        sb["hit"] = sb["capped_progress"] >= HOT_ZONE
+        # 괴리 지수는 lead(백분위 차이)가 곧 과열도라 초고온 진입선도 그 척도 위에 있다.
+        sb["hot_threshold"] = HOT_ZONE
         # 카드용: 두 축 백분위 + 방향(lead) + 원값(툴팁). 병합해 남의 키 보존.
-        sb["details"] = {
-            **(get_latest_details(client, sb["indicator_id"]) or {}),
+        sb["extra_details"] = {
             "real_strength": round(real_strength, 1),
             "market_strength": round(market_strength, 1),
             "lead": round(lead, 1),  # 양수=증시 강세, 음수=실물 강세
@@ -410,18 +421,35 @@ def main() -> None:
     print()
     excluded = [r["slug"] for r in results if r["no_value"]]
     print(
-        f"[종합] Hit: {hit_count}/{len(results)}, weighted_score: {weighted_score:.2f}% "
+        f"[종합] 초고온: {hit_count}/{len(results)}, weighted_score: {weighted_score:.2f}% "
         f"(weight_sum: {weight_sum:.1f}), stage: {stage}"
         + (f", 제외됨: {', '.join(excluded)}" if excluded else "")
     )
+
+    # 0에 눌린 지표는 "더 식어도 점수를 못 내리는" 상태다. 한둘이면 정상(순매도·비관처럼
+    # 과열의 반대는 0이 맞다)이지만, 가중치 합이 커지면 종합점수가 구조적으로 위로만
+    # 움직이게 된다. 눈금이 실제 분포와 어긋났다는 신호이기도 해서 매 실행 찍어 둔다.
+    clamped = [r for r in weighted_results if r["capped_progress"] <= 0.0]
+    if clamped:
+        cw = sum(r["weight"] for r in clamped)
+        print(
+            f"[감시] 과열도 0으로 눌린 지표 {len(clamped)}개 · 가중치 {cw:.1f}/{weight_sum:.1f} "
+            f"({cw / weight_sum * 100:.0f}%): " + ", ".join(r["slug"] for r in clamped)
+        )
 
     for r in results:
         payload = {
             "normalized_score": round(r["progress"], 2),
             "threshold": round(r["threshold"], 2) if r["threshold"] is not None else None,
         }
-        if r.get("details") is not None:
-            payload["details"] = r["details"]
+        # details는 fetch 스크립트와 나눠 쓰는 칸이라 통째로 대입하면 남의 키가 날아간다
+        # (2026-07-20 괴리 카드가 그렇게 비었다). 읽어온 기존 값 위에 내 키만 얹는다.
+        merged = dict(r.get("base_details") or {})
+        merged.update(r.get("extra_details") or {})
+        if r.get("hot_threshold") is not None:
+            merged["hot_threshold"] = round(r["hot_threshold"], 4)
+        if merged:
+            payload["details"] = merged
         client.table("indicator_values").update(payload).eq(
             "indicator_id", r["indicator_id"]
         ).eq("date", r["date"]).execute()
