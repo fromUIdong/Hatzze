@@ -190,20 +190,35 @@ function Shell({
 // 어긋나 있었다. 이름을 구간 이름으로 맞춰 배지와 히어로·요약이 한 말을 쓰게 한다.
 function HitBadge({ label = "🌋 초고온", small = false }: { label?: string; small?: boolean }) {
   return (
+    // 바깥 span은 '제목 행'과 똑같은 자리를 차지하는 빈 상자다 — top은 Shell의 안쪽 여백(24),
+    // height는 제목 행의 높이(TitleRow의 아이콘 크기 22 = 그 행에서 가장 큰 요소)와 맞춘다.
+    // 그 안에서 배지를 세로 가운데 정렬하면 배지 글자 크기·여백을 바꿔도 제목과 계속 나란하다.
+    // (예전엔 배지에 top을 직접 줬는데, 그 값은 테두리 기준이고 제목은 여백 기준이라 서로
+    //  어긋났다 — 1칸 카드에서 배지가 제목보다 6px 위에 떠 있었다.)
     <span
       style={{
         position: "absolute",
-        top: small ? 18 : 24,
+        top: 24,
         right: small ? 18 : 24,
-        background: C.mania,
-        color: "#fff",
-        fontWeight: 800,
-        fontSize: small ? 9 : 11,
-        padding: small ? "4px 9px" : "6px 12px",
-        borderRadius: small ? 6 : 8,
+        height: 22,
+        display: "flex",
+        alignItems: "center",
       }}
     >
-      {label}
+      <span
+        style={{
+          background: C.mania,
+          color: "#fff",
+          fontWeight: 800,
+          fontSize: small ? 9 : 11,
+          lineHeight: 1.2,
+          padding: small ? "4px 9px" : "6px 12px",
+          borderRadius: small ? 6 : 8,
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label}
+      </span>
     </span>
   );
 }
@@ -1161,7 +1176,10 @@ function CardRiskAssets({ gold, kosdaq }: { gold: Pick; kosdaq: Pick }) {
       <div style={{ display: "flex", gap: 32, flex: 1 }}>
         <SubRatio v={gold} icon="balance" label="코스피 강도 (vs 금)" note="코스피 지수 ÷ 금 시세" />
         <div style={{ width: 1, background: C.line }} />
-        <SubRatio v={kosdaq} icon="celebration" label="코스닥 강도 (vs 코스피)" signed note={kosdaqNote} />
+        {/* 라벨을 '강도'에서 '초과 상승'으로 바꿨다. 왼쪽 칸이 배수(1.65배)라 '코스닥 강도
+            (vs 코스피)'가 나란히 놓이면 이 숫자도 배수로 읽힌다 — 실제로는 두 수익률의
+            차이(코스닥 +5.2% − 코스피 +3.9%)라 뜻이 완전히 다르다. */}
+        <SubRatio v={kosdaq} icon="celebration" label="코스닥 초과 상승 (vs 코스피)" signed note={kosdaqNote} />
       </div>
       {/* 지표가 둘인 카드의 설명 줄. Foot 과 박스 모델을 똑같이 맞춰야 같은 행에 놓인
           카드끼리 divider 가 같은 높이에 온다 — marginTop:auto 로 바닥에 붙이고,
@@ -1345,18 +1363,16 @@ function CardDivergence({ v }: { v: Pick }) {
       : undefined;
   return (
     <Shell span={2} hit={v.isHit} minH={236}>
-      <TitleRow desc={v.headline}
-        icon="compare_arrows"
-        name={v.name}
-        right={
-          <span style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: C.sub }}>{leadWho}</span>
-            <span style={{ fontFamily: MONO, fontSize: 28, fontWeight: 800, color: leadColor, letterSpacing: "-0.02em" }}>{Math.round(Math.abs(lead))}</span>
-            <span style={{ fontSize: 12, fontWeight: 800, color: "var(--c-faint)" }}>%</span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: C.sub }}>강세</span>
-          </span>
-        }
-      />
+      <TitleRow desc={v.headline} icon="compare_arrows" name={v.name} />
+      {/* 결론 수치는 제목 행의 right 자리에 있었는데, 거기는 초고온 배지가 뜨는 자리라
+          이 카드가 초고온에 들면 둘이 겹친다. 카드 본문 맨 위로 내려 배지와 자리를 나눈다 —
+          span=2 인데 내용이 짧아 남던 공간도 이 줄이 채운다. */}
+      <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "2px 0 0" }}>
+        <span style={{ fontSize: 15, fontWeight: 700, color: C.sub }}>{leadWho}</span>
+        <span style={{ fontFamily: MONO, fontSize: 32, fontWeight: 800, color: leadColor, letterSpacing: "-0.02em", lineHeight: 1 }}>{Math.round(Math.abs(lead))}</span>
+        <span style={{ fontSize: 14, fontWeight: 800, color: "var(--c-faint)" }}>%</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: C.sub }}>강세</span>
+      </div>
       {/* span=2 인데 내용이 짧아 남는 공간을 박스·Foot 이 auto 마진으로 나눠 갖는다. */}
       <div style={{ background: C.bg, borderRadius: 10, padding: 16, marginTop: "auto", display: "flex", gap: 22 }}>
         <DivergenceBar label="실물 강도" hint="소비심리(CCSI)" value={real} color={C.blue} tip={realTip} />
