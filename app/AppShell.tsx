@@ -42,7 +42,7 @@ function Sidebar() {
           <Link href="/" aria-label="hatzze 홈" className="hz-logo-link" style={{ display: "inline-flex" }}>
             <LogoLockup symbolSize={29} wordmarkSize={30} gap={7} />
           </Link>
-          <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 800, color: C.blue, background: "var(--c-blue-tint)", padding: "4px 12px", borderRadius: 999 }}>
+          <span style={{ flexShrink: 0, fontSize: 8, fontWeight: 800, color: C.blue, background: "var(--c-blue-tint)", padding: "3px 8px", borderRadius: 999 }}>
             베타
           </span>
         </h1>
