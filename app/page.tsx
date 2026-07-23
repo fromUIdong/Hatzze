@@ -940,6 +940,9 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
   // 점수(daily_score)가 쓰는 값과도 달라진다.
   const gap = v.raw ?? 0;
   const fillH = Math.max(0, Math.min(100, 100 - Math.abs(gap)));
+  const close = v.details?.close;
+  const priorHigh = v.details?.prior_high;
+  const num = (n: number) => n.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
   return (
     <Shell span={2} hit={v.isHit} minH={230}>
       <TitleRow
@@ -949,12 +952,28 @@ function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
         badge={sourceDateBadge(v) ?? "최근 거래일 기준"}
       />
       <div style={{ display: "flex", gap: 24, flex: 1 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
+        {/* alignSelf:flex-start 로 이 묶음이 세로로 내용만큼만 차지하게 한다 — 그래야
+            옆의 세로 막대가 (기본 stretch 로) 왼쪽 텍스트 칸과 **위아래 끝이 정확히
+            일치**한다. 예전엔 묶음이 카드 본문 전체 높이로 늘어나 막대만 위아래로
+            삐져나왔다. */}
+        <div style={{ display: "flex", alignSelf: "flex-start", gap: 16, flexShrink: 0 }}>
           <div style={{ display: "flex", flexDirection: "column" }}>
             <span style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{gap > 0 ? "+" : ""}{v.disp}{v.unit}</span>
             <span style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginTop: 4 }}>{gap > 0 ? "이전 전고점 돌파" : "전고점으로부터"}</span>
+            {/* 배지가 "7/22 기준"이라고만 말하면 그날 지수가 얼마였는지는 안 보인다.
+                divider 아래에 종가와 전고점을 같이 적어 "-25%"의 근거를 드러낸다.
+                색은 아래 설명 줄과 같은 C.sub — ink 로 두면 이 카드에서 두 번째로
+                진한 덩어리가 돼 정작 주인공인 괴리율보다 먼저 눈에 들어온다. */}
+            {typeof close === "number" && (
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.line}` }}>
+                <span style={{ fontFamily: MONO, fontSize: 20, fontWeight: 800, color: C.sub, letterSpacing: "-0.03em" }}>{num(close)}</span>
+                <span style={{ display: "block", fontSize: 10, fontWeight: 700, color: C.sub, marginTop: 3 }}>
+                  최근 거래일 지수{typeof priorHigh === "number" ? ` · 전고점 ${num(priorHigh)}` : ""}
+                </span>
+              </div>
+            )}
           </div>
-          <div style={{ alignSelf: "stretch", display: "flex", justifyContent: "center", padding: "6px 0" }}>
+          <div style={{ display: "flex", justifyContent: "center" }}>
             <div style={{ width: 74, position: "relative", background: C.bg, borderRadius: 10, overflow: "hidden" }}>
               <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: `${fillH}%`, background: `linear-gradient(180deg,#7cbde6,${C.cold})` }} />
               <span style={{ position: "absolute", top: 6, right: 8, fontSize: 9, fontWeight: 800, color: C.ink }}>전고점</span>
@@ -1007,7 +1026,7 @@ function CardSpeed({ v }: { v: Pick }) {
   const num = (n: number) => n.toLocaleString("ko-KR", { maximumFractionDigits: 0 });
   return (
     <Shell hit={v.isHit} minH={210}>
-      <TitleRow desc={v.headline} icon="trending_up" name={v.name} />
+      <TitleRow desc={v.headline} icon="trending_up" name={v.name} badge={sourceDateBadge(v) ?? "최근 거래일 기준"} />
       <div>
         <span style={{ fontFamily: MONO, fontSize: 30, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>
           {spd !== null && spd > 0 ? "+" : ""}{v.disp}{v.unit}
