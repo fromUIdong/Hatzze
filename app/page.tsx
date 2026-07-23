@@ -1,5 +1,5 @@
-import { getKospiHighGapLive, getLatestDailyScore, getPublicIndicators, getTopStockHighGaps } from "@/lib/data";
-import type { DailyScore, IndicatorCategory, IndicatorWithLatestValue, KospiHighGapLive, StockHighGap } from "@/lib/data";
+import { getLatestDailyScore, getPublicIndicators, getTopStockHighGaps } from "@/lib/data";
+import type { DailyScore, IndicatorCategory, IndicatorWithLatestValue, StockHighGap } from "@/lib/data";
 import { formatEokMixed, formatIndicatorValue, formatKstUpdate, sentimentTone, shortDate } from "@/lib/format";
 import { C, Icon, MONO, stageForScore } from "./ui";
 
@@ -142,7 +142,20 @@ function pick(ind: Ind | undefined): Pick {
  */
 function sourceBadge(v: Pick, fresh: string): string {
   if (v.staleDays < 2 || !v.details?.source_date) return fresh;
-  const s = String(v.details.source_date);
+  return sourceDateBadge(v) ?? fresh;
+}
+
+/**
+ * 자료 기준일을 **항상** 밝히는 배지 — "7/22 기준".
+ *
+ * sourceBadge 는 2영업일 이상 밀렸을 때만 날짜로 바꾸는데, 그러면 평소엔 날짜가 안 보여
+ * "이 숫자가 언제 것인지"를 매번 알 수 없다. KRX 종가처럼 늘 하루 늦는 게 정상인
+ * 지표는 그 사실을 숨기지 말고 계속 적는 편이 정직하다.
+ */
+function sourceDateBadge(v: Pick): string | null {
+  const sd = v.details?.source_date;
+  if (!sd) return null;
+  const s = String(sd);
   return `${shortDate(`${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`)} 기준`;
 }
 
@@ -947,12 +960,11 @@ function CardTurnover({ v }: { v: Pick }) {
  * 보인다. 지금 돈이 몰리는 종목들이 각자 고점에서 얼마나 떨어져 있는지를 나란히 두면
  * 지수 숫자가 어디서 온 건지 읽힌다(종목 선정·산출은 lib/data.ts getTopStockHighGaps).
  */
-function CardHighGap({ v, tops, live }: { v: Pick; tops: StockHighGap[]; live: KospiHighGapLive | null }) {
-  // 실시간 야후 값을 우선한다 — 오른쪽 상위 3종목이 이미 야후 실시간이라, 왼쪽만
-  // KRX 어제 종가면 한 카드 안에서 기준이 갈린다(lib/data.getKospiHighGapLive 참고).
-  // 야후가 실패하면 파이프라인 값(KRX 종가)으로 떨어지고, 그때만 자료일 배지를 단다.
-  const gap = live ? live.gapPct : (v.raw ?? 0);
-  const gapDisp = `${gap > 0 ? "+" : ""}${gap.toFixed(gap <= -10 ? 0 : 1)}%`;
+function CardHighGap({ v, tops }: { v: Pick; tops: StockHighGap[] }) {
+  // 지수·개별 종목 모두 KRX 종가 기준으로 통일하고, 그 기준일을 배지로 항상 밝힌다.
+  // 야후 실시간을 섞으면 카드 안에서 기준이 갈리고(왼쪽 종가 vs 오른쪽 실시간),
+  // 점수(daily_score)가 쓰는 값과도 달라진다.
+  const gap = v.raw ?? 0;
   const fillH = Math.max(0, Math.min(100, 100 - Math.abs(gap)));
   return (
     <Shell span={2} hit={v.isHit} minH={230}>
@@ -960,12 +972,12 @@ function CardHighGap({ v, tops, live }: { v: Pick; tops: StockHighGap[]; live: K
         desc={v.headline}
         icon="vertical_align_top"
         name={v.name}
-        badge={live ? "실시간" : sourceBadge(v, "")}
+        badge={sourceDateBadge(v) ?? "최근 거래일 기준"}
       />
       <div style={{ display: "flex", gap: 24, flex: 1 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
           <div style={{ display: "flex", flexDirection: "column" }}>
-            <span style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{gapDisp}</span>
+            <span style={{ fontFamily: MONO, fontSize: 34, fontWeight: 800, color: v.color, letterSpacing: "-0.03em" }}>{gap > 0 ? "+" : ""}{v.disp}{v.unit}</span>
             <span style={{ fontSize: 10, fontWeight: 700, color: C.sub, marginTop: 4 }}>{gap > 0 ? "이전 전고점 돌파" : "전고점으로부터"}</span>
           </div>
           <div style={{ alignSelf: "stretch", display: "flex", justifyContent: "center", padding: "6px 0" }}>
@@ -1837,11 +1849,10 @@ function GenericCard({ v, icon }: { v: Pick; icon: string }) {
 }
 
 export default async function Home() {
-  const [dailyScore, indicators, topGaps, kospiLive] = await Promise.all([
+  const [dailyScore, indicators, topGaps] = await Promise.all([
     getLatestDailyScore(),
     getPublicIndicators(),
     getTopStockHighGaps(3),
-    getKospiHighGapLive(),
   ]);
 
   const bySlug = new Map(indicators.map((i) => [i.slug, i]));
@@ -1873,7 +1884,7 @@ export default async function Home() {
                     ③ 콘텐츠가 풍부한 2칸 카드들, ④ 해석이 한 단계 필요한 지표 순.
                     버핏지수는 예전에 맨 앞이었지만 분기 GDP 기반이라 30일 변동계수가
                     0.04로 거의 안 움직여(가중치 주석의 "느림·비타이밍"과 같은 이유) 뒤로 뺐다. */}
-                <CardHighGap v={p("kospi_high_gap")} tops={topGaps} live={kospiLive} />
+                <CardHighGap v={p("kospi_high_gap")} tops={topGaps} />
                 <CardVolume v={p("kospi_volume_surge")} />
                 <CardDeposit v={p("investor_deposit")} />
                 <CardVkospi v={p("vkospi")} />

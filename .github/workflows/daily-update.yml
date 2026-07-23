@@ -210,6 +210,7 @@ jobs:
         continue-on-error: true
         run: python data-pipeline/scripts/fetch_krx_stocks.py
 
+
       - name: (텔레그램) 채널 동기화 + 구독자 스냅샷
         id: telegram_sync
         continue-on-error: true

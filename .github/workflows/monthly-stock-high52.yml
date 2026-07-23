@@ -1,0 +1,44 @@
+name: Monthly Stock 52w High
+
+# 종목별 52주 최고 종가 전체 재계산.
+#
+# 일일 워크플로에 넣을 수 없다 — KRX 일별매매정보는 한 번 호출에 KOSPI 943행 +
+# KOSDAQ 1,821행을 주고 응답이 하루당 5~15초 걸려서, 52주(약 250영업일)를 훑으면
+# **80분 안팎**이 든다(실측). 일일 파이프라인 전체가 21분인 걸 감안하면 넣을 자리가 없다.
+#
+# 대신 이렇게 나눈다:
+#   - 위로 갱신(신고가 경신)은 매일 공짜로 — fetch_krx_stocks.py 가 이미 오늘치 전 종목
+#     종가를 받으므로, 저장된 고점보다 높으면 그 자리에서 올린다. 고점은 위로만
+#     움직이므로 이 증분은 항상 옳다.
+#   - 아래로 내려가야 하는 경우(옛 고점이 52주 창을 벗어남)만 여기서 바로잡는다.
+#     한 달에 한 번이면 충분하다 — 고점 만료는 느리게 일어나는 일이다.
+#
+# 최초 1회는 workflow_dispatch 로 직접 돌려야 한다(마이그레이션 019 실행 후).
+
+on:
+  schedule:
+    - cron: "0 18 1 * *" # 매월 1일 UTC 18:00 = KST 익일 03:00 (장 종료 후, 한산한 시간)
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150 # 실측 80분 + 재시도 여유
+    env:
+      KRX_API_KEY: ${{ secrets.KRX_API_KEY }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r data-pipeline/requirements.txt
+
+      - name: 종목별 52주 최고 종가 전체 재계산
+        run: python data-pipeline/scripts/fetch_stock_high52.py --force
