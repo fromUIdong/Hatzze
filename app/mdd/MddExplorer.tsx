@@ -321,11 +321,22 @@ function Underwater({ series, mdd }: { series: DrawdownPoint[]; mdd: number }) {
   // 연도 경계(1월로 처음 넘어가는 지점)를 눈금으로. 첫 데이터 지점은 연중(예: 2016-07)에
   // 시작해 완전한 연도가 아니고, x=0 이라 라벨이 왼쪽으로 잘린다("2016"→"16"). 그래서
   // i=0 은 건너뛰고 실제 1월 경계부터만 찍는다.
-  const ticks: { x: number; year: number }[] = [];
+  const yearMarks: { x: number; year: number }[] = [];
   for (let i = 1; i < n; i++) {
     const yr = Number(series[i].date.slice(0, 4));
-    if (Number(series[i - 1].date.slice(0, 4)) !== yr) ticks.push({ x: x(i), year: yr });
+    if (Number(series[i - 1].date.slice(0, 4)) !== yr) yearMarks.push({ x: x(i), year: yr });
   }
+  // 기간이 길면(전체 = 27년 등) 해마다 찍을 때 라벨이 서로 겹쳐 붙어 버린다
+  // ("2001200220032004…"). 들어갈 수 있는 라벨 수를 세어 1·2·5·10년 중 가장 촘촘한
+  // 간격을 고르고, 그 배수 해에만 라벨을 둔다(2005·2010·2015… 처럼 떨어지는 해로).
+  const LABEL_SLOT = 68; // 라벨 하나가 차지할 최소 폭(연도 라벨 실측 ~28 + 여유)
+  const maxLabels = Math.max(2, Math.floor((W - PAD_L) / LABEL_SLOT));
+  let yearStep = 1;
+  for (const s of [1, 2, 5, 10]) {
+    yearStep = s;
+    if (yearMarks.filter((t) => t.year % s === 0).length <= maxLabels) break;
+  }
+  const ticks = yearMarks.filter((t) => t.year % yearStep === 0);
   // 그리드 라인(0/절반/바닥) 라벨.
   const rows = [0, floor / 2, floor];
 
