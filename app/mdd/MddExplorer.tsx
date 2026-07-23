@@ -348,9 +348,21 @@ function Underwater({ series, mdd }: { series: DrawdownPoint[]; mdd: number }) {
       {/* 시장 브리핑 지표 카드와 같은 크로스헤어 — 보이지 않는 세로 띠가 hover 시 기준선(hz-vline)과
           툴팁(hz-tip)을 낸다. 연도 라벨 높이(≈26px)만큼 아래로 남는 띠는 무시할 수준이다. */}
       <div style={{ position: "absolute", top: 0, left: `${(PAD_L / W) * 100}%`, right: 0, bottom: 26, display: "flex" }}>
-        {series.map((p, i) => (
-          <div key={i} className="hz-tip hz-vline" data-tip={`${p.date} · ${fmtWon(p.close)} · 고점 대비 ${fmtPct(p.dd)}`} style={{ flex: 1, position: "relative" }} />
-        ))}
+        {series.map((p, i) => {
+          // 툴팁이 넓어서(날짜·가격·낙폭, nowrap) 가운데 정렬이면 양 끝 지점에서 컨테이너를
+          // 벗어난다 — 오른쪽으로 벗어나면 페이지에 가로 스크롤까지 생긴다. 끝쪽 15%는
+          // 안쪽으로 열리게 방향을 튼다.
+          const at = n <= 1 ? 0 : i / (n - 1);
+          const edge = at < 0.15 ? " hz-tip-start" : at > 0.85 ? " hz-tip-end" : "";
+          return (
+            <div
+              key={i}
+              className={`hz-tip hz-vline${edge}`}
+              data-tip={`${p.date} · ${fmtWon(p.close)} · 고점 대비 ${fmtPct(p.dd)}`}
+              style={{ flex: 1, position: "relative" }}
+            />
+          );
+        })}
       </div>
     </div>
   );

@@ -232,6 +232,21 @@ body {
   opacity: 0.6;
 }
 
+/* 가장자리에서 툴팁이 여는 방향을 튼다. 기본은 가운데 정렬(left:50% + translateX(-50%))
+   이라, 폭이 넓은 툴팁(MDD 차트의 "날짜 · 가격 · 낙폭")이 양 끝 지점에서 컨테이너 밖으로
+   나간다. 특히 오른쪽으로 나가면 투명한 상태여도 스크롤 영역에 잡혀 페이지에 가로
+   스크롤이 생긴다. 끝쪽 지점엔 이 클래스를 붙여 안쪽으로 열리게 한다. */
+.hz-tip-start::after {
+  left: 0;
+  right: auto;
+  transform: translateX(0) translateY(-6px);
+}
+.hz-tip-end::after {
+  left: auto;
+  right: 0;
+  transform: translateX(0) translateY(-6px);
+}
+
 /* 긴 설명용 — 줄바꿈 허용 + 너비 제한 */
 .hz-tip-wide::after {
   white-space: normal;
