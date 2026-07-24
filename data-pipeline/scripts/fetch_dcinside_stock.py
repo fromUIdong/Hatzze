@@ -33,7 +33,12 @@ from bs4 import BeautifulSoup
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from common.details import merge_details, sentiment_details, store_abs_scale_details  # noqa: E402
+from common.details import (  # noqa: E402
+    merge_details,
+    pooled_sentiment_details,
+    sentiment_details,
+    store_abs_scale_details,
+)
 from common.supabase_client import get_client  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
@@ -311,8 +316,13 @@ def main() -> None:
                 "config/sentiment_keywords.py의 키워드를 보강하는 걸 권장합니다."
             )
 
-    score = round(result["score"], 2)
-    print(f"[DCInside] 감성 스코어: {score}pt")
+    # 뉴스와 같은 이유로 풀링한다 — 디시는 같은 ~2,987건을 매일 다시 분류해 순감성이
+    # 회차마다 출렁이므로, 여러 날 합산이 그 재분류 노이즈를 그대로 눌러 준다(common.details).
+    score, pooled = pooled_sentiment_details(client, indicator_id, today, result)
+    print(
+        f"[DCInside] 오늘 순감성 {round(result['score'], 2)}pt → "
+        f"{pooled['pool_days']}일 풀링 {score}pt (분석 {pooled['total_count']}건)"
+    )
 
     # 같은 날 재실행이면 이미 details가 있을 수 있어 병합해서 쓴다(공유 칸).
     client.table("indicator_values").upsert(
@@ -320,7 +330,7 @@ def main() -> None:
             "indicator_id": indicator_id,
             "date": today,
             "raw_value": score,
-            "details": merge_details(client, indicator_id, today, sentiment_details(result)),
+            "details": merge_details(client, indicator_id, today, pooled),
         },
         on_conflict="indicator_id,date",
     ).execute()

@@ -92,6 +92,92 @@ def sentiment_details(result: dict) -> dict:
     }
 
 
+# 감성 지표(뉴스·디시)를 며칠 풀링해 하루짜리 표본 노이즈를 줄이는 창 길이.
+# **하루 단위 LLM 분류는 두 겹으로 흔들린다** — (1) 같은 입력을 회차마다 다르게 분류하는
+# LLM 변동성, (2) 매일 표본 자체가 달라지는 문제(뉴스는 그날 긁힌 헤드라인 수가 1,615→828로
+# 반토막 나며 낙관 64%→18%로 뒤집힌 적이 있다). 하루짜리 값이 종합 점수(온도)를 25 경계선
+# 너머로 튕겨 라벨을 상온↔저온으로 뒤집었다.
+#
+# 점수 자체를 평균내는 대신 **원자료(긍정·부정·중립 건수)를 창 안에서 합산**해 비율을 한 번
+# 계산한다. 이게 나은 이유: 점수 평균은 (2)번(작은 표본이 뒤집히는 것)을 못 잡지만, 건수를
+# 합치면 표본이 3배로 커져 (1)·(2)를 동시에 완화하고, 건수 많은 날이 자연히 더 무겁게 반영된다.
+#
+# 창은 '영업일'이 아니라 저장된 최근 행 기준이다(뉴스·디시는 주말에도 값이 쌓인다).
+SENTIMENT_POOL_WINDOW = 3
+
+
+def _daily_atom(details: dict | None) -> tuple[int, int, int, int] | None:
+    """한 행에서 '그 날의 원자 카운트'(긍정·부정·중립·전체)를 꺼낸다.
+
+    풀링 도입(2026-07-24) 이후의 행은 카드용 pos_count 에 **풀링된** 값이 들어가므로,
+    그 날의 원자는 pos_count_1d 에 따로 남겨둔다. 그 키가 있으면 그걸 쓰고, 없으면(그 이전
+    행) pos_count 자체가 곧 그 날의 원자다 — 두 경우를 함께 다뤄 재실행·소급이 멱등해진다.
+    """
+    if not details:
+        return None
+    if "pos_count_1d" in details:
+        keys = ("pos_count_1d", "neg_count_1d", "neu_count_1d", "total_count_1d")
+    elif "pos_count" in details:
+        keys = ("pos_count", "neg_count", "neu_count", "total_count")
+    else:
+        return None
+    try:
+        pos, neg, neu, total = (int(details[k]) for k in keys)
+    except (KeyError, TypeError, ValueError):
+        return None
+    return pos, neg, neu, total
+
+
+def pooled_sentiment_details(
+    client,
+    indicator_id: str,
+    day: str,
+    today: dict,
+    window: int = SENTIMENT_POOL_WINDOW,
+) -> tuple[float, dict]:
+    """오늘 분류결과와 최근 window-1일치 원자를 풀링해 (raw_value, details) 를 돌려준다.
+
+    `today` 는 compute_sentiment() 의 반환(positive/negative/neutral/total).
+    반환 details 는 merge 로 얹을 키들만 담는다:
+      - pos_count/neg_count/neu_count/total_count : **풀링 합산** — 카드가 읽어 비율을 그린다.
+        raw_value 와 같은 표본을 가리켜 카드-점수가 어긋나지 않는다.
+      - pos_count_1d/… : 오늘치 원자 — 다음 실행의 풀링 재료(위 _daily_atom 참고).
+    """
+    prior = (
+        client.table("indicator_values")
+        .select("date,details")
+        .eq("indicator_id", indicator_id)
+        .lt("date", day)
+        .order("date", desc=True)
+        .limit(window - 1)
+        .execute()
+    )
+    atoms = [(int(today["positive"]), int(today["negative"]), int(today["neutral"]), int(today["total"]))]
+    for row in prior.data:
+        atom = _daily_atom(row.get("details"))
+        if atom is not None:
+            atoms.append(atom)
+
+    pos = sum(a[0] for a in atoms)
+    neg = sum(a[1] for a in atoms)
+    neu = sum(a[2] for a in atoms)
+    total = sum(a[3] for a in atoms)
+    score = round((pos - neg) / total * 100, 2) if total else 0.0
+
+    details = {
+        "pos_count": pos,
+        "neg_count": neg,
+        "neu_count": neu,
+        "total_count": total,
+        "pos_count_1d": int(today["positive"]),
+        "neg_count_1d": int(today["negative"]),
+        "neu_count_1d": int(today["neutral"]),
+        "total_count_1d": int(today["total"]),
+        "pool_days": len(atoms),
+    }
+    return score, details
+
+
 def merge_details(client, indicator_id: str, day: str, new_keys: dict) -> dict:
     """그 날짜의 기존 details에 new_keys만 얹은 dict를 돌려준다(저장은 호출자가).
 

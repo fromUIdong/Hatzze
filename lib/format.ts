@@ -50,22 +50,23 @@ const KST_UPDATE_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
   hourCycle: "h23",
 });
 
-/** 정기 실행 예정 시각(KST) — .github/workflows/daily-update.yml 의 cron 과 맞춘다. */
-const SCHEDULED_HOURS_KST = [9, 17];
+/**
+ * 정기 실행의 **표기용 완료 시각**(KST). cron 발화 시각이 아니라 완료를 여기에 맞춰 스냅한다.
+ * 아침 완료 ~11:00, 오후 완료 ~20:00(7시로 스냅) — .github/workflows/daily-update.yml 의
+ * '발화+큐지연' 설계 참고.
+ */
+const SCHEDULED_HOURS_KST = [11, 19];
 /** 예정 시각에서 이만큼 안에 끝났으면 "예정대로 돌았다"고 보고 정각으로 스냅한다. */
 const SCHEDULE_SLACK_HOURS = 3;
 
 /**
  * "최종 업데이트" 라벨.
  *
- * 파이프라인은 KST 09:00·17:00 예약인데 실제 완료는 늘 늦다. 두 가지가 겹친다 —
- * GitHub Actions 가 예약 실행을 미루고(실측 1~2시간), 파이프라인 자체가 20분 안팎
- * 걸린다. 그 지연을 감추려고 무조건 09:00/17:00 으로 스냅했는데, 그러면 예정과
- * 무관한 시각에 돈 실행(수동 실행·재시도)까지 정각으로 적혀 거짓말이 된다 —
- * 실제로 KST 23:28 에 끝난 실행이 "오후 5:00 기준"으로 표시됐다.
- *
- * 이제 예정 시각 ±3시간 안이면 그 정각으로 스냅하고(정기 실행의 깔끔함 유지),
- * 벗어나면 실제 시각을 그대로 적는다(거짓말 방지).
+ * 파이프라인 완료가 KST 11:00·17:00 근처가 되도록 발화 시각을 설계했다(cron 은 그보다
+ * 앞서 발화하고 GitHub 예약 큐 지연 90~150분이 실행을 그 시각으로 밀어준다 — 자세한 건
+ * 워크플로 cron 주석). 완료는 그래도 날마다 흔들리므로, 예정 시각 ±3시간 안이면 그 정각으로
+ * 스냅하고(정기 실행의 깔끔함 유지), 벗어난 실행(수동·재시도)은 실제 시각을 적어 거짓말을
+ * 막는다 — 예전엔 무조건 정각 스냅이라 KST 23:28 에 끝난 실행이 "오후 5:00 기준"으로 표시됐다.
  */
 export function formatKstUpdate(isoString: string): string {
   const parts = KST_UPDATE_FORMATTER.formatToParts(new Date(isoString));

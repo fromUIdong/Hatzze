@@ -21,7 +21,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from common.naver_client import search_news  # noqa: E402
-from common.details import merge_details, sentiment_details, store_abs_scale_details  # noqa: E402
+from common.details import (  # noqa: E402
+    merge_details,
+    pooled_sentiment_details,
+    sentiment_details,
+    store_abs_scale_details,
+)
 from common.supabase_client import get_client  # noqa: E402
 from common.timeutil import today_kst  # noqa: E402
 from common.indicator import ensure_indicator  # noqa: E402
@@ -282,8 +287,14 @@ def main() -> None:
                 "config/news_sentiment_keywords.py의 키워드를 보강하는 걸 권장합니다."
             )
 
-    score = round(result["score"], 2)
-    print(f"[Naver News] 감성 스코어: {score}pt")
+    # 하루짜리 표본은 노이즈가 커서(헤드라인 수·LLM 분류 둘 다 흔들린다) 점수로 바로 쓰면
+    # 종합 온도가 튄다 — 최근 며칠 원자료를 합산해 풀링한다(common.details 참고). raw_value·
+    # 카드 비율 모두 풀링값을 가리켜 서로 어긋나지 않는다.
+    score, pooled = pooled_sentiment_details(client, indicator_id, today, result)
+    print(
+        f"[Naver News] 오늘 순감성 {round(result['score'], 2)}pt → "
+        f"{pooled['pool_days']}일 풀링 {score}pt (분석 {pooled['total_count']}건)"
+    )
 
     # 같은 날 재실행이면 이미 details가 있을 수 있어 병합해서 쓴다(공유 칸).
     client.table("indicator_values").upsert(
@@ -291,7 +302,7 @@ def main() -> None:
             "indicator_id": indicator_id,
             "date": today,
             "raw_value": score,
-            "details": merge_details(client, indicator_id, today, sentiment_details(result)),
+            "details": merge_details(client, indicator_id, today, pooled),
         },
         on_conflict="indicator_id,date",
     ).execute()
